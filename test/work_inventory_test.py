@@ -22,15 +22,15 @@ class InventoryTest(unittest.TestCase):
         self.sha = self.run_git('-C', str(self.common), 'rev-parse', 'HEAD')
         self.root = self.base / 'works' / 'example'
         (self.root / 'repos').mkdir(parents=True)
-        (self.root / 'SESSION.md').write_text('# Fixture\n- 状态: active\n')
+        (self.root / 'SESSION.md').write_text('# Fixture\n- 状态: active\n', encoding='utf-8')
         self.run_git('-C', str(self.common), 'worktree', 'add', '-qb', 'current', str(self.root / 'repos/app'))
         self.item = {'name': 'app', 'path': 'repos/app', 'repo': str(self.common / '.git'), 'branch': 'current', 'base': 'main', 'baseSha': self.sha, 'mr': None}
 
     def run_git(self, *args):
-        return subprocess.run(['git', *args], check=True, capture_output=True, text=True).stdout.strip()
+        return subprocess.run(['git', *args], check=True, capture_output=True, text=True, encoding='utf-8').stdout.strip()
 
     def write(self, members):
-        (self.root / 'work.json').write_text(json.dumps({'version': 1, 'members': members}))
+        (self.root / 'work.json').write_text(json.dumps({'version': 1, 'members': members}), encoding='utf-8')
 
     def test_branch_and_numeric_mr_are_read_only_nonblocking(self):
         self.write([{**self.item, 'branch': 'registered-old', 'mr': 171}])

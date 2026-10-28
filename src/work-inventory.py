@@ -16,7 +16,7 @@ import time
 
 def git(root, *args):
     result = subprocess.run(['git', '-C', str(root), *args], capture_output=True,
-                            text=True, timeout=15, env={**os.environ, 'GIT_OPTIONAL_LOCKS': '0'})
+                            text=True, encoding='utf-8', timeout=15, env={**os.environ, 'GIT_OPTIONAL_LOCKS': '0'})
     if result.returncode:
         raise ValueError(result.stderr.strip() or f'git {args[0]} 失败')
     return result.stdout.strip()
@@ -49,7 +49,7 @@ def inspect(root):
     root = root.resolve()
     result['root'] = str(root)
     try:
-        content = (root / 'SESSION.md').read_text()
+        content = (root / 'SESSION.md').read_text(encoding='utf-8')
         result['idleDays'] = max(0, int((time.time() - (root / 'SESSION.md').stat().st_mtime) // 86400))
         match = re.search(r'(?m)^\s*-\s*\*{0,2}状态\*{0,2}[:：]\s*([a-z]+)', content)
         if match: result['state'] = match[1]
@@ -57,7 +57,7 @@ def inspect(root):
         add('session_read', '无法读取 SESSION.md：' + str(e))
     try:
         manifest = root / 'work.json'
-        data = json.loads(manifest.read_text()) if manifest.exists() else {'version': 1, 'members': []}
+        data = json.loads(manifest.read_text(encoding='utf-8')) if manifest.exists() else {'version': 1, 'members': []}
     except (OSError, ValueError) as e:
         add('manifest_read', '无法读取 work.json：' + str(e)); return finish()
     if not isinstance(data, dict) or data.get('version') != 1 or not isinstance(data.get('members'), list):
