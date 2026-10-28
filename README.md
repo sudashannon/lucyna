@@ -103,6 +103,8 @@ npm run screenshots
 
 ## 来源与许可
 
-Cindy 组件保留原始 **Apache-2.0** 许可、NOTICE 与来源记录，见 [第三方署名](THIRD_PARTY_NOTICES.md)。OMP 是用户单独安装的原生运行时。本项目自己的许可证尚待维护者选择；源码公开不代表自动授予第三方代码之外的使用或再分发许可。
+Lucyna 项目代码采用 **[Apache License 2.0](LICENSE)**，版权与署名见 [NOTICE](NOTICE)。
+
+Cindy 组件保留原始 **Apache-2.0** 许可、NOTICE 与来源记录；其他第三方依赖保留各自许可，见 [第三方署名](THIRD_PARTY_NOTICES.md)。OMP 是用户单独安装的原生运行时。
 
 模型配置、用户 session、私人 Work 内容与本机验收日志不属于仓库。报告问题前请阅读 [安全与本地数据说明](SECURITY.md)。
