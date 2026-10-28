@@ -14,7 +14,9 @@ test('uses the physical marker location when Windows AppData parent paths are vi
 test('keeps an ordinary root stable across launches and preserves existing files', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omp-data-root-'));
   fs.writeFileSync(path.join(root, 'existing'), 'keep');
-  assert.equal(resolveDataRoot(root), fs.realpathSync(root));
-  assert.equal(resolveDataRoot(root), fs.realpathSync(root));
+  // Windows runners may expose TEMP with an 8.3 alias; compare canonical native paths.
+  const physicalRoot = fs.realpathSync.native(root);
+  assert.equal(resolveDataRoot(root), physicalRoot);
+  assert.equal(resolveDataRoot(root), physicalRoot);
   assert.equal(fs.readFileSync(path.join(root, 'existing'), 'utf8'), 'keep');
 });
