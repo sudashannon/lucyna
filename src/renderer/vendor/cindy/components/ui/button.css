@@ -1,0 +1,50 @@
+/* SPDX-License-Identifier: Apache-2.0
+ * Cindy 2c1ae8d81f803f56c1cc4a36af77ed5d0dcce511 / components/ui/button.css
+ * Local adaptations are listed in PROVENANCE.md.
+ */
+/* Shared action feedback: only this background layer moves; the hitbox and
+   children remain stationary. Face values are theme-token aliases supplied by
+   Button / ChromeIconButton / SidebarIconButton, not a second theme registry. */
+:where(.cindy-button-frame) {
+  position: relative;
+  isolation: isolate;
+}
+
+.cindy-button-frame::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: calc(0px - var(--button-face-outset, 0px));
+  border-radius: inherit;
+  border: var(--button-face-border-width, 0px) solid var(--button-face-border, transparent);
+  background: var(--button-face-bg, transparent);
+  transition:
+    transform var(--motion-instant) var(--motion-ease-out),
+    background-color var(--motion-fast),
+    border-color var(--motion-fast);
+}
+
+.cindy-button-frame:enabled:not([aria-disabled='true']):not(
+    [data-press-feedback='none']
+  ):active::before {
+  transform: scale(0.96);
+}
+
+.cindy-button {
+  --button-face-outset: var(--space-px);
+  --button-face-border-width: var(--space-px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cindy-button-frame,
+  .cindy-button-frame::before {
+    transition: none;
+  }
+
+  .cindy-button-frame:enabled:not([aria-disabled='true']):not(
+      [data-press-feedback='none']
+    ):active::before {
+    inset: calc(0px - var(--button-face-outset, 0px));
+  }
+}

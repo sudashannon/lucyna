@@ -1,0 +1,12 @@
+{
+  "distro": "Ubuntu-22.04",
+  "user": "user",
+  "home": "/home/user",
+  "workRoot": "/home/user/develop",
+  "wslExecutable": "/home/linuxbrew/.linuxbrew/bin/omp",
+  "wslAgentDir": "/home/user/.omp/agent",
+  "skillDirectory": "/home/user/.agents/skills",
+  "defaultRuntime": "windows",
+  "installWorkIntegration": false,
+  "windowsProviderHook": false
+}

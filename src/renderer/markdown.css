@@ -1,0 +1,32 @@
+/* Streamdown supplies the renderer and interactions; Cindy supplies the surfaces. */
+.markdown-engine { --color-muted-foreground: var(--muted-readable); }
+.markdown-engine>div { min-width: 0; max-width: 100%; }
+.markdown-engine [data-streamdown="code-block"],
+.markdown-engine [data-streamdown="mermaid-block"] { border-color: var(--border-default); background: var(--code-bg); border-radius: 12px; }
+.markdown-engine [data-streamdown="code-block-body"] { background: var(--surface-elevated); border-color: var(--border-default); }
+.markdown-engine [data-streamdown="code-block-body"] pre { margin: 0; padding: 0; border-radius: 0; background: transparent; max-height: none; overflow: visible; }
+.markdown-engine [data-streamdown="code-block-body"] code { font-size: 12px; }
+.markdown-engine [data-streamdown="code-block-actions"],
+.markdown-engine [data-streamdown="mermaid-block-actions"] { background: var(--code-bg); border-color: var(--border-default); }
+.markdown-engine [data-streamdown="mermaid-block"]>div:first-child { padding-inline: 4px; }
+.markdown-engine [data-streamdown="mermaid"] { background: var(--surface-elevated); border-radius: 6px; }
+.markdown-engine [data-streamdown="mermaid"]>div { min-height: 240px; }
+.markdown-engine [data-streamdown="mermaid"] svg { max-width: none; }
+.markdown-engine [data-streamdown="table-wrapper"] { max-width: 100%; }
+.markdown-engine button { color: var(--muted-readable); }
+.markdown-engine button:hover { color: var(--text-primary); background-color: var(--surface-hover-soft); }
+.markdown-engine button svg { width: 16px; height: 16px; }
+.markdown-engine .katex-display { overflow: auto; padding-block: 8px; }
+.markdown-engine .katex { font-size: 1.12em; }
+.markdown-engine .contains-task-list { list-style: none; padding-left: 8px; }
+.markdown-engine input[type="checkbox"] { margin-inline: 0 8px; accent-color: var(--text-primary); }
+.markdown-engine details { border: 1px solid var(--border-default); border-radius: 8px; padding: 10px 14px; margin-block: 12px; }
+.markdown-engine summary { cursor: pointer; font-weight: 500; }
+.markdown-engine section[data-footnotes] { margin-top: 24px; border-top: 1px solid var(--border-default); font-size: 12px; }
+.markdown-diagram-error, .markdown-long-notice { padding: 16px; color: var(--muted-readable); }
+.markdown-diagram-error button, .markdown-long-notice button { border: 1px solid var(--border-default); border-radius: 6px; padding: 5px 10px; }
+[data-streamdown="mermaid-fullscreen"], [data-streamdown="table-fullscreen"] { z-index: 2000; background: var(--surface); color: var(--text-primary); }
+[data-streamdown="mermaid-fullscreen"] button, [data-streamdown="table-fullscreen"] button { color: var(--text-primary); }
+[data-streamdown="mermaid-fullscreen"] svg { max-width: none; }
+[data-streamdown="table-fullscreen"] table { border-collapse: collapse; }
+[data-streamdown="table-fullscreen"] td, [data-streamdown="table-fullscreen"] th { padding: 8px 12px; border: 1px solid var(--border-default); }

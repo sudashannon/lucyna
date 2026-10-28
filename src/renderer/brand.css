@@ -1,0 +1,13 @@
+/* Cindy OMP character identity; existing neutral UI tokens remain unchanged. */
+.cindy-logo, .cindy-avatar, .cindy-companions { display: block; object-fit: contain; flex-shrink: 0; user-select: none; pointer-events: none; }
+.brand-symbol:has(.cindy-logo), .brand-symbol:has(.cindy-avatar) { width: 32px; height: 32px; border: 0; border-radius: 0; }
+.welcome-mark.welcome-character { width: 144px; height: 144px; margin-bottom: var(--space-4); border: 0; border-radius: 0; background: transparent; box-shadow: none; transform: none; }
+.welcome-character .cindy-companions { width: 100%; height: 100%; }
+.run-mascot { display: inline-flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
+.brand-about { display: flex; align-items: center; gap: var(--space-5); margin-bottom: var(--space-5); }
+.brand-about .cindy-companions { width: 112px; height: 112px; }
+.brand-about strong { font-size: var(--text-20); font-weight: 550; }
+.brand-about p { color: var(--muted-readable); font-size: var(--text-12); margin-top: var(--space-2); }
+@media (max-height: 760px) {
+  .welcome-mark.welcome-character { width: 96px; height: 96px; margin-bottom: var(--space-3); }
+}

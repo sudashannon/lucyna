@@ -1,0 +1,19 @@
+{
+  "sizes": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    128,
+    256
+  ],
+  "icoBytes": 143655,
+  "nativeDecoded": {
+    "width": 256,
+    "height": 256
+  },
+  "mastersUnchanged": true
+}
