@@ -13,8 +13,8 @@ export const localDate=(value=new Date())=>`${value.getFullYear()}-${String(valu
 export function useRemote<T>(kind:string,args:Record<string,unknown>,active=true,revision=0){
   const key=JSON.stringify(args),[tick,setTick]=useState(0),[state,setState]=useState<{data?:T;key?:string;busy:boolean;error:string}>({busy:false,error:''});
   const refresh=useCallback(()=>setTick(t=>t+1),[]);
-  useEffect(()=>{if(!active)return;let current=true;setState(old=>({...old,busy:true,error:''}));const request=kind==='catalog'?api.knowledgeCatalog(tick>0||revision>0):kind==='candidates'?api.knowledgeCandidates():kind==='reviews'?api.knowledgeReviews():api.knowledgeRequest(kind,JSON.parse(key));void request.then(data=>{if(current)setState({data,key,busy:false,error:''});}).catch(error=>{if(current)setState(old=>({...old,busy:false,error:errorText(error)}));});return()=>{current=false;};},[kind,key,active,tick,revision]);
-  return {...state,data:state.key===key?state.data:undefined,refresh};
+  useEffect(()=>{if(!active)return;let current=true;setState(old=>({...old,key,busy:true,error:'',data:old.key===key?old.data:undefined}));const request=kind==='catalog'?api.knowledgeCatalog(tick>0||revision>0):kind==='candidates'?api.knowledgeCandidates():kind==='reviews'?api.knowledgeReviews():api.knowledgeRequest(kind,JSON.parse(key));void request.then(data=>{if(current)setState({data,key,busy:false,error:''});}).catch(error=>{if(current)setState(old=>({...old,key,busy:false,error:errorText(error)}));});return()=>{current=false;};},[kind,key,active,tick,revision]);
+  return {...state,busy:state.busy||(active&&state.key!==key),error:state.key===key?state.error:'',data:state.key===key?state.data:undefined,refresh};
 }
 export function useOperation(){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');const lock=useRef(false);

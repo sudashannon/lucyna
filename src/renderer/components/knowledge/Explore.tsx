@@ -13,13 +13,42 @@ export function GraphView({active,revision,onOpen}:{active:boolean;revision:numb
   const [overview,setOverview]=useState<string>(),[overviewOpen,setOverviewOpen]=useState(false),operation=useOperation();
   return <><RemoteState {...remote} busy={remote.busy&&!remote.data} onRetry={remote.refresh}>{remote.data&&<Suspense fallback={<div className="knowledge-empty" role="status">正在加载图谱引擎…</div>}><KnowledgeGraph data={remote.data} onOpen={onOpen} onOverview={community=>{setOverview(undefined);setOverviewOpen(true);void operation.run(async()=>{const result=await api.knowledgeRequest('overview',{community});setOverview(result.body);});}}/></Suspense>}</RemoteState><KnowledgeDialog open={overviewOpen} onClose={()=>{if(!operation.busy)setOverviewOpen(false);}} title="社区综述" wide>{operation.busy?<p role="status">正在整理社区内的文档…</p>:overview&&<Document content={overview} onError={()=>{}}/>}<OperationNotice operation={operation}/></KnowledgeDialog></>;
 }
-export function SearchView({active,revision,workspace,onEvidence,onQuote}:{active:boolean;revision:number;workspace:string;onEvidence:(ref:KnowledgeEvidence)=>void;onQuote:(text:string)=>void}){
-  const [query,setQuery]=useState(''),[submitted,setSubmitted]=useState(''),[selected,setSelected]=useState(''),[reading,setReading]=useState(false);
-  const remote=useRemote<{id:string;title:string;workspace:string;type:string;rankScore:number;reasons:string[];evidence?:KnowledgeEvidence}[]>('search',{query:submitted},active&&!!submitted,revision);
-  const results=(remote.data||[]).filter(r=>!workspace||r.workspace===workspace),item=results.find(r=>r.id===selected)||results[0];
-  return <div className="knowledge-search-view"><form className="knowledge-search-form" onSubmit={e=>{e.preventDefault();if(query.trim()){if(submitted===query.trim())remote.refresh();setSubmitted(query.trim());setSelected('');setReading(false);}}}><Search size={17}/><Input aria-label="证据检索关键词" placeholder="搜索正文、标题或问题…" value={query} onChange={setQuery}/><Button variant="cta" compact type="submit" disabled={!query.trim()||remote.busy}>检索证据</Button></form>
-    {!submitted?<div className="knowledge-empty"><Search size={28}/><h2>从问题找到原始证据</h2><p>检索结果保留排序原因、来源版本和原文片段。</p></div>:<RemoteState {...remote} busy={remote.busy} empty={!results.length} onRetry={remote.refresh} emptyText="没有找到匹配的证据"><Split reading={reading} onBack={()=>setReading(false)} list={<>{results.map(r=><button type="button" className={'knowledge-native-row '+(item?.id===r.id?'selected':'')} aria-current={item?.id===r.id?'true':undefined} key={r.id} onClick={()=>{setSelected(r.id);setReading(true);}}><span className="knowledge-native-meta">{r.workspace}<span>{names[r.type]||r.type}</span></span><strong>{r.title}</strong><p>{r.evidence?.excerpt||r.reasons?.join(' / ')}</p><small>{r.reasons?.join(' / ')}</small></button>)}</>}>{item&&<article className="knowledge-native-article"><h2>{item.title}</h2><p className="knowledge-native-muted">排序依据：{item.reasons?.join(' / ')||'Stele 综合排序'}</p>{item.evidence?<><Evidence reference={item.evidence} onOpen={onEvidence}/><div className="knowledge-native-actions"><Button compact variant="cta" onClick={()=>onEvidence(item.evidence!)}>核对原文</Button><Button compact variant="secondary" onClick={()=>onQuote(`参考知识：${item.title}\n来源：${item.evidence!.path||item.id}\n版本：${item.evidence!.version||'未提供'}\n原文行：${item.evidence!.lineStart||'?'} 至 ${item.evidence!.lineEnd||'?'}\n\n${item.evidence!.excerpt}`)}>引用到草稿</Button></div></>:<p>此结果尚未提供可核对的原文片段。</p>}<p className="knowledge-native-muted">相关排序不代表结论可信度。引用前请核对原文与适用范围。</p></article>}</Split></RemoteState>}
+type SearchResult={id:string;title:string;workspace:string;type:string;updatedAt?:string;rankScore:number;reasons:string[];matchedTerms?:string[];keywordScore?:number;evidence?:KnowledgeEvidence};
+export function SearchView({active,revision,workspace,onEvidence,onQuote,seed}:{active:boolean;revision:number;workspace:string;onEvidence:(ref:KnowledgeEvidence)=>void;onQuote:(text:string)=>void;seed?:{query:string;nonce:number}}){
+  const [query,setQuery]=useState(''),[submitted,setSubmitted]=useState(''),[selected,setSelected]=useState(''),[reading,setReading]=useState(false),[showSemantic,setShowSemantic]=useState(false);
+  useEffect(()=>{if(seed){setQuery(seed.query);setSubmitted(seed.query.trim());setSelected('');setReading(false);}},[seed]);
+  const remote=useRemote<SearchResult[]>('search',{query:submitted,workspace},active&&!!submitted,revision);
+  const scoped=(remote.data||[]).filter(r=>!workspace||r.workspace===workspace);
+  const direct=scoped.filter(r=>(r.keywordScore??1)>0),semanticCount=scoped.length-direct.length;
+  const results=showSemantic||!direct.length?scoped:direct,item=results.find(r=>r.id===selected)||results[0];
+  const evidence=useRemote<KnowledgeEvidence&{bodyMatch:boolean;matchedTerms:string[]}>('searchEvidence',{id:item?.id||'',workspace:item?.workspace||'',query:submitted},active&&!!item&&!remote.busy,revision);
+  const ref=evidence.data;
+  return <div className="knowledge-search-view">
+    <form className="knowledge-search-form" onSubmit={e=>{e.preventDefault();if(query.trim()){if(submitted===query.trim())remote.refresh();setSubmitted(query.trim());setSelected('');setReading(false);}}}>
+      <Search size={17}/><Input aria-label="证据检索关键词" placeholder="搜索正文、标题或问题…" value={query} onChange={setQuery}/><Button variant="cta" compact type="submit" disabled={!query.trim()||remote.busy}>检索证据</Button>
+    </form>
+    {!submitted?<div className="knowledge-empty"><Search size={28}/><h2>从问题找到原始证据</h2><p>输入关键词或问题，选中结果后定位正文片段。来源和版本可逐条核对。</p></div>:<RemoteState {...remote} empty={!scoped.length} onRetry={remote.refresh} emptyText="没有找到匹配的证据">
+      <div className="knowledge-search-caption"><span>{results.length} 条结果 · {workspace||'全部来源'}{!direct.length?' · 暂无关键词匹配，以下为语义相关结果':''}</span>{direct.length>0&&semanticCount>0&&<label><input type="checkbox" checked={showSemantic} onChange={e=>setShowSemantic(e.target.checked)}/>包含仅语义相关的 {semanticCount} 条</label>}</div>
+      <Split reading={reading} onBack={()=>setReading(false)} list={<>{results.map(r=><button type="button" className={'knowledge-native-row '+(item?.id===r.id?'selected':'')} aria-current={item?.id===r.id?'true':undefined} key={r.id} onClick={()=>{setSelected(r.id);setReading(true);}}>
+        <span className="knowledge-native-meta">{r.workspace}<span>{names[r.type]||r.type}</span></span><strong><SearchHighlight text={r.title} terms={r.matchedTerms}/></strong>
+        <p>{(r.matchedTerms?.length||0)>0?'匹配关键词：'+r.matchedTerms!.join('、'):'语义相关 · 请核对适用范围'}</p><small>{r.updatedAt?'更新于 '+date(r.updatedAt):'更新时间未知'}</small>
+      </button>)}</>}>
+        {item&&<article className="knowledge-native-article"><h2>{item.title}</h2><p className="knowledge-native-muted">{item.workspace} · {names[item.type]||item.type} · {date(item.updatedAt)}</p>
+          <RemoteState {...evidence} onRetry={evidence.refresh}>{ref&&<>
+            <p className="knowledge-native-muted">{ref.bodyMatch?'已定位包含查询关键词的正文；请结合前后文判断。':'正文未发现查询关键词，以下为正文起始片段。'}</p>
+            {ref.excerpt?<><Evidence reference={ref} onOpen={onEvidence}/><div className="knowledge-native-actions"><Button compact variant="cta" onClick={()=>onEvidence(ref)}>核对原文</Button><Button compact variant="secondary" onClick={()=>onQuote('参考知识：'+item.title+'\n来源：'+(ref.path||item.id)+'\n版本：'+ref.version+'\n原文行：'+ref.lineStart+' 至 '+ref.lineEnd+'\n\n'+ref.excerpt)}>引用到草稿</Button></div></>:<p>此文档暂无可引用的正文。</p>}
+          </>}</RemoteState>
+          <details className="knowledge-search-reasons"><summary>查看排序依据</summary><p>优先展示标题、标签或服务片段中的关键词匹配；同等匹配保留服务排序。</p><small>{item.reasons?.map(reason=>({ 'tag-match':'标签匹配','semantic-match':'语义相关','catalog-match':'文档目录匹配'} as Record<string,string>)[reason]||reason).join(' / ')}</small></details>
+          <p className="knowledge-native-muted">相关排序不代表结论可信度。引用前请核对原文与适用范围。</p>
+        </article>}
+      </Split>
+    </RemoteState>}
   </div>;
+}
+function SearchHighlight({text,terms=[]}:{text:string;terms?:string[]}){
+  if(!terms.length)return <>{text}</>;
+  const escaped=terms.map(t=>t.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&')),pattern=new RegExp('('+escaped.join('|')+')','gi');
+  return <>{text.split(pattern).map((part,i)=>i%2?<mark key={i}>{part}</mark>:part)}</>;
 }
 export function SessionsView({active,revision,workspace,catalog,onOpen,onChanged,focusId}:{active:boolean;revision:number;workspace:string;catalog:KnowledgeCatalog|null;onOpen:(id:string)=>void;onChanged:()=>void;focusId?:string}){
   const remote=useRemote<{sessions:KnowledgeSession[];enabled:boolean}>('sessions',{},active,revision),[selected,setSelected]=useState(''),[reading,setReading]=useState(false),operation=useOperation();

@@ -73,6 +73,7 @@ test/*
 !test/window-chrome-desktop.cjs
 !test/taskbar-desktop.cjs
 !test/experience-desktop.cjs
+!test/usability-desktop.cjs
 !test/experience-preload.cjs
 !test/drafts-desktop.cjs
 !test/single-instance-desktop.cjs

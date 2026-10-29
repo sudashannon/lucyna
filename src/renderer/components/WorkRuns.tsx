@@ -11,7 +11,7 @@ const reasons:Record<string,string>={service_restarted:'服务重启，已有改
 const terminal=new Set(['completed','failed','cancelled']);
 const date=(value:number)=>new Date(value*1000).toLocaleString('zh-CN');
 
-export function WorkRuns({root,active}:{root:string;active:boolean}){
+export function WorkRuns({root,active,connections=0,onConnections}:{root:string;active:boolean;connections?:number;onConnections?:()=>void}){
   const [runs,setRuns]=useState<Run[]>([]),[selected,setSelected]=useState(''),[events,setEvents]=useState<Event[]>([]);
   const [error,setError]=useState(''),[busy,setBusy]=useState(''),[loaded,setLoaded]=useState(false);
   const [objective,setObjective]=useState(''),[acceptance,setAcceptance]=useState(''),[model,setModel]=useState('');
@@ -47,6 +47,7 @@ export function WorkRuns({root,active}:{root:string;active:boolean}){
     setBusy(op);setError('');try{await api.workRun(op,{runId:selected,...data});await refresh();return true;}catch(e){setError(String(e));return false;}finally{if(alive.current)setBusy('');}
   };
   const create=async()=>{
+    if(connections||occupied||!loaded||busy){setError('请先处理连接冲突，并等待读取任务状态完成。');return;}
     setBusy('create');setError('');try{
       let verification=null;
       if(command.trim()){const argv=JSON.parse(command);if(!Array.isArray(argv))throw Error('验收命令须为 JSON 参数数组');verification={argv,cwd:cwd.trim()||'.',files:files.split('\n').map(s=>s.trim()).filter(Boolean)};}
@@ -58,14 +59,16 @@ export function WorkRuns({root,active}:{root:string;active:boolean}){
     }catch(e){setError(String(e));}finally{if(alive.current)setBusy('');}
   };
   const content=<section className="work-runs" hidden={!active} aria-label="Work 后台任务">
-    <p className="wd-caption">关闭界面后仍在 WSL 继续。任务可使用 Work 文件、技能与公共知识读取、隔离构建和 Git 查看；进化实验比较候选后再采纳。</p>
+    {!showForm&&<><p className="wd-caption">关闭界面后仍在 WSL 继续。任务可使用 Work 文件、技能与公共知识读取、隔离构建和 Git 查看；进化实验比较候选后再采纳。</p>
     <div className="wr-capabilities"><span>Work 内迭代</span><span>技能 / L3 只读</span><span>候选可回退</span></div>
-    {!expanded&&<button className="wr-expand" onClick={()=>setExpanded(true)}>放大查看任务与实验</button>}
-    <div className="wr-actions"><button disabled={!!busy||occupied} onClick={()=>{setMode('task');setShowForm(true);}}>新建后台任务</button><button disabled={!!busy||occupied} onClick={()=>{setMode('evolution');setShowForm(true);}}>新建进化实验</button><button disabled={!!busy} onClick={()=>void refresh()}>刷新状态</button></div>
+    {!expanded&&<button className="wr-expand" onClick={()=>setExpanded(true)}>放大查看任务与实验</button>}</>}
+    <div className="wr-readiness" role="status"><strong>{connections?'暂不能启动：此 Work 有 '+connections+' 个普通会话连接':occupied?'此 Work 已有未结束的后台任务':!loaded?'正在检查已有任务…':'可以配置后台任务'}</strong><p>{connections?'先在活跃会话中结束连接，历史和草稿仍保留。':'后台任务独立运行，关闭客户端后仍会继续。启动时将再次检查可用状态。'}</p>{connections>0&&onConnections&&<button type="button" onClick={()=>{setShowForm(false);setExpanded(false);onConnections();}}>查看会话连接</button>}</div>
+    <p className="wd-caption">首次启动会安装并启用 Lucyna 用户级后台服务。模型请求在途时可能略超 Token 预算。</p>
+    {!showForm&&<div className="wr-actions"><button disabled={!!busy||occupied||!loaded} onClick={()=>{setMode('task');setShowForm(true);}}>新建后台任务</button><button disabled={!!busy||occupied||!loaded} onClick={()=>{setMode('evolution');setShowForm(true);}}>新建进化实验</button><button disabled={!!busy} onClick={()=>void refresh()}>刷新状态</button></div>}
     {error&&<p role="alert" className="error-text">{error}</p>}
     {showForm&&<form onSubmit={e=>{e.preventDefault();void create();}} className="wr-form">
       <div className="wr-section-title"><strong>{mode==='evolution'?'进化实验 · AntOmniEvo':'后台任务 · OMP'}</strong></div>
-      <label>目标<textarea required maxLength={16000} value={objective} onChange={e=>setObjective(e.target.value)} placeholder="当前 Work 需要完成什么"/></label>
+      <fieldset disabled={!!busy}><label>目标<textarea required maxLength={16000} value={objective} onChange={e=>setObjective(e.target.value)} placeholder="当前 Work 需要完成什么"/></label>
       <label>验收标准<textarea required maxLength={8000} value={acceptance} onChange={e=>setAcceptance(e.target.value)} placeholder="满足哪些条件才算完成"/></label>
       <label>模型<input value={model} onChange={e=>setModel(e.target.value)} placeholder="留空使用 WSL OMP 默认模型"/></label>
       <div className="wr-budget"><label>Token 预算<input type="number" min="1000" max="200000" step="1000" required value={tokens} onChange={e=>setTokens(e.target.value)}/></label><label>时间上限（分钟）<input type="number" min="1" max="720" required value={minutes} onChange={e=>setMinutes(e.target.value)}/></label></div>
@@ -76,8 +79,8 @@ export function WorkRuns({root,active}:{root:string;active:boolean}){
         <label>冻结的验收文件（每行一个相对路径）<textarea required={mode==='evolution'} value={files} onChange={e=>setFiles(e.target.value)} placeholder="tests/check.py"/></label>
       </details>
       {mode==='evolution'&&<details open><summary>独立留出检查（必填）</summary><label>命令参数数组<textarea required value={validationCommand} onChange={e=>setValidationCommand(e.target.value)} placeholder={'["/usr/bin/python3", "tests/holdout.py"]'}/></label><label>冻结文件（模型不可读取，每行一个）<textarea required value={validationFiles} onChange={e=>setValidationFiles(e.target.value)} placeholder="tests/holdout.py"/></label><p className="wd-caption">首次实验会下载固定版本 AntOmniEvo 并安装独立 Python 环境，可能需要几分钟。候选均在副本中执行。</p></details>}
-      <p className="wd-caption">首次启动会安装并启用 Lucyna 用户级后台服务。请先结束此 Work 的普通会话连接。模型请求在途时可能略超 Token 预算。</p>
-      <div className="wr-actions"><button type="submit" disabled={!!busy}>{busy==='create'?'正在启动…':'开始执行'}</button><button type="button" disabled={!!busy} onClick={()=>setShowForm(false)}>收起</button></div>
+      </fieldset>
+      <div className="wr-actions wr-form-actions"><span>{connections?'请先结束普通会话连接':'预算 '+Number(tokens).toLocaleString()+' Token · 上限 '+minutes+' 分钟'}</span><button type="submit" disabled={!!busy||!!connections||occupied||!loaded}>{busy==='create'?'正在启动…':'开始执行'}</button><button type="button" disabled={!!busy} onClick={()=>setShowForm(false)}>取消</button></div>
     </form>}
     {loaded&&!runs.length&&!showForm&&<p className="empty-line">此 Work 尚无后台任务。</p>}
     {!!runs.length&&<label className="wr-picker">任务<select value={selected} onChange={e=>choose(e.target.value)}>{runs.map(run=><option key={run.id} value={run.id}>{states[run.state]||run.state} · {run.objective.slice(0,45)}</option>)}</select></label>}
@@ -106,5 +109,5 @@ export function WorkRuns({root,active}:{root:string;active:boolean}){
       {terminal.has(current.state)&&<p className="wd-caption">本次任务已结束；Work 的整体交付、合并与归档状态由现有工作流管理。</p>}
     </article>}
   </section>;
-  return expanded?<Modal open={active} onClose={()=>setExpanded(false)} title="Work 后台任务与进化实验" description="查看执行阶段、独立检查、候选差异与采纳记录。" className="wr-dashboard-modal">{content}</Modal>:content;
+  return expanded||showForm?<Modal open={active} onClose={()=>{if(!busy){setExpanded(false);setShowForm(false);}}} title={showForm?(mode==='evolution'?'新建进化实验':'新建后台任务'):'Work 后台任务与进化实验'} description={showForm?'设定目标、验收标准和预算。启动后可在这里跟踪进度。':'查看执行阶段、独立检查、候选差异与采纳记录。'} className="wr-dashboard-modal">{content}</Modal>:content;
 }

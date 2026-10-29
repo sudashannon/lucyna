@@ -21,6 +21,7 @@
     "test:drafts": "electron test/drafts-desktop.cjs",
     "test:single-instance": "electron test/single-instance-desktop.cjs",
     "test:experience": "electron test/experience-desktop.cjs",
+    "test:usability": "electron test/usability-desktop.cjs",
     "test:work:ui": "electron test/work-details-ui.cjs",
     "test:history:native": "electron test/history-native-desktop.cjs",
     "test:knowledge:native": "electron test/knowledge-native-desktop.cjs",

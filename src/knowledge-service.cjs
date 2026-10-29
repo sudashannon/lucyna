@@ -1,5 +1,6 @@
 const {createKnowledgeReader}=require('./knowledge.cjs');
 const {createHash}=require('node:crypto');
+const {rankSearchResults,excerptFromSnapshot}=require('./knowledge-search.cjs');
 
 // The renderer names operations; it cannot choose hosts, methods or filesystem paths.
 function createKnowledgeService(fetchImpl=fetch,{origin='http://127.0.0.1:18989'}={}) {
@@ -53,7 +54,17 @@ function createKnowledgeService(fetchImpl=fetch,{origin='http://127.0.0.1:18989'
     const scoped=()=>({workspace:workspace()});
     switch(kind){
       case 'graph':return call('/api/wiki/graph');
-      case 'search':return call('/api/wiki/search-semantic',{method:'POST',timeout:120000,body:{query:text(args.query,'查询',2000),topK:50}});
+      case 'search':{
+        const query=text(args.query,'查询',2000),scope=text(args.workspace,'知识来源',4096,true);
+        const [results,catalog]=await Promise.all([call('/api/wiki/search-semantic',{method:'POST',timeout:120000,body:{query,topK:50}}),legacy('catalog')]);
+        return rankSearchResults(results,catalog.documents,query,scope);
+      }
+      case 'searchEvidence':{
+        const query=text(args.query,'查询',2000),catalog=await legacy('catalog'),doc=catalog.documents.find(d=>d.id===args.id&&d.workspace===workspace());
+        if(!doc||doc.type==='session')throw Error('请选择当前来源中已索引的文档');
+        const snapshot=await call('/api/artifact',{params:{path:doc.path,workspace:doc.workspace},snapshot:true});
+        return {id:doc.id,title:doc.title,path:doc.path,workspace:doc.workspace,version:snapshot.version,freshness:'current',...excerptFromSnapshot(snapshot.content,query)};
+      }
       case 'evidence':return call('/api/wiki/evidence',{method:'POST',body:{id:text(args.id,'文档'),workspace:workspace(),query:text(args.query,'查询',1000,true)}});
       case 'snapshot':case 'artifactWrite':{
         const catalog=await legacy('catalog'),doc=catalog.documents.find(d=>d.id===args.id);

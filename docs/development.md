@@ -37,6 +37,7 @@ docs/                公共文档与演示截图
 | `npm run test:attachments:native -- --work=/绝对/work/路径` | 可选真实 Windows/WSL OMP 模型读取 `local://`，原会话恢复和 Windows 短路径缓存恢复；仅创建隔离验收会话 |
 | `npm run test:single-instance` | 重复启动唤起已有窗口，不另开 profile 数据库或丢失输入 |
 | `npm run test:experience` | 空会话、删除文件范围预览与取消、会话和 Work 备忘的真实移动/恢复、慢连接、长历史时间轴、并行监控、停止后的草稿归属与窄窗口回归 |
+| `npm run test:usability` | 独立 profile 与合成服务：文档加载/空白/失败/竞态、证据检索来源与版本、连接冲突预检、宽表单固定操作区、工作区筛选、设置导航与窄屏布局 |
 | `npm run test:work:ui` | 工作详情、搜索、来源跳转、阅读位置、大 diff、窄窗口/深色与读取失败保留旧数据的离线 UI 回归 |
 | `npm run test:history:native -- --work=/绝对/work/路径` | 可选真实 OMP 验收：原地续聊、显式复制、原件/副本切换与跨运行时复制 |
 | `python -m unittest discover -s test -p work_inventory_test.py` | 临时 Git 仓库中的工作区诊断测试 |

@@ -398,6 +398,16 @@ kbd { font-family: var(--font-body); font-size: var(--text-11); color: var(--mut
 
 .settings-modal { width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
 .settings-modal>.modal-header, .settings-modal>.modal-description { flex: none; }
+.settings-navigation {display:flex;flex-wrap:wrap;gap:4px;flex:none;border-bottom:1px solid var(--soft-border);padding-bottom:12px;margin-bottom:16px;}
+.settings-navigation button {padding:7px 10px;border-radius:6px;font-size:12px;color:var(--muted-readable);}
+.settings-navigation button:hover,.settings-navigation button:focus-visible {background:var(--surface-chip);color:var(--text-primary);}
+.settings-effect {font-size:12px;line-height:1.6;margin:0 0 10px;color:var(--muted-readable);}
+.settings-body h3 {scroll-margin-top:8px;}
+.work-list-filter {padding:0 10px 8px;font-size:11px;color:var(--muted-readable);}
+.work-list-filter label {display:flex;align-items:center;gap:8px;}
+.work-list-filter select {min-width:0;flex:1;border:1px solid var(--soft-border);border-radius:6px;background:var(--surface);padding:6px;color:var(--text-primary);font:inherit;}
+.history-origin {font-weight:500;color:var(--text-primary);}
+.history-item .history-copy,.history-item .history-delete {width:32px;height:32px;opacity:.8;}
 .settings-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 5px 20px 0; }
 .settings-body section+section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-default); }
 .settings-body h3 { margin: 0 0 9px; font-size: 14px; font-weight: 600; }

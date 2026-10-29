@@ -5,6 +5,12 @@
 .work-runs button:hover:not(:disabled) { background:var(--surface-hover-soft); }
 .work-runs button:disabled { opacity:.5; cursor:not-allowed; }
 .wr-form { border:1px solid var(--soft-border); border-radius:10px; padding:12px; margin:16px 0; }
+.wr-form fieldset { border:0; padding:0; margin:0; min-width:0; }
+.wr-readiness { padding:12px; border:1px solid var(--soft-border); border-radius:8px; font-size:12px; line-height:1.7; }
+.wr-readiness p { color:var(--muted-readable); margin:5px 0; }
+.wr-form-actions { position:sticky; bottom:-16px; z-index:2; background:var(--surface-elevated); border-top:1px solid var(--soft-border); margin:16px -12px -12px; padding:12px; align-items:center; }
+.wr-form-actions>span { flex:1; color:var(--muted-readable); font-size:12px; }
+.wr-form-actions>button[type=submit]:enabled { background:var(--accent-pure-cta-bg); color:var(--accent-pure-cta-fg); }
 .work-runs label { display:flex; flex-direction:column; gap:6px; font-size:12px; margin:12px 0; }
 .work-runs input,.work-runs textarea,.work-runs select { min-width:0; width:100%; border:1px solid var(--soft-border); border-radius:6px; background:var(--surface); color:var(--text-primary); padding:8px; font:inherit; }
 .work-runs textarea { min-height:76px; resize:vertical; }

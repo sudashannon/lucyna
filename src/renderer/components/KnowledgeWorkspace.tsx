@@ -20,7 +20,9 @@ export const KnowledgeWorkspace=memo(function KnowledgeWorkspace({active,workNam
   const [libraryTarget,setLibraryTarget]=useState<HTMLDivElement|null>(null);
   const [group,setGroup]=useState('documents'),[tab,setTab]=useState(''),[workspace,setWorkspace]=useState(''),[visited,setVisited]=useState(new Set(['documents'])),[revision,setRevision]=useState(0),[documentId,setDocumentId]=useState(''),[sessionId,setSessionId]=useState(''),[capture,setCapture]=useState(false),[captured,setCaptured]=useState<{workspace:string;id:string}>(),[evidence,setEvidence]=useState<KnowledgeEvidence>(),[ask,setAsk]=useState<KnowledgeDocument>(),[summaryDoc,setSummaryDoc]=useState<KnowledgeDocument>(),[edit,setEdit]=useState<KnowledgeDocument>(),operation=useOperation();
   const catalog=useRemote<KnowledgeCatalog>('catalog',{},active,revision),current=group==='documents'||group==='sources'?group:tab;
+  const [searchSeed,setSearchSeed]=useState<{query:string;nonce:number}>();
   const change=()=>setRevision(n=>n+1);
+  const searchEvidence=(query:string,scope:string)=>{setWorkspace(scope);setSearchSeed({query,nonce:Date.now()});navigate('explore','search');};
   const navigate=(g:string,t=tabs[g][0]?.value||'')=>{setGroup(g);setTab(t);setVisited(old=>new Set([...old,g==='documents'||g==='sources'?g:t]));};
   const open=(id:string)=>{const node=catalog.data?.documents.find(doc=>doc.id===id);if(node?.type==='session'){setSessionId(id);setWorkspace(node.workspace);navigate('explore','sessions');return;}setDocumentId(id);navigate('documents');};
   useEffect(()=>{if(!active)return;const timer=setInterval(()=>{if(document.visibilityState==='visible')change();},60000);return()=>clearInterval(timer);},[active]);
@@ -39,8 +41,8 @@ export const KnowledgeWorkspace=memo(function KnowledgeWorkspace({active,workNam
     {(!sidebarTarget||!sidebarExpanded)&&context}
     {catalog.error&&<div className="knowledge-alert" role="alert"><span>{catalog.error}</span><Button compact variant="secondary" onClick={catalog.refresh}>重试连接</Button></div>}
     <div className="knowledge-workspace-content">
-      <KnowledgeLibrary sidebarTarget={sidebarExpanded?libraryTarget:null} active={active&&current==='documents'} workName={workName} onQuote={onQuote} navigateTo={documentId} refreshKey={revision} onAsk={setAsk} onEdit={setEdit} onSummary={setSummaryDoc} onSession={open}/>
-      {visited.has('search')&&<div className="knowledge-view" hidden={current!=='search'}><SearchView active={active&&current==='search'} revision={revision} workspace={workspace} onEvidence={setEvidence} onQuote={onQuote}/></div>}
+      <KnowledgeLibrary sidebarTarget={sidebarExpanded?libraryTarget:null} active={active&&current==='documents'} workName={workName} onQuote={onQuote} navigateTo={documentId} refreshKey={revision} onAsk={setAsk} onEdit={setEdit} onSummary={setSummaryDoc} onSession={open} onSearchEvidence={searchEvidence}/>
+      {visited.has('search')&&<div className="knowledge-view" hidden={current!=='search'}><SearchView seed={searchSeed} active={active&&current==='search'} revision={revision} workspace={workspace} onEvidence={setEvidence} onQuote={onQuote}/></div>}
       {visited.has('graph')&&<div className="knowledge-view" hidden={current!=='graph'}><GraphView active={active&&current==='graph'} revision={revision} onOpen={open}/></div>}
       {visited.has('sessions')&&<div className="knowledge-view" hidden={current!=='sessions'}><SessionsView active={active&&current==='sessions'} revision={revision} workspace={workspace} catalog={data} onOpen={open} onChanged={change} focusId={sessionId}/></div>}
       {visited.has('calendar')&&<div className="knowledge-view" hidden={current!=='calendar'}><CalendarView active={active&&current==='calendar'} revision={revision} workspace={workspace} onOpen={open}/></div>}
