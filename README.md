@@ -12,7 +12,7 @@ Lucyna 是一个围绕 [oh-my-pi / OMP](https://github.com/can1357/oh-my-pi) 的
 
 界面借鉴 [Cindy](https://github.com/makecindy/cindy)，复用部分带许可证的 UI 组件；Work 承载当前工作上下文，Stele 承载 L3 长期知识。银发女孩与黑猫是 Lucyna 的视觉伙伴，也可以作为桌面像素宠物陪伴工作。
 
-> 当前为 **早期源码版本**，主要面向 Windows 11 + WSL2。展示名为 Lucyna，内部包名保留 `omp-cindy` 以兼容现有数据目录。截图由真实生产界面渲染，所有工作、会话和知识内容均为演示数据，不代表真实模型执行记录。
+> 当前为 **早期源码版本**，主要面向 Windows 11 + WSL2。产品名称统一为 **Lucyna**，包名为 `lucyna`；现有数据仍使用兼容目录 `omp-cindy`，无需搬迁。截图由真实生产界面渲染，所有工作、会话和知识内容均为演示数据，不代表真实模型执行记录。
 
 ## 可以做什么
 
