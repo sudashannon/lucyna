@@ -136,7 +136,7 @@ async function selectWork(work) {
   const start = el('button', 'primary-wide', state.running ? 'OMP 已启动' : '启动 OMP'); start.disabled = state.running || state.starting; start.onclick = () => startSession(null);
   const resume = el('button', 'outline-wide', '从文件导入 session…'); resume.disabled = state.running || state.starting; resume.onclick = async () => {
     const source = await window.desktop.chooseSession(); if (!source) return;
-    if (!confirm('将把此 session 导入 OMP Cindy 的 Windows 管理目录，再从副本恢复。原文件不会修改；引用到原目录之外的附件可能无法复制。继续吗？')) return;
+    if (!confirm('将把此 session 导入 Lucyna 的 Windows 管理目录，再从副本恢复。原文件不会修改；引用到原目录之外的附件可能无法复制。继续吗？')) return;
     resume.disabled = true; resume.textContent = '正在复制 session…'; $('connection').textContent = '正在导入副本';
     try {
       const imported = await window.desktop.importSession(source, work.root);

@@ -7,7 +7,7 @@ const out=path.resolve('.runtime','pet-layout-'+scale);fs.mkdirSync(out,{recursi
 app.setPath('userData',path.join(out,'profile'));
 const errors=[],checks=[];let pet;
 class HiddenWindow extends BrowserWindow{
- constructor(options){super({...options,show:false});this.webContents.on('console-message',e=>{if(e.level==='error')errors.push(e.message);});}
+ constructor(options){super({...options,show:false,webPreferences:{...options.webPreferences,offscreen:true,backgroundThrottling:false}});this.webContents.on('console-message',e=>{if(e.level==='error')errors.push(e.message);});}
  showInactive(){}
 }
 const load=Module._load,controller=path.resolve('src/pet/controller.cjs');
@@ -49,11 +49,52 @@ app.whenReady().then(async()=>{
   const after=await bubble('({scroll:document.getElementById("notices").scrollTop,same:window.testButton===document.querySelector(".notice button"),focused:document.activeElement===window.testButton})');
   assert.equal(after.scroll,before.scroll);assert.ok(after.same&&after.focused);
   checks.push('Live phase updates preserve inbox scroll, button identity and keyboard focus.');
+  pet.ingest({clientSessionId:'summary',type:'agent_start'});
+  pet.ingest({clientSessionId:'summary',type:'tool_execution_end',toolCallId:'test-tool'});
+  pet.ingest({clientSessionId:'summary',type:'message_end',message:{role:'assistant',content:[{type:'text',text:'构建和功能测试已通过，详细结果可在会话中查看。'.repeat(20)}]}});
+  pet.ingest({clientSessionId:'summary',type:'session_settled'});
+  await pet.save({privacy:false});await until(async()=>await bubble('!!document.querySelector(".result-excerpt")'),'visible result excerpt');
+  assert.ok(await bubble('document.querySelector(".completion-stats").textContent.includes("1 次工具调用")'));
+  assert.ok(await bubble('document.documentElement.scrollWidth<=innerWidth'));
+  await bubble('document.querySelector(".result-excerpt").closest(".notice").scrollIntoView({block:"end"})');pet.bubble.webContents.invalidate();await pause(600);
+  assert.ok(await bubble('(()=>{const row=document.querySelector(".result-excerpt").closest(".notice"),button=row.querySelector("button").getBoundingClientRect(),list=document.getElementById("notices").getBoundingClientRect();return button.top>=list.top&&button.bottom<=list.bottom})()'),'completion action remains fully visible');
+  fs.writeFileSync(path.join(out,'completion.png'),(await pet.bubble.webContents.capturePage()).toPNG());
+  await pet.save({privacy:true});await until(async()=>await bubble('!document.querySelector(".result-excerpt")'),'privacy hides excerpt');
+  assert.ok(!await bubble('document.body.textContent.includes("构建和功能测试")'));
+  checks.push('Completed notices show bounded visible answer and tool stats; privacy hides the excerpt.');
   await pet.save({quiet:true,reducedMotion:true});
   await until(async()=>await sprite('document.body.dataset.reduced==="true"'),'reduced motion');
   assert.equal(pet.snapshot().pendingCount,20);
   await pet.action('close-bubble');assert.equal(pet.snapshot().pendingCount,20);assert.equal(pet.bubble.isVisible(),false);
   checks.push('Quiet/reduced motion and dismiss preserve unresolved native questions.');
+  // A single real overlay uses readable metadata even while result privacy is on.
+  pet.model=new (require('../src/pet/state.cjs').PetState)();
+  const root='/private/work/lucyna',send=(id,type,data={})=>pet.ingest({clientSessionId:id,workRoot:root,type,...data});
+  send('background-task','session_connecting');send('background-task','ready');
+  send('background-task','session_state',{sessionName:'修复会话草稿读取与恢复'});
+  send('background-task','agent_start');send('background-task','tool_execution_end',{toolCallId:'one'});
+  send('background-task','message_end',{message:{role:'assistant',content:'PRIVATE RESULT'}});send('background-task','session_settled');
+  send('another-task','ready');send('another-task','session_metadata',{titleHint:'验证图片预览'});
+  await pet.action('inbox');
+  await until(async()=>await bubble('document.querySelectorAll(".notice").length===1&&document.querySelector(".notice strong").textContent==="修复会话草稿读取与恢复"'),'readable background label');
+  assert.equal(await bubble('document.querySelector(".notice-workspace").textContent'),'lucyna');
+  assert.ok(!await bubble('document.body.textContent.includes("PRIVATE RESULT")'));
+  assert.ok(!await bubble('document.body.textContent.includes("/private/work")'));
+  const labels=await bubble('Array.from(document.querySelector("#focus").options).map(o=>o.text)');
+  assert.ok(labels.includes('lucyna · 验证图片预览'));assert.ok(labels.includes('lucyna · 修复会话草稿读取与恢复'));
+  const visible=()=>bubble('(()=>{const row=document.querySelector(".notice"),button=row.querySelector("button").getBoundingClientRect(),list=document.getElementById("notices").getBoundingClientRect();return button.top>=list.top&&button.bottom<=list.bottom&&document.documentElement.scrollWidth<=innerWidth})()');
+  assert.ok(await visible(),'readable notice actions fit without scrolling');
+  pet.bubble.webContents.invalidate();await pause(400);fs.writeFileSync(path.join(out,'readable-notice.png'),(await pet.bubble.webContents.capturePage()).toPNG());
+  send('background-task','session_state',{sessionName:'检查后台会话标题与跨工作区通知正确对应，保留草稿并验证历史恢复以及长标题显示'.repeat(4)});pet.publish();
+  await until(async()=>await bubble('document.querySelector(".notice strong").textContent.startsWith("检查后台")'),'late native title update');
+  assert.ok(await visible(),'two-line title leaves actions visible');
+  assert.ok(await bubble('(()=>{const title=document.querySelector(".notice strong");return title.getBoundingClientRect().height<=parseFloat(getComputedStyle(title).lineHeight)*2+1})()'));
+  pet.theme='dark';pet.publish();await until(async()=>await bubble('document.body.dataset.theme==="dark"'),'dark notification');
+  pet.bubble.webContents.invalidate();await pause(300);fs.writeFileSync(path.join(out,'readable-notice-dark-long.png'),(await pet.bubble.webContents.capturePage()).toPNG());
+  const navigated=[];pet.getMain=()=>({isDestroyed:()=>false,isMinimized:()=>false,show(){},focus(){},webContents:{send:(type,payload)=>{if(type==='pet:navigate')navigated.push(payload.id);}}});
+  await bubble('document.querySelector(".notice .primary").click()');
+  await until(()=>navigated.length===1,'open named session');assert.deepEqual(navigated,['background-task']);
+  checks.push('Private notifications retain work/title; long names fit, dropdowns disambiguate tasks and open targets the correct background session.');
   assert.deepEqual(errors,[]);
   fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({passed:true,scale,checks,errors},null,2));console.log(JSON.stringify({passed:true,scale,checks}));
  }catch(e){fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({passed:false,scale,checks,error:e.stack,errors},null,2));console.error(e.stack);process.exitCode=1;}

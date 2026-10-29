@@ -1,0 +1,42 @@
+/* The shell keeps both sidebar trees mounted so navigation preserves local state. */
+.sidebar>.work-sidebar-content,.sidebar>.knowledge-sidebar-slot {flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;gap:var(--space-1);overflow:hidden;}
+.work-sidebar-content>:not(.workspace-section) {flex-shrink:0;}
+.knowledge-sidebar {display:flex;flex-direction:column;min-height:0;min-width:0;flex:1;gap:var(--space-2);overflow:hidden;}
+.knowledge-sidebar-actions {display:flex;align-items:center;gap:var(--space-2);flex-shrink:0;}
+.knowledge-sidebar-actions>.new-chat {flex:1;margin:0;}
+.knowledge-sidebar-nav {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-1);padding-block:var(--space-2);flex-shrink:0;}
+.knowledge-sidebar-nav>button {display:flex;align-items:center;gap:var(--space-2);min-height:34px;padding:var(--space-2) var(--space-3);border-radius:8px;text-align:left;font-size:var(--text-12);color:var(--muted-readable);white-space:nowrap;}
+.knowledge-sidebar-nav>button:last-child {grid-column:1/-1;}
+.knowledge-sidebar-nav svg {flex-shrink:0;}
+.knowledge-sidebar-nav>button:hover {background:var(--sidebar-hover);color:var(--text-primary);}
+.knowledge-sidebar-nav>button[aria-current] {background:var(--sidebar-selection);color:var(--text-primary);}
+.knowledge-sidebar :focus-visible {outline:2px solid var(--focus-ring);outline-offset:-2px;}
+.knowledge-sidebar-library {display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:hidden;}
+.knowledge-sidebar .knowledge-library {flex:1;border:0;}
+.knowledge-sidebar .knowledge-filters {padding:var(--space-2) 0;gap:var(--space-2);border-top:1px solid var(--soft-border);}
+.knowledge-sidebar select {min-width:0;max-width:100%;height:32px;border:1px solid var(--input-border);border-radius:7px;background:var(--surface-elevated);color:var(--text-primary);font:inherit;padding:0 var(--space-2);font-size:var(--text-12);}
+.knowledge-sidebar .knowledge-search input {font-size:var(--text-12);border-color:var(--input-border);}
+.knowledge-sidebar .knowledge-search>svg {display:none;}
+.knowledge-sidebar .knowledge-list {padding:0 2px 0 0;}
+.knowledge-sidebar .knowledge-row {padding:var(--space-3);gap:var(--space-1);}
+.knowledge-sidebar .knowledge-row strong {font-size:var(--text-13);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
+.knowledge-sidebar .knowledge-row-meta,.knowledge-sidebar .knowledge-row-bottom,.knowledge-sidebar .knowledge-row-description {font-size:var(--text-11);}
+.knowledge-sidebar .knowledge-row-description {display:none;}
+.knowledge-sidebar .knowledge-row-bottom>span {display:none;}
+.knowledge-sidebar .knowledge-pagination {padding:var(--space-2) 0 0;flex-shrink:0;}
+.knowledge-sidebar .knowledge-workspace-context {flex-direction:column;align-items:stretch;gap:var(--space-3);padding:var(--space-3) 0;border-top:1px solid var(--soft-border);border-bottom:0;min-height:0;}
+.knowledge-sidebar-subnav {display:flex;flex-direction:column;gap:var(--space-1);padding-left:var(--space-3);border-left:1px solid var(--soft-border);margin-left:var(--space-3);}
+.knowledge-sidebar-subnav>button {text-align:left;padding:var(--space-2) var(--space-3);min-height:32px;border-radius:7px;font-size:var(--text-12);color:var(--muted-readable);}
+.knowledge-sidebar-subnav>button:hover {background:var(--sidebar-hover);}
+.knowledge-sidebar-subnav>button[aria-current] {color:var(--text-primary);background:var(--sidebar-selection);}
+.knowledge-sidebar-note {font-size:var(--text-11);line-height:1.8;color:var(--muted-readable);padding:var(--space-3);}
+.knowledge-docked>.knowledge-body {grid-template-columns:minmax(0,1fr);}
+.knowledge-docked>.knowledge-body>.knowledge-detail {display:flex;}
+.knowledge-docked .knowledge-back {display:none;}
+.knowledge-sidebar.is-compact {align-items:center;gap:8px;width:100%;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:auto;}
+.knowledge-sidebar.is-compact .knowledge-sidebar-actions,.knowledge-sidebar.is-compact .knowledge-sidebar-nav {display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;}
+.knowledge-sidebar.is-compact .knowledge-sidebar-actions>button,.knowledge-sidebar.is-compact .knowledge-sidebar-nav>button {width:36px;height:36px;min-height:36px;flex:none;justify-content:center;padding:0;border-radius:10px;}
+.knowledge-sidebar.is-compact .knowledge-sidebar-actions span,.knowledge-sidebar.is-compact .knowledge-sidebar-nav span {display:none;}
+.rail-mode .work-sidebar-content {align-items:center;}
+.knowledge-sidebar.is-compact .knowledge-sidebar-nav {padding-top:8px;border-top:1px solid var(--soft-border);}
+@media(max-width:760px){.work-sidebar-content {align-items:center;}}

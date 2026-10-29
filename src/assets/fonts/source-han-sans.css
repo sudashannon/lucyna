@@ -1,0 +1,9 @@
+/* Unmodified Adobe Source Han Sans SC variable font, SIL Open Font License 1.1.
+ * See LICENSE.txt and PROVENANCE.md in this directory. No network font requests. */
+@font-face {
+  font-family: 'Source Han Sans SC';
+  src: url('./SourceHanSansSC-VF.otf.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}

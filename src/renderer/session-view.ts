@@ -44,17 +44,17 @@ export function userMessage(message: OmpEvent): {content: any; skill?: Message['
   return {content: [{type: 'text', text}, ...(Array.isArray(message.content) ? message.content.filter(x => x.type === 'image') : [])], skill: {name, path: typeof path === 'string' ? path : undefined}};
 }
 export function restoreMessages(items: OmpEvent[]): Message[] {
-  const result: Message[] = [];
+  const result: Message[] = [],tools=new Map<string,Message>();
   for (const [index, item] of items.entries()) {
     const m = item.message ?? item, id = item.id || `history-${index}`;
     const user = userMessage(m);
     if (user || m.role === 'assistant') {
       result.push(user ? {id, role: 'user', ...user} : {id, role: m.role, content: m.content});
       if (m.role === 'assistant' && Array.isArray(m.content)) for (const block of m.content) {
-        if (block.type === 'toolCall') result.push({id: block.id || `${id}-tool`, role: 'tool', title: block.name, args: block.arguments, intent: block.intent, content: '', status: '历史记录'});
+        if (block.type === 'toolCall') {const tool:Message={id: block.id || `${id}-tool`, role: 'tool', title: block.name, args: block.arguments, intent: block.intent, content: '', status: '历史记录'};result.push(tool);tools.set(tool.id,tool);}
       }
     } else if (m.role === 'toolResult') {
-      const previous = result.find(x => x.id === m.toolCallId && x.role === 'tool');
+      const previous = tools.get(m.toolCallId);
       if (previous) Object.assign(previous, {content: m.content, status: m.isError ? '失败' : '完成'});
       else result.push({id: m.toolCallId || id, role: 'tool', title: m.toolName, content: m.content, status: m.isError ? '失败' : '完成'});
     }

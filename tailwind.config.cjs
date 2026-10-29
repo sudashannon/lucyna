@@ -8,6 +8,6 @@ module.exports = {
       muted: {DEFAULT: 'var(--surface-hover-soft)', foreground: 'var(--muted-readable)'},
       sidebar: 'var(--code-bg)', primary: 'var(--text-primary)',
     },
-    animation: { spinner: 'spin var(--motion-spinner) linear infinite', 'fade-in': 'appear var(--motion-fast) var(--motion-ease-out)', 'float-out': 'disappear var(--motion-exit) var(--motion-ease-in)' },
+    animation: { spinner: 'spin var(--motion-spinner-cycle, 1000ms) linear infinite', 'fade-in': 'appear var(--motion-fast) var(--motion-ease-out)', 'float-out': 'disappear var(--motion-exit) var(--motion-ease-in)' },
   } }, plugins: [],
 };

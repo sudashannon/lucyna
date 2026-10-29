@@ -11,14 +11,14 @@ app.whenReady().then(async()=>{
  const timer=setTimeout(()=>app.exit(2),90000),errors=[];
  try{
   fs.mkdirSync(out,{recursive:true});
-  window=new BrowserWindow({width:1500,height:1000,show:false,useContentSize:true,webPreferences:{preload:path.join(__dirname,'screenshot-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,offscreen:true,backgroundThrottling:false}});
+  window=new BrowserWindow({icon:require('../src/app-icon.cjs').applicationIcon,width:1500,height:1000,show:false,useContentSize:true,webPreferences:{preload:path.join(__dirname,'screenshot-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,offscreen:true,backgroundThrottling:false}});
   window.webContents.on('console-message',e=>{if(e.level==='error')errors.push(e.message);});
   await window.loadFile(path.resolve(__dirname,'../dist/renderer/index.html'));
   await until('document.querySelectorAll(".work-row").length===3');
   await js('document.querySelector(".work-row").click()');
   await until('document.querySelector("#message-input")');
-  await click('展开工具面板');await js('document.querySelector("#tab-work").click()');
-  await until('document.querySelector("#tool-panel-work").textContent.includes("工作概览")');
+  await js('document.querySelector("#tab-work").click()');
+  await until('document.querySelector("#tool-panel-work .wd-provenance")');
   await js('window.gallery.ready()');await until('document.querySelector(".composer-footnote").textContent.includes("会话已连接")');await js('window.gallery.conversation()');await until('document.querySelector(".message.assistant")');
   await shot('workbench-light');await click('切换深色外观');await shot('workbench-dark');await click('切换浅色外观');
   await js('document.querySelector("#tab-preview").click()');await until('document.querySelectorAll(".file-list-row:not(:disabled)").length===2');

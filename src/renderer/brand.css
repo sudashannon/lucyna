@@ -1,4 +1,4 @@
-/* Cindy OMP character identity; existing neutral UI tokens remain unchanged. */
+/* Lucyna character identity; existing neutral UI tokens remain unchanged. */
 .cindy-logo, .cindy-avatar, .cindy-companions { display: block; object-fit: contain; flex-shrink: 0; user-select: none; pointer-events: none; }
 .brand-symbol:has(.cindy-logo), .brand-symbol:has(.cindy-avatar) { width: 32px; height: 32px; border: 0; border-radius: 0; }
 .welcome-mark.welcome-character { width: 144px; height: 144px; margin-bottom: var(--space-4); border: 0; border-radius: 0; background: transparent; box-shadow: none; transform: none; }

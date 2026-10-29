@@ -1,0 +1,6 @@
+import {Activity,BookOpen,PanelsTopLeft} from 'lucide-react';
+export type Section='workbench'|'knowledge'|'sessions';
+const sections=[{id:'workbench',label:'工作台',icon:PanelsTopLeft},{id:'knowledge',label:'知识库',icon:BookOpen},{id:'sessions',label:'活跃会话',icon:Activity}] as const;
+export function PrimaryNavigation({section,expanded,count,onChange}:{section:Section;expanded:boolean;count:number;onChange:(section:Section)=>void}){
+ return <nav className={`primary-switcher ${expanded?'':'is-compact'}`} role="tablist" aria-label="主要功能" aria-orientation={expanded?'horizontal':'vertical'}>{sections.map(({id,label,icon:Icon},index)=><button key={id} role="tab" tabIndex={section===id?0:-1} aria-label={`打开${label}`} aria-selected={section===id} title={label+(id==='sessions'&&count>0?` · ${count} 个连接`:'')} onClick={()=>onChange(id)} onKeyDown={event=>{const keys=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];if(!keys.includes(event.key))return;event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?2:(index+(event.key==='ArrowLeft'||event.key==='ArrowUp'?-1:1)+3)%3;onChange(sections[next].id);(event.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();}}>{expanded?label:<Icon size={18}/>} {id==='sessions'&&count>0&&<span className="primary-count" aria-hidden="true">{count>99?'99+':count}</span>}</button>)}</nav>;
+}

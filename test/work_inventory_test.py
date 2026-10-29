@@ -71,12 +71,15 @@ class InventoryTest(unittest.TestCase):
         self.assertEqual(result['kind'], 'invalid')
         self.assertEqual({i['code'] for i in result['issues']}, {'common_mismatch','base_sha_missing'})
 
-    def test_detached_head_is_not_silently_accepted(self):
+    def test_detached_head_is_visible_warning_without_blocking_reading(self):
         self.write([self.item])
         self.run_git('-C',str(self.root/'repos/app'),'checkout','--detach','-q')
         result = inventory.inspect(self.root)
-        self.assertEqual(result['kind'], 'invalid')
-        self.assertIn('git_branch', {i['code'] for i in result['issues']})
+        self.assertEqual(result['kind'], 'work')
+        self.assertEqual(result['health'], 'warning')
+        self.assertTrue(result['members'][0]['detached'])
+        self.assertEqual(result['members'][0]['branch'], 'detached HEAD')
+        self.assertEqual({(i['code'],i['severity']) for i in result['issues']}, {('branch_mismatch','warning')})
 
     def test_symlink_cannot_bypass_member_boundary(self):
         try:

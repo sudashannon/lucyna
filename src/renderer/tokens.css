@@ -11,8 +11,9 @@
   --color-ink: var(--text-primary); --color-ink-2: var(--text-primary-body-strong); --color-muted: var(--text-secondary);
   --color-rule: var(--border-default);
   --color-accent: var(--accent-cta-bg); --color-accent-ink: var(--accent-pure-cta-fg); --color-focus: var(--focus-ring);
-  --font-display: 'Inter Variable', 'Microsoft YaHei', system-ui, sans-serif; --font-body: var(--font-display); --font-outlier: var(--font-body);
-  --font-code: 'Cascadia Mono', Consolas, ui-monospace, monospace;
+  --font-display: 'Source Han Sans SC', 'Microsoft YaHei', system-ui, sans-serif; --font-body: var(--font-display); --font-outlier: var(--font-body);
+  --app-font-ui-default: var(--font-body); --font-sans: var(--font-body);
+  --font-code: 'Cascadia Mono', Consolas, 'Source Han Sans SC', ui-monospace, monospace;
   --radius-card: 4px; --radius-pill: 999px; --rule-hair: 1px; --shadow-card: none;
   --tracking-display: -0.02em;
 }

@@ -10,6 +10,7 @@
 /* Hallmark · answered F24 · modal uses Cindy dialog geometry; the hairline preserves its boundary in both themes, and the shadow provides separation. */
 @import './vendor/cindy/colors.css';
 @import './vendor/cindy/styles/generated/tokens.css';
+@import '../assets/fonts/source-han-sans.css';
 @import './tokens.css';
 @import './base.css';
 @tailwind base;
@@ -433,3 +434,14 @@ kbd { font-family: var(--font-body); font-size: var(--text-11); color: var(--mut
 .composer-attachments img { height: 64px; width: 80px; object-fit: cover; border: 1px solid var(--soft-border); border-radius: 8px; }
 .composer-attachments>div>button:last-child { position: absolute; right: -4px; top: -4px; border-radius: 50%; padding: 3px; background: var(--surface-elevated); border: 1px solid var(--soft-border); }
 .attachment-loading { font-size: 12px; padding: 8px 16px; }
+/* Connection feedback belongs to its session; navigation stays available. */
+.connection-progress{display:flex;align-items:center;gap:14px;margin:12px 24px;padding:16px 20px;border:1px solid var(--soft-border);border-radius:14px;background:var(--surface);min-width:0;flex-shrink:0}
+.connection-progress>div{flex:1;min-width:0}.connection-progress strong{font-size:14px}.connection-progress p{font-size:12px;color:var(--muted-readable);margin:6px 0 0;line-height:1.6}.connection-progress time{white-space:nowrap;font-size:12px;color:var(--muted-readable)}
+.history-item{display:flex;align-items:center;gap:4px;min-width:0}.history-item>.history-row{flex:1;min-width:0}.history-delete{flex-shrink:0;opacity:.55}.history-item:hover .history-delete,.history-item:focus-within .history-delete{opacity:1}.history-delete:hover{color:var(--text-danger)}
+.history-copy{flex-shrink:0;opacity:.55}.history-item:hover .history-copy,.history-item:focus-within .history-copy{opacity:1}
+.trash-link,.load-earlier{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--soft-border);background:transparent;color:var(--muted-readable);border-radius:12px;padding:9px 14px;font-size:12px;cursor:pointer}.load-earlier{margin:4px auto 24px}.load-earlier:hover,.trash-link:hover{color:var(--text-primary);background:var(--surface)}
+.history-trash-list{max-height:50vh;overflow:auto}.trash-item{display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--soft-border)}.trash-item>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.trash-item small{display:block;color:var(--text-muted);margin-top:6px;font-size:12px}.history-delete-title{overflow-wrap:anywhere}.history-delete-loading{display:flex;gap:8px;align-items:center}.history-delete-files{list-style:none;padding:0;margin:20px 0;max-height:38vh;overflow:auto;border-block:1px solid var(--soft-border)}.history-delete-files li{padding:12px 0;display:grid;gap:4px;min-width:0}.history-delete-files li+li{border-top:1px solid var(--soft-border)}.history-delete-files strong{font-size:12px;color:var(--text-muted);font-weight:500}.history-delete-files span{font-size:14px;overflow-wrap:anywhere}.history-delete-files small{font-size:11px;overflow-wrap:anywhere;color:var(--text-muted)}.history-delete-note{font-size:12px;color:var(--text-muted);line-height:1.6;overflow-wrap:anywhere}
+.open-session .session-dismiss{opacity:.55}.open-session:hover .session-dismiss,.open-session:focus-within .session-dismiss{opacity:1}
+
+.desktop-window.demo-window{display:flex;flex-direction:column}.demo-window>.app-shell{flex:1;height:auto;min-height:0}.demo-banner{flex:none;padding:5px 12px;background:var(--surface-chip);border-bottom:1px solid var(--soft-border);color:var(--muted-readable);font-size:11px;text-align:center;line-height:18px}

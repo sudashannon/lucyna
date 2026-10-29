@@ -10,7 +10,7 @@ test('settings survive relaunch with rollback copy and reject malformed edits wi
 });
 test('runtime paths are literal arguments and Windows journal paths roundtrip through WSL',()=>{
  const s={...defaults(),runtime:'wsl',wslExecutable:'/home/user/my omp/bin/omp',wslAgentDir:'/home/user/profile name'};validateSettings(s);
- const args=wslArgs(s,['--mode','rpc-ui']);assert.ok(args.includes(s.wslExecutable));assert.ok(args.includes('PI_CODING_AGENT_DIR='+s.wslAgentDir));assert.equal(args.includes('bash'),false);assert.ok(args.includes('OMP_PROFILE='));
+ const args=wslArgs(s,['--mode','rpc-ui']);assert.ok(args.includes(s.wslExecutable));assert.equal(args[args.indexOf('--agent-dir')+1],s.wslAgentDir);assert.equal(args.includes('bash'),false);assert.ok(args.some(arg=>arg.endsWith('/tools/launch_wsl.py')));assert.equal(args[args.indexOf('--cd')+1],'/home/user');
  const file='C:\\Users\\test user\\客户端\\history.jsonl';assert.equal(windowsSessionPath(toWslPath(file)),file);assert.throws(()=>validateSettings({...s,wslExecutable:'/home/x/../omp'}));assert.throws(()=>validateSettings({...s,model:'not a model'}));assert.throws(()=>validateSettings({...s,thinking:'superfast'}));
 });
 test('separate runtime stores and root buckets cannot accidentally share a writer',()=>{

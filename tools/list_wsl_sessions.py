@@ -46,7 +46,8 @@ def main():
             except (OSError, ValueError, TypeError, AttributeError):
                 continue
     out.sort(key=lambda x: x['modified'], reverse=True)
-    print(json.dumps({'sessions': out[:200], 'total': len(out)}, ensure_ascii=False))
+    # Complete identities disambiguate short Work log names; display stays bounded.
+    print(json.dumps({'sessions': out[:200], 'identities': [{'path': x['path'], 'id': x['id']} for x in out], 'total': len(out)}, ensure_ascii=False))
 
 if __name__ == '__main__':
     main()

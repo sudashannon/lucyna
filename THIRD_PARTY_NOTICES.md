@@ -16,11 +16,14 @@ Electron, React, Radix UI, Tailwind CSS, Lucide, Streamdown, KaTeX, Mermaid, xte
 
 Knowledge graph rendering uses [Cytoscape.js](https://github.com/cytoscape/cytoscape.js), copyright The Cytoscape Consortium, under the MIT license. Its license is retained in the installed package and must accompany distributions. Lucyna supplies its own interface, styling, data adapter and graph interactions.
 
-
 ## AntOmniEvo (optional runtime)
 
 [AntOmniEvo](https://github.com/ant-research/AntOmniEvo) is licensed under Apache License 2.0. The Work experiment installer checks out commit `050665afb1d4b8f12e02ae667cf9ebb7548bfc29` into a separate user runtime and retains its upstream source and license. Framework code is not vendored in Lucyna. Lucyna provides the OMP proposer, Work evaluation adapter, controlled promotion, and visualization.
 
-## Artwork
+## Source Han Sans
+
+The UI bundles the unmodified [Source Han Sans SC variable font](https://github.com/adobe-fonts/source-han-sans), copyright 2014–2025 Adobe, under the SIL Open Font License 1.1. Original copyright, license and download identity are retained in `src/assets/fonts/LICENSE.txt` and `src/assets/fonts/PROVENANCE.md`. The font's own license applies to the font; it is not relicensed under the application's Apache license.
+
+## Application artwork
 
 The silver-haired companion, black cat, application icons and sprite artwork were generated for this project and refined into application assets. Source art and preparation metadata are in `design/`. They are not official artwork from Cindy or Cyberpunk: Edgerunners and do not imply affiliation or endorsement. Screenshots in `docs/screenshots/` are actual Lucyna renderer captures with synthetic demonstration data.

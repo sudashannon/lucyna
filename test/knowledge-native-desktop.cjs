@@ -24,10 +24,14 @@ app.whenReady().then(async()=>{
   await win.loadFile(path.resolve(__dirname,'../dist/renderer/index.html'));
   await aria('打开知识库');await until('document.querySelectorAll(".knowledge-row").length>=2');
   if(liveRead){
-    await js('document.querySelector(".knowledge-row").click()');await until('document.querySelector(".knowledge-reader .markdown-engine")');
+    assert.ok(await js('document.querySelectorAll(".sidebar .knowledge-row").length>=2'),'real catalog is in knowledge sidebar');
+    await js('document.querySelector(".sidebar .knowledge-row").click()');await until('document.querySelector(".knowledge-reader .markdown-engine")');
     assert.ok(await js('document.querySelector(".knowledge-reader .markdown-engine").textContent.length>0'),'real document body');
-    await shot('live-library');
-    console.log('live library document: passed');
+    await shot('live-library-sidebar');
+    const selected=await js('document.querySelector(".knowledge-row.selected").title');
+    await aria('打开活跃会话');assert.equal(await js('document.querySelector(".knowledge-sidebar-slot").getClientRects().length'),0);
+    await aria('打开知识库');assert.equal(await js('document.querySelector(".knowledge-row.selected").title'),selected);
+    console.log('live library sidebar and retained document: passed');
     await click('探索');await click('知识图谱');await until('document.querySelector(".knowledge-network-canvas canvas")');await pause(700);await shot('live-graph');
     win.setContentSize(375,844);await pause(300);await shot('live-graph-375');
     console.log(await js('JSON.stringify([...document.querySelectorAll(".knowledge-network,.knowledge-network-main,.knowledge-network-canvas,.knowledge-network-detail,.knowledge-network-controls")].map(e=>({class:e.className,rect:{x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y,width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height},computed:getComputedStyle(e).gridTemplateRows})))'));

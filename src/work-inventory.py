@@ -51,7 +51,7 @@ def inspect(root):
     try:
         content = (root / 'SESSION.md').read_text(encoding='utf-8')
         result['idleDays'] = max(0, int((time.time() - (root / 'SESSION.md').stat().st_mtime) // 86400))
-        match = re.search(r'(?m)^\s*-\s*\*{0,2}状态\*{0,2}[:：]\s*([a-z]+)', content)
+        match = re.search(r'(?m)^\s*-\s*\*{0,2}状态\*{0,2}[:：]\s*`?([a-z]+)', content)
         if match: result['state'] = match[1]
     except (OSError, UnicodeError) as e:
         add('session_read', '无法读取 SESSION.md：' + str(e))
@@ -113,11 +113,12 @@ def inspect(root):
             actual = (member / actual).resolve() if not actual.is_absolute() else actual.resolve()
             if actual != Path(repo).expanduser().resolve(): add('common_mismatch', 'Git 仓库归属与登记不一致', name, actual=str(actual), expected=repo)
         def current(value):
-            row['branch'] = value
+            row['branch'] = value or 'detached HEAD'
+            row['detached'] = not value
             if value != branch: add('branch_mismatch', '当前分支与 work 登记不一致', name, 'warning', value, branch)
         check('git_top', ('rev-parse', '--show-toplevel'), top)
         check('git_common', ('rev-parse', '--git-common-dir'), common)
-        check('git_branch', ('symbolic-ref', '--quiet', '--short', 'HEAD'), current)
+        check('git_branch', ('branch', '--show-current'), current)
         check('git_head', ('rev-parse', 'HEAD'), lambda value: row.update(head=value))
         if sha_valid: check('base_sha_missing', ('cat-file', '-e', sha + '^{commit}'), lambda _: None)
         check('git_status', ('status', '--porcelain', '--untracked-files=no'), lambda value: row.update(dirty=len(value.splitlines())))

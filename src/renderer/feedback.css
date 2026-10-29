@@ -1,0 +1,23 @@
+/* Shared motion grammar. Only opacity/transform animate; never transcript height. */
+:root{--motion-fast:100ms;--motion-base:180ms;--motion-enter:200ms;--motion-exit:140ms;--feedback-settle:220ms;--feedback-ease:cubic-bezier(.2,.7,.2,1)}
+.feedback-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0 18px}
+.feedback-presets button{display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center;text-align:left;min-width:0;border:1px solid var(--soft-border);border-radius:12px;padding:12px;background:var(--surface);transition:background-color var(--motion-fast),border-color var(--motion-fast)}
+.feedback-presets button[aria-pressed=true]{background:var(--sidebar-selection);border-color:var(--input-border)}
+.feedback-presets button strong{font-size:13px;font-weight:500}.feedback-presets button small{grid-column:1/-1;color:var(--muted-readable);font-size:11px;line-height:1.5}
+.feedback-controls{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}.feedback-controls .settings-field{margin-top:0;position:relative}
+.feedback-volume{position:absolute;right:0;font-size:12px;color:var(--muted-readable);font-variant-numeric:tabular-nums}
+.feedback-controls input[type=range]{width:100%;height:35px;margin:0;accent-color:var(--focus-ring);cursor:pointer}
+.feedback-preview,.feedback-events{display:flex;align-items:center;flex-wrap:wrap;gap:8px 20px;margin-block:8px}.feedback-preview{gap:8px}
+.icon-button:active:not(:disabled),.send-button:active:not(:disabled){transform:scale(.94)}
+.activity-row .expanded,.activity-group-heading .expanded{transition:transform var(--motion-base) var(--feedback-ease)}
+.activity-body,.activity-rows,.connection-progress{animation:feedback-fade var(--motion-base) var(--feedback-ease)}
+.message[data-enter=true]{animation:feedback-message 150ms var(--feedback-ease)}
+.run-activity.finished[data-outcome=completed] .run-label>svg{animation:feedback-check var(--feedback-settle) var(--feedback-ease)}
+.app-shell:not(.rail-mode) .brand>span:last-child,.app-shell:not(.rail-mode) .nav-action>span{animation:feedback-fade var(--motion-base) var(--feedback-ease)}
+.resizing-sidebar *{transition:none!important;animation:none!important}
+@keyframes feedback-fade{from{opacity:.35}to{opacity:1}}
+@keyframes feedback-message{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes feedback-check{0%{opacity:.4;transform:scale(.85)}60%{transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
+:root[data-reduced-motion=true] *,:root[data-reduced-motion=true] *::before,:root[data-reduced-motion=true] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media(max-width:600px){.feedback-controls{grid-template-columns:1fr;gap:0}.feedback-presets button{padding:10px 8px}}

@@ -21,7 +21,8 @@ function validateSettings(value) {
 }
 function execute(file,args) {return new Promise((resolve,reject)=>execFile(file,args,{encoding:'utf8',windowsHide:true,timeout:20000,maxBuffer:64*1024},(error,stdout)=>error?reject(new Error('环境检测失败：请检查 OMP 路径和 WSL 是否可用')):resolve(stdout.trim())));}
 function wslArgs(settings, args, agentDir = settings.wslAgentDir) {
-  return [...runtime.wslPrefix,'--','env',`PI_CODING_AGENT_DIR=${agentDir}`,'OMP_PROFILE=',settings.wslExecutable,...args];
+  const cwdIndex=args.indexOf('--cwd'),cwd=cwdIndex>=0?args[cwdIndex+1]:runtime.home;
+  return [...runtime.wslPrefix,'--cd',cwd,'--','/usr/bin/python3',toWslPath(path.resolve(__dirname,'../tools/launch_wsl.py')),'--agent-dir',agentDir,settings.wslExecutable,...args];
 }
 async function checkSettings(input) {
   const settings=validateSettings(input), started=Date.now();

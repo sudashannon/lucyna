@@ -1,0 +1,52 @@
+/* Hallmark · component: conversation timeline · genre: modern-minimal · theme: Cindy · v2.0.0 */
+/* Hallmark · pre-emit critique: a persistent reading margin, no dismissible card, no content overlap. */
+.chat-stage.has-messages { container-type: inline-size; container-name: conversation; }
+.transcript-region .transcript { padding-right: var(--space-lg); }
+.conversation-timeline.is-docked { position: relative; inset: auto; width: 36px; flex: 0 0 36px; min-height: 0; z-index: 1; margin-block: var(--space-sm); }
+.timeline-outline { display: none; min-width: 0; min-height: 0; height: 100%; flex-direction: column; }
+.timeline-outline header { display: flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm) var(--space-md); flex: none; }
+.timeline-outline header strong { flex: 1; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.timeline-outline header > span { color: var(--muted-readable); font-size: 11px; white-space: nowrap; }
+.timeline-outline .timeline-search { gap: var(--space-xs); padding: 0 var(--space-xs) var(--space-sm); }
+.timeline-outline .timeline-search svg { flex: none; }
+.timeline-outline .timeline-search input { height: 30px; min-width: 0; padding-inline: var(--space-xs); border-radius: var(--radius-card); border-color: var(--soft-border); background: transparent; font-size: 12px; }
+.timeline-outline ol { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0 var(--space-2xs); overflow: auto; overscroll-behavior: contain; scrollbar-width: auto; }
+.timeline-outline ol::-webkit-scrollbar { width: 4px; }
+.timeline-outline ol::-webkit-scrollbar-track { background: transparent; }
+.timeline-outline ol::-webkit-scrollbar-thumb { background: var(--soft-border); border-radius: var(--radius-pill); }
+.timeline-outline ol:hover::-webkit-scrollbar-thumb { background: var(--muted-readable); }
+.timeline-outline ol::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+.timeline-outline li + li { margin-top: var(--space-2xs); }
+.timeline-outline .timeline-entry { position: relative; gap: var(--space-2xs); padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-card); color: var(--text-primary); }
+.timeline-outline .timeline-entry small { font-size: 11px; }
+.timeline-outline .timeline-entry > span { font-size: 12px; line-height: 1.65; }
+.timeline-outline .timeline-entry[aria-current=location] { background: var(--surface-chip); }
+.timeline-outline .timeline-entry[aria-current=location]:before { content: ''; position: absolute; left: 0; top: var(--space-xs); bottom: var(--space-xs); width: 2px; border-radius: var(--radius-pill); background: var(--focus-ring); }
+.timeline-outline .timeline-entry:active { background: var(--sidebar-selection); }
+.timeline-outline .timeline-entry:focus-visible, .timeline-outline footer button:focus-visible, .timeline-outline input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.timeline-outline footer { display: flex; align-items: center; justify-content: space-between; padding: var(--space-xs); flex: none; color: var(--muted-readable); font-size: 11px; }
+.timeline-outline footer button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-card); }
+.timeline-outline footer button:hover:not(:disabled) { background: var(--surface-chip); }
+.timeline-outline footer button:active:not(:disabled) { background: var(--sidebar-selection); }
+.timeline-outline footer button:disabled { opacity: .5; background: transparent; color: var(--text-placeholder); cursor: not-allowed; }
+.timeline-outline .empty-line { padding: var(--space-sm); color: var(--muted-readable); font-size: 12px; }
+.timeline-rail-heading { position: absolute; top: var(--space-xs); right: var(--space-xs); width: 20px; height: 20px; display: grid; place-items: center; color: var(--muted-readable); }
+.is-docked .timeline-rail { left: auto; right: var(--space-xs); top: 48px; bottom: var(--space-md); width: 20px; }
+.is-docked .timeline-rail:before { left: 50%; }
+.is-docked .timeline-marker { --timeline-mark: var(--muted-readable); left: 0; width: 20px; height: 20px; border: 0; border-radius: var(--radius-card); background: transparent; opacity: 1; }
+.is-docked .timeline-marker:after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 4px; height: 4px; border-radius: var(--radius-pill); background: var(--timeline-mark); }
+.is-docked .timeline-marker.failure { --timeline-mark: var(--text-danger); }
+.is-docked .timeline-marker.question { --timeline-mark: var(--focus-ring); }
+.is-docked .timeline-marker.completed { --timeline-mark: var(--color-success); }
+.is-docked .timeline-marker.failure:after, .is-docked .timeline-marker.question:after { width: 6px; height: 6px; }
+.is-docked .timeline-marker.selected { z-index: 2; }
+.is-docked .timeline-marker.selected:after { width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--focus-ring); }
+.is-docked .timeline-marker:hover, .is-docked .timeline-marker:active { background: var(--surface-chip); }
+.is-docked .timeline-marker:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; z-index: 3; }
+.timeline-marker-tip { display: block; max-width: 230px; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.timeline-marker-tip small { display: block; font-size: 11px; margin-bottom: var(--space-2xs); }
+@container conversation (min-width: 960px) {
+ .conversation-timeline.is-docked { width: 240px; flex-basis: 240px; border-left: 1px solid var(--soft-border); }
+ .timeline-outline { display: flex; margin-right: 32px; }
+ .chat-stage.has-messages > .composer-area { width: min(720px,calc(100% - 304px)); margin-left: max(32px,calc((100% - 960px) / 2)); margin-right: auto; }
+}

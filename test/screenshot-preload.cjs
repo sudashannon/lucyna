@@ -1,14 +1,17 @@
 // Public gallery only: synthetic data, no production IPC, filesystem or model calls.
-const {contextBridge}=require('electron');
+const {contextBridge,ipcRenderer}=require('electron');
 let listener;
 const root='/home/demo/work/lucyna',date='2026-10-28T08:00:00Z';
 const works=['lucyna','docs-site','design-system'].map(name=>({name,root:'/home/demo/work/'+name,kind:'gitless',health:'ok',state:'active'}));
-const session='# Lucyna · 工作摘要\n\n- 状态: active\n- 目标: 让原生 OMP 在桌面上更好用。\n\n## 下一步\n\n- [x] 原生会话与工作区切换\n- [x] 文件阅读与知识引用\n- [ ] 整理下一轮交互反馈\n\n> 此内容为公开截图使用的演示数据。';
+const session='# Lucyna · 工作摘要\n\n## 定位\n\n- 状态: active\n- 目标: 让原生 OMP 在桌面上更好用。\n- 当前: 已接通原生会话、工作详情与知识库阅读。\n- 最近更新: 2026-10-29\n\n## 下一步\n\n- [x] 原生会话与工作区切换\n- [x] 文件阅读与知识引用\n- [ ] 整理下一轮交互反馈\n\n> 此内容为公开截图使用的演示数据。';
 const markdown='# 一次工作，留下可复用的知识\n\nLucyna 把 **原生会话**、工作文件与长期知识放在同一个工作台。\n\n## 上下文分层\n\n| 层次 | 保存什么 |\n| --- | --- |\n| Work | 当前目标、进展与共享笔记 |\n| Stele | 跨任务复用的知识与证据 |\n\n## 工作流\n\n```mermaid\nflowchart LR\n  A[任务] --> B[OMP]\n  B --> C[Work]\n  C --> D[Stele]\n```\n\n- [x] 保留原生技能与工具\n- [x] 让阅读位置随工作保留\n- [ ] 持续改进交互体验\n';
 const docs=['工作上下文与长期知识','原生会话的生命周期','Markdown 与图表阅读','桌面伙伴的状态设计'].map((title,i)=>({id:'demo-'+i,title,path:'knowledge/'+['context.md','sessions.md','reading.md','companion.md'][i],workspace:'lucyna',type:'knowledge',updatedAt:date,frontmatter:{tags:i?['设计','工作台']:['架构','记忆']}}));
 const settings={version:1,runtime:'wsl',windowsExecutable:'omp',wslExecutable:'/usr/local/bin/omp',wslAgentDir:'/home/demo/.omp/agent',model:'',thinking:'medium'};
-contextBridge.exposeInMainWorld('desktop',{
+contextBridge.exposeInMainWorld('desktop',{mode:'demo',
+  windowChrome:{enabled:process.argv.includes('--lucyna-titlebar'),menu:(id,position)=>ipcRenderer.invoke('window:menu',id,position),theme:theme=>ipcRenderer.invoke('window:theme',theme),onAction:fn=>{const listener=(_,action)=>fn(action);ipcRenderer.on('window:action',listener);return()=>ipcRenderer.removeListener('window:action',listener);}},
   listWorks:async()=>works,readWork:async()=>session,
+  workDetails:async()=>({root,name:'lucyna',kind:'gitless',content:session,modifiedAt:date,fetchedAt:date,members:[],assets:[{name:'architecture.md',path:'architecture.md',kind:'note',indexed:true,modifiedAt:date}],issues:[],warnings:[]}),
+  workRun:async()=>[],
   getSettings:async()=>({settings,storage:'Demo profile',workspace:{distro:'Ubuntu-22.04',user:'demo',root:'/home/demo/work'}}),
   listHistory:async()=>({sessions:['完善桌面工作流','整理知识库阅读体验','检查文件预览'].map((title,i)=>({title,id:'gallery-'+i,cwd:root,sessionFile:root+'/demo-'+i+'.jsonl',modified:date,runtime:'wsl'})),managed:[]}),
   onEvent:fn=>{listener=fn;return()=>{listener=null;};},onTerminal:()=>()=>{},

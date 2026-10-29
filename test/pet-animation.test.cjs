@@ -4,8 +4,14 @@ const {validate,defaults}=require('../src/pet/state.cjs');
 test('animation follows aggregate native status, never celebrating stop or masking a pending question',()=>{
  assert.equal(clipFor({phase:'completed',activeCount:1}),'working');
  assert.equal(clipFor({phase:'working',activeCount:2,pendingCount:1}),'attention');
- assert.equal(clipFor({phase:'aborted'}),'idle');assert.equal(clipFor({phase:'error'}),'attention');
+ assert.equal(clipFor({phase:'aborted'}),'idle');assert.equal(clipFor({phase:'error'}),'error');
  assert.equal(clipFor({phase:'completed'}),'completed');
+});
+
+test('attention settles into a static pose; error, connection and stopping stay distinct without endless animation',()=>{
+ for(const phase of ['attention','error','connecting','stopping']){assert.equal(clipFor({phase}),phase);assert.equal(sample(phase,10000).delay,0);}
+ assert.equal(clipFor({phase:'stopping',activeCount:1}),'stopping');
+ assert.equal(sample('attention',10000).frame,8);assert.equal(sample('stopping',10000).frame,0);
 });
 test('blink holds rest pose, activity loops, celebration returns to idle and reduced motion has no timer',()=>{
  assert.equal(sample('idle',2500).frame,0);assert.equal(sample('idle',2650).frame,1);assert.equal(sample('idle',2800).frame,2);

@@ -32,13 +32,27 @@ async function validateImportedSession(root, agentDir, sessionFile, expectedWork
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || path.basename(realAgent) !== 'agent') throw new Error('导入 session 的 agent 目录不属于客户端历史库');
   const sessionRel = path.relative(path.join(realAgent, 'sessions'), realSession);
   if (!sessionRel || sessionRel.startsWith('..') || path.isAbsolute(sessionRel) || !realSession.endsWith('.jsonl')) throw new Error('session 不属于导入的 agent 目录');
+  let meta;
   if (expectedWorkRoot !== undefined) {
-    const meta = JSON.parse(await fs.readFile(path.join(path.dirname(realAgent), 'import.json'), 'utf8'));
+    meta = JSON.parse(await fs.readFile(path.join(path.dirname(realAgent), 'import.json'), 'utf8'));
     if (meta.version !== 1 || meta.workRoot !== expectedWorkRoot || typeof meta.session !== 'string' || path.isAbsolute(meta.session) || path.resolve(realAgent, meta.session).toLowerCase() !== realSession.toLowerCase()) throw new Error('此历史会话属于其他工作根或导入记录已失效');
   }
   const header = await readSourceHeader(realSession);
   if (expectedWorkRoot && !belongsToWork(header.cwd, expectedWorkRoot)) throw new Error('历史会话工作目录与导入记录不一致');
-  return { agentDir: realAgent, sessionFile: realSession, executionRoot: linuxCwd(header.cwd) };
+  return { agentDir: realAgent, sessionFile: realSession, id:header.id, forkPending:meta?.forkPending===true, independentCopy:meta?.forkPending===false, executionRoot: linuxCwd(header.cwd) };
+}
+// Native transfer preserves the source ID. A user-requested independent copy
+// must fork once, otherwise OMP's ID-based writer lease also covers the original.
+async function completeImportedFork(root,agentDir,source,sessionFile,workRoot){
+  const original=await validateImportedSession(root,agentDir,source,workRoot);
+  if(!original.forkPending)return;
+  const fork=await validateNativeSession(agentDir,sessionFile,workRoot);
+  if(!fork.id||fork.id===original.id||fork.sessionFile===original.sessionFile)throw Error('OMP 未创建独立会话副本，原件已保留');
+  const file=path.join(path.dirname(original.agentDir),'import.json'),meta=JSON.parse(await fs.readFile(file,'utf8'));
+  const updated={...meta,session:path.relative(original.agentDir,fork.sessionFile),forkPending:false};
+  const temp=file+'.'+randomUUID()+'.tmp';
+  try{await fs.writeFile(temp,JSON.stringify(updated,null,2)+'\n',{flag:'wx'});await fs.rename(temp,file);}
+  finally{await fs.unlink(temp).catch(()=>{});}
 }
 async function readSourceHeader(source) {
   const handle = await fs.open(source, 'r');
@@ -100,18 +114,22 @@ async function importedJournal(agentDir) {
 }
 const wslHistoryCache = new Map();
 const wslHistoryInFlight = new Map();
+function invalidateWslHistory(){wslHistoryCache.clear();}
 async function scanWslSessions(root, agentDir) {
   const helper = path.resolve(__dirname, '..', 'tools', 'list_wsl_sessions.py').replaceAll('\\', '/');
   const unixHelper = toWslPath(helper);
   if (!unixHelper.startsWith('/mnt/')) throw new Error('无法定位 WSL 历史检索脚本');
   const { stdout } = await execute('wsl.exe', [...runtime.wslPrefix, '--', 'python3', unixHelper, root, agentDir], { timeout: 60000 });
   const result = JSON.parse(stdout);
-  return { total: result.total, sessions: result.sessions.map(item => ({ ...item, modifiedAt: new Date(item.modified * 1000).toISOString(), path: '\\\\wsl.localhost\\'+runtime.distro + item.path.replaceAll('/', '\\') })) };
+  return { total: result.total, identities: result.identities, sessions: result.sessions.map(item => {
+    const source='\\\\wsl.localhost\\'+runtime.distro+item.path.replaceAll('/', '\\');
+    return {...item,path:source,sessionFile:source,agentDir,runtime:'wsl',sourceKind:'native-wsl',modifiedAt:new Date(item.modified*1000).toISOString()};
+  }) };
 }
-async function listWslSessions(root, agentDir = runtime.wslAgentDir) {
+async function listWslSessions(root, agentDir = runtime.wslAgentDir, {refresh=false}={}) {
   const key=JSON.stringify([root,agentDir]);
   const cached = wslHistoryCache.get(key);
-  if (cached && Date.now() - cached.time < 15000) return cached.result;
+  if (!refresh && cached && Date.now() - cached.time < 15000) return cached.result;
   if (wslHistoryInFlight.has(key)) return wslHistoryInFlight.get(key);
   const pending = scanWslSessions(root,agentDir).then(result => {
     wslHistoryCache.set(key, { time: Date.now(), result });
@@ -149,7 +167,7 @@ async function importSession({ source, cwd, destinationRoot, omp, workRoot, sett
     ? await execute('wsl.exe',wslArgs(settings,['session','unpack',toWslPath(archive),'--cwd',linuxCwd(sourceHeader.cwd)],toWslPath(agentDir)))
     : await execute(omp, ['session', 'unpack', archive, '--cwd', targetCwd], { env });
   const sessionFile = await importedJournal(agentDir);
-  const metadata = { version: 1, workRoot, session: path.relative(agentDir, sessionFile), sourceKind: linuxSource || sourceRuntime==='wsl' ? 'wsl' : 'windows', runtime:settings?.runtime || 'windows', importedAt: new Date().toISOString() };
+  const metadata = { version: 1, workRoot, session: path.relative(agentDir, sessionFile), forkPending:true, sourceKind: linuxSource || sourceRuntime==='wsl' ? 'wsl' : 'windows', runtime:settings?.runtime || 'windows', importedAt: new Date().toISOString() };
   if (typeof workRoot === 'string') await fs.writeFile(path.join(destination, 'import.json'), JSON.stringify(metadata, null, 2) + '\n', { encoding: 'utf8', flag: 'wx' });
   warning = /missing|缺失/i.test(pack.stderr + pack.stdout + unpack.stderr) ? '打包输出提示可能有缺失附件，请核查。' : null;
   imported = { sessionFile, agentDir, sourceKind: metadata.sourceKind, runtime:metadata.runtime };
@@ -207,4 +225,4 @@ async function listNativeSessions(agentDir, workRoot) {
   }
   return result.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
 }
-module.exports = { importSession, wslSource, importedJournal, validateImportedSession, listWslSessions, listImportedSessions, belongsToWork, validateNativeSession, listNativeSessions, readSessionTitle };
+module.exports = { importSession, completeImportedFork, wslSource, importedJournal, validateImportedSession, listWslSessions, listImportedSessions, belongsToWork, validateNativeSession, listNativeSessions, readSessionTitle, readSourceHeader, invalidateWslHistory };

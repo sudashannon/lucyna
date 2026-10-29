@@ -4,7 +4,9 @@ import path from 'node:path';
 export default defineConfig({
   root: 'src/renderer', base: './', plugins: [react()],
   resolve: { alias: { '@cindy': path.resolve('src/renderer/vendor/cindy') } },
-  build: { commonjsOptions:{include:[/node_modules/,/run-outcome\.cjs$/]}, outDir: '../../dist/renderer', emptyOutDir: true, assetsInlineLimit: 0, rollupOptions: {output: {manualChunks(id) {
+  // The running desktop can still reference an older hashed asset. The normal
+  // build command stages and publishes atomically; direct Vite builds also retain it.
+  build: { commonjsOptions:{include:[/node_modules/,/run-outcome\.cjs$/]}, outDir: '../../dist/renderer', emptyOutDir: false, assetsInlineLimit: 0, rollupOptions: {output: {manualChunks(id) {
     if (!id.includes('node_modules')) return;
     if (id.includes('@xterm')) return 'terminal';
     if (/react-markdown|highlight|remark|rehype|micromark|hast|unist|mdast/.test(id)) return 'markdown';

@@ -5,8 +5,8 @@ import { Spinner } from '@cindy/components/ui/spinner';
 import { api } from '../api';
 import type { FileEntry, FileListing, FilePreview } from '../types';
 
-export function FileBrowser({root, active, selected, onOpen, onError}: {root: string; active: boolean; selected?: string; onOpen: (file: FilePreview) => void; onError: (e: unknown) => void}) {
-  const [directory, setDirectory] = useState(''), [query, setQuery] = useState(''), [showHidden, setShowHidden] = useState(false), [collapsed, setCollapsed] = useState(false);
+export function FileBrowser({root, active, selected, onOpen, onError, initialDirectory=''}: {root: string; active: boolean; selected?: string; onOpen: (file: FilePreview) => void; onError: (e: unknown) => void; initialDirectory?:string}) {
+  const [directory, setDirectory] = useState(initialDirectory), [query, setQuery] = useState(''), [showHidden, setShowHidden] = useState(false), [collapsed, setCollapsed] = useState(false);
   const [listing, setListing] = useState<FileListing | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(''), [opening, setOpening] = useState('');
   const [offset, setOffset] = useState(0), [revision, setRevision] = useState(0);
   const request = useRef(0), alive = useRef(true), loaded = useRef(''), scroll = useRef<HTMLDivElement>(null), positions = useRef(new Map<string, number>());

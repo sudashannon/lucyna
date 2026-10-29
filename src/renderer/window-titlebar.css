@@ -1,0 +1,15 @@
+.desktop-window { height:100dvh; min-height:0; overflow:hidden; }
+.desktop-window.with-window-chrome { display:flex; flex-direction:column; }
+.with-window-chrome>.app-shell { flex:1; height:auto; min-height:0; }
+.window-titlebar { flex:none; height:env(titlebar-area-height,36px); min-height:32px; width:100%; -webkit-app-region:drag; app-region:drag; user-select:none; background:linear-gradient(105deg,#f0eff7 0%,#f6f3f4 52%,#f8f6f0 100%); color:#64636b; }
+.window-titlebar-content { display:flex; align-items:center; gap:12px; height:100%; width:env(titlebar-area-width,calc(100% - 138px)); padding:0 12px; min-width:0; }
+.window-app-mark { display:flex; align-items:center; gap:7px; font-size:11px; font-weight:500; letter-spacing:.01em; flex:none; }
+.window-app-mark .cindy-logo { width:18px; height:18px; border-radius:4px; }
+.window-menubar { display:flex; align-items:center; gap:2px; -webkit-app-region:no-drag; app-region:no-drag; }
+.window-menubar>button { -webkit-app-region:no-drag; app-region:no-drag; border:0; border-radius:5px; background:transparent; color:inherit; font-size:12px; line-height:24px; min-height:26px; padding:0 10px; cursor:default; white-space:nowrap; }
+.window-menubar>button:hover,.window-menubar>button[aria-expanded=true] { background:#22222a0b; color:#292930; }
+.window-menubar>button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:-2px; }
+.window-drag-space { flex:1; align-self:stretch; min-width:32px; }
+[data-theme=dark] .window-titlebar { background:linear-gradient(105deg,#24242e 0%,#27262c 52%,#262727 100%); color:#b9b8c0; }
+[data-theme=dark] .window-menubar>button:hover,[data-theme=dark] .window-menubar>button[aria-expanded=true] { background:#ffffff12; color:#f2f2f4; }
+@media(max-width:760px){.window-app-mark>span{display:none}.window-titlebar-content{gap:6px;padding-left:8px}.window-menubar>button{padding-inline:8px}}

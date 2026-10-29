@@ -50,7 +50,7 @@ function steleCall(name, args) {
 
 class OmpSession {
   constructor(send, executable = defaultOmp) { this.send = send; this.executable = executable; this.pending = new Map(); this.child = null; this.ready = false; }
-  async start({ root, executionRoot, resume, model, agentDir, env: extraEnv, settings, sessionDir }) {
+  async start({ root, executionRoot, resume, fork, model, agentDir, env: extraEnv, settings, sessionDir }) {
     if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
     const works = await listWorks();
     if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
@@ -60,7 +60,7 @@ class OmpSession {
     const cwd = isWsl ? executionRoot || root : wslUnc(executionRoot || root);
     const args = ['--mode', 'rpc-ui', '--cwd', cwd];
     if (!isWsl) args.push('--append-system-prompt', `This OMP process runs on Windows. The work root and repositories are in ${runtime.distro} WSL. Before handling work lifecycle or persistent knowledge, load the installed worktree-session skill and use the Stele MCP work_skill tool for its WSL-specific references. Use wsl.exe -d ${runtime.distro} -u ${runtime.user} for Linux commands with an explicit Linux working directory. Do not assume built-in tools, scripts, LSP, or subagents run inside WSL; check their execution context. Respect the worktree-session approval and preservation boundaries.`);
-    if (resume) args.push('--resume', isWsl ? wslSessionPath(resume) : resume);
+    if (resume) args.push(fork?'--fork':'--resume', isWsl ? wslSessionPath(resume) : resume);
     if (sessionDir) args.push('--session-dir', isWsl ? wslSessionPath(sessionDir) : sessionDir);
     if (model) args.push('--model', model);
     if (settings?.thinking && settings.thinking !== 'inherit') args.push('--thinking', settings.thinking);

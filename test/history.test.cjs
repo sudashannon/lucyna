@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { wslSource, belongsToWork, validateImportedSession, validateNativeSession, listNativeSessions } = require('../src/history.cjs');
+const { wslSource, belongsToWork, validateImportedSession, validateNativeSession, listNativeSessions, completeImportedFork } = require('../src/history.cjs');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
@@ -21,6 +21,20 @@ test('import metadata prevents continuing a session in a different work', async 
   await assert.rejects(() => validateImportedSession(root, agentDir, sessionFile, '/work/b'));
 });
 test('Windows source is not classified as WSL', () => assert.equal(wslSource('C:\\Users\\user\\session.jsonl'), null));
+
+test('only a native fork with a distinct ID and correct work becomes the managed copy',async()=>{
+ const temp=await fs.mkdtemp(path.join(os.tmpdir(),'lucyna-history-fork-')),agentDir=path.join(temp,'entry','agent'),bucket=path.join(agentDir,'sessions','work');
+ await fs.mkdir(bucket,{recursive:true});const source=path.join(bucket,'packed.jsonl'),fork=path.join(bucket,'fork.jsonl'),file=path.join(temp,'entry','import.json');
+ const metadata={version:1,workRoot:'/work/a',session:path.relative(agentDir,source),forkPending:true};
+ await fs.writeFile(source,JSON.stringify({type:'session',id:'original',cwd:'/work/a'})+'\n');await fs.writeFile(file,JSON.stringify(metadata));
+ const before=await fs.readFile(source,'utf8');await fs.writeFile(fork,JSON.stringify({type:'session',id:'original',cwd:'/work/a'})+'\n');
+ await assert.rejects(completeImportedFork(temp,agentDir,source,fork,'/work/a'),/未创建独立/);assert.deepEqual(JSON.parse(await fs.readFile(file,'utf8')),metadata);
+ await fs.writeFile(fork,JSON.stringify({type:'session',id:'independent',cwd:'/work/b'})+'\n');await assert.rejects(completeImportedFork(temp,agentDir,source,fork,'/work/a'),/其他工作根/);
+ await fs.writeFile(fork,JSON.stringify({type:'session',id:'independent',cwd:'/work/a'})+'\n');await completeImportedFork(temp,agentDir,source,fork,'/work/a');
+ assert.deepEqual(JSON.parse(await fs.readFile(file,'utf8')),{...metadata,session:path.relative(agentDir,fork),forkPending:false});assert.equal(await fs.readFile(source,'utf8'),before);
+ const selected=await validateImportedSession(temp,agentDir,fork,'/work/a');assert.equal(selected.forkPending,false);assert.equal(selected.id,'independent');
+ await assert.rejects(validateImportedSession(temp,agentDir,source,'/work/a'),/导入记录已失效/);
+});
 test('historical session is bound to the selected work root', () => {
   const root = '/home/user/develop/sample-work';
   assert.equal(belongsToWork(root + '/repos/main', root), true);

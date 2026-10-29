@@ -58,10 +58,11 @@ export function WorkSummary({work, content, loading, error, updated, refresh, on
 export function DocumentReader({file, root, onError, onNavigate, positions: sharedPositions, active = true}: {file: FilePreview; root?: string; onError: (e: unknown) => void; onNavigate?: (file: FilePreview) => void; positions?: Map<string, ReaderPosition>; active?: boolean}) {
   const [search, setSearch] = useState(''), [index, setIndex] = useState(0), [count, setCount] = useState(0);
   const body = useRef<HTMLDivElement>(null), localPositions = useRef(new Map<string, ReaderPosition>()), positions = sharedPositions || localPositions.current;
+  const handledAnchor = useRef<FilePreview|null>(null);
   const identity = `${root || ''}|${file.path || file.name}`, headings = useMemo(() => file.kind === 'markdown' ? documentHeadings(file.content || '') : [], [file.content, file.kind]);
   const navigate = useCallback(async (href: string) => {
     if (!root || !file.path || !onNavigate) {onError('请在文件预览中打开此链接。'); return;}
-    try {const [reference] = href.split('#'); const next = await api.readPreview(root, decodeURIComponent(reference), file.path); onNavigate(next);} catch (e) {onError(e);}
+    try {const [reference,anchor] = href.split('#'); const next = await api.readPreview(root, decodeURIComponent(reference), file.path); onNavigate({...next,anchor:anchor?decodeURIComponent(anchor):undefined});} catch (e) {onError(e);}
   }, [root, file.path, onNavigate, onError]);
   const resolveImage = useCallback(async (src: string) => {const next = await api.readPreview(root!, decodeURIComponent(src), file.path); if (next.kind !== 'image') throw Error('不是图片'); return next.dataUrl!;}, [root, file.path]);
   useLayoutEffect(() => {
@@ -78,6 +79,11 @@ export function DocumentReader({file, root, onError, onNavigate, positions: shar
     return () => observer.disconnect();
   }, [identity, active, positions]);
   useLayoutEffect(() => {setSearch(''); setIndex(0);}, [identity]);
+  useEffect(() => {
+    if(!file.anchor||!active||handledAnchor.current===file)return;
+    const frame=requestAnimationFrame(()=>{const el=body.current,heading=el?.querySelector(`[id="${CSS.escape(file.anchor!)}"]`);if(el&&heading){el.scrollTop+=heading.getBoundingClientRect().top-el.getBoundingClientRect().top;positions.set(identity,captureReaderPosition(el));handledAnchor.current=file;}});
+    return()=>cancelAnimationFrame(frame);
+  },[file,active,identity,positions]);
   useEffect(() => {
     const el = body.current; if (!el || !active) return;
     const ranges: Range[] = [], term = search.trim().toLocaleLowerCase();

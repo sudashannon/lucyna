@@ -4,33 +4,41 @@ const fs = require('node:fs/promises');
 const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { listWorks, wslUnc, steleCall, OmpSession, defaultOmp } = require('./backend.cjs');
-const { importSession, validateImportedSession, listWslSessions, listImportedSessions, validateNativeSession, listNativeSessions } = require('./history.cjs');
+const { importSession, completeImportedFork, validateImportedSession, listWslSessions, listImportedSessions, validateNativeSession, listNativeSessions } = require('./history.cjs');
 const { prepare: prepareModel } = require('./windows-provider.cjs');
 const runtime=require('./runtime-config.cjs');
 const { installWorkSteleMcp, installWorkSkillDirectory, installWorkCommandMirrors } = require('./work-stele.cjs');
 const { ensureOwnedAgentDir } = require('./profile.cjs');
-const { resolveDataRoot } = require('./data-root.cjs');
+const {configureAppIdentity}=require('./app-identity.cjs');
+const {installTaskbarIdentity}=require('./windows-taskbar.cjs');
 const { TerminalManager } = require('./terminal-manager.cjs');
 const { SessionManager } = require('./session-manager.cjs');
 const { WslSessionHistory } = require('./wsl-session-history.cjs');
+const { HistoryTrash } = require('./history-trash.cjs');
+const {planDeletion,publicPlan}=require('./history-deletion.cjs');
+const {acquireHistoryLease}=require('./history-lease.cjs');
+const {invalidateWslHistory}=require('./history.cjs');
 const {PetController}=require('./pet/controller.cjs');
+const {FeedbackController}=require('./feedback/controller.cjs');
 const {applicationIcon}=require('./app-icon.cjs');
+const windowChrome=require('./window-chrome.cjs');
 const { listDirectory, previewKind, IMAGE_MIME, within } = require('./file-browser.cjs');
 const {SettingsStore, checkSettings, validateSettings, historyLocations, sessionDirectory, windowsSessionPath} = require('./client-settings.cjs');
 const knowledge = require('./knowledge-service.cjs').createKnowledgeService();
+const workDetails = require('./work-details.cjs').createWorkDetails({listWorks});
 const {WorkRunner}=require('./work-runner.cjs');
 
-let window, sessions, pet, selectedHistory, listedHistory = new Map(), terminal, runtimeMutation = false;
+let window, sessions, pet, feedback, selectedHistory, listedHistory = new Map(), terminal, runtimeMutation = false;
 let windowsPreparation = Promise.resolve();
-// Optional local data root permits isolated development/verification runs.
-if (process.env.OMP_CINDY_USERDATA) {
-  if (!path.isAbsolute(process.env.OMP_CINDY_USERDATA)) throw new Error('OMP_CINDY_USERDATA must be absolute');
-  app.setPath('userData', path.resolve(process.env.OMP_CINDY_USERDATA));
-}
-app.setPath('userData', resolveDataRoot(app.getPath('userData')));
+configureAppIdentity(app);
+// Shortcut launches reveal the existing workbench instead of opening its
+// IndexedDB again, including while the companion keeps the client alive.
+if (!require('./single-instance.cjs').claimInstance(app, () => window)) return;
+installTaskbarIdentity(app);
 const settingsStore = new SettingsStore(app.getPath('userData'));
-const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get()});
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
+const historyTrash = new HistoryTrash(app.getPath('userData'));
+const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get()});
 const onlyMain = event => { if (!window || event.sender !== window.webContents) throw new Error('Unauthorized IPC sender'); };
 async function readBounded(filePath, limit, label) {
   const handle = await fs.open(filePath, 'r');
@@ -50,19 +58,32 @@ async function readBounded(filePath, limit, label) {
   } finally { await handle.close(); }
 }
 app.whenReady().then(async () => {
-  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 960, minHeight: 640, title: 'OMP 工作台', icon: applicationIcon, backgroundColor: '#f9f9f8', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 960, minHeight: 640, title: 'Lucyna · 工作台', icon: applicationIcon, backgroundColor: '#f9f9f8', ...windowChrome.windowOptions(), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, additionalArguments:windowChrome.enabled()?['--lucyna-titlebar']:[] } });
+  if(windowChrome.enabled())windowChrome.installWindowChrome(window);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file://')) event.preventDefault(); });
-  sessions = new SessionManager({create: send => new OmpSession(send), onState:record=>nativeWslHistory.remember(record), send: e => { pet?.ingest(e); if (window && !window.isDestroyed()) window.webContents.send('omp:event', e); }});
-  pet=new PetController({directory:app.getPath('userData'),getMain:()=>window,getSessions:()=>sessions,onQuit:()=>app.quit()});
+  sessions = new SessionManager({create: send => new OmpSession(send), onState:async record=>{
+    if(record.forkSource){
+      record.forkTask ||= completeImportedFork(record.importRoot,record.agentDir,record.forkSource,record.sessionFile,record.root);
+      try{await record.forkTask;record.forkSource=undefined;}finally{record.forkTask=undefined;}
+    }
+    await nativeWslHistory.remember(record);
+  }, send: e => { pet?.ingest(e); if (window && !window.isDestroyed()) window.webContents.send('omp:event', e); }});
+  pet=new PetController({directory:app.getPath('userData'),getMain:()=>window,getSessions:()=>sessions,onQuit:()=>app.quit(),onState:snapshot=>feedback?.observe(snapshot)});
   await pet.init().catch(error=>{console.error('Desktop companion:',error.message);});
+  feedback=new FeedbackController({directory:app.getPath('userData'),getMain:()=>window,onChange:settings=>{pet.feedbackReducedMotion=settings.reducedMotion;pet.schedule();}});
+  await feedback.init(pet.settings.reducedMotion);
   window.on('close',event=>{if(!quitting&&pet?.shouldKeepAlive()){event.preventDefault();window.hide();}});
   window.on('closed',()=>{if(!quitting)app.quit();});
   const handle = (name, fn) => ipcMain.handle(name, (e, ...args) => { onlyMain(e); return fn(...args); });
   handle('pet:get',()=>pet.snapshot());
   handle('pet:settings',patch=>pet.save(patch));
-  handle('pet:context',context=>pet.context(context));
+  handle('pet:context',context=>{pet.context(context);feedback.context(context);});
   handle('pet:reset-position',()=>pet.save({position:null}));
+  handle('feedback:get',()=>feedback.snapshot());
+  handle('feedback:settings',patch=>feedback.save(patch));
+  handle('feedback:preview',input=>feedback.preview(input));
+  handle('feedback:stop-preview',()=>feedback.stopPreview());
   handle('settings:get', async () => ({settings:await settingsStore.get(),storage:app.getPath('userData'),workspace:{distro:runtime.distro,user:runtime.user,root:runtime.workRoot}}));
   handle('settings:check', checkSettings);
   handle('settings:save', async input => {
@@ -73,7 +94,9 @@ app.whenReady().then(async () => {
     finally {runtimeMutation=false;}
   });
   handle('works:list', () => listWorks({refresh: true}));
+  handle('work:details', root => workDetails(root));
   handle('work:run', (operation,data) => workRunner.call(operation,data));
+  handle('work:git', (root, member, action, options) => workDetails(root, member, action, options));
   handle('clipboard:write-text', async text => {
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 4 * 1024 * 1024) throw new Error('复制内容超过 4 MiB，请分段复制');
     await clipboard.writeText(text);
@@ -103,10 +126,10 @@ app.whenReady().then(async () => {
       return await startNative(safe);
     }
     if (options.resume || options.agentDir) {
-      if (typeof options.resume !== 'string' || typeof options.agentDir !== 'string') throw new Error('请先导入 session 的独立副本');
+      if (typeof options.resume !== 'string' || typeof options.agentDir !== 'string') throw new Error('请从当前工作区历史列表打开会话，或显式导入副本');
       if(settings.runtime==='wsl'&&options.agentDir.startsWith('/')){
-        const restored=await nativeWslHistory.validate(options.agentDir,options.resume,options.root);
-        safe.resume=restored.sessionFile;safe.agentDir=restored.agentDir;safe.executionRoot=restored.executionRoot;safe.nativeHistory=true;
+        const restored=await nativeWslHistory.resolve(options.agentDir,options.resume,options.root,settings.wslAgentDir);
+        safe.resume=restored.sessionFile;safe.resumeId=restored.id;safe.agentDir=restored.agentDir;safe.executionRoot=restored.executionRoot;safe.nativeHistory=true;
         safe.settings={...settings,wslAgentDir:restored.agentDir};
         return await startNative(safe);
       }
@@ -114,8 +137,9 @@ app.whenReady().then(async () => {
       const imported = path.resolve(options.agentDir).toLowerCase() === path.resolve(nativeDir).toLowerCase()
         ? await validateNativeSession(nativeDir, options.resume, options.root)
         : await validateImportedSession(locations.historyDir, options.agentDir, options.resume, options.root);
-      safe.resume = imported.sessionFile; safe.agentDir = imported.agentDir;
+      safe.resume = imported.sessionFile; safe.resumeId=imported.id; safe.agentDir = imported.agentDir;
       safe.executionRoot = imported.executionRoot;
+      if(imported.forkPending){safe.fork=true;safe.importRoot=locations.historyDir;}
     }
     if (!safe.agentDir) safe.agentDir = locations.agentDir;
     safe.agentDir = await ensureOwnedAgentDir(app.getPath('userData'), safe.agentDir);
@@ -144,7 +168,7 @@ app.whenReady().then(async () => {
   handle('omp:close', id => sessions.close(id));
   handle('omp:list', () => sessions.list());
   handle('omp:path', async () => {const s=await settingsStore.get();return s.runtime==='wsl'?s.wslExecutable:s.windowsExecutable;});
-  handle('session:choose', async () => { const r = await dialog.showOpenDialog(window, { title: '选择需要导入的 OMP session', filters: [{ name: 'OMP session', extensions: ['jsonl'] }], properties: ['openFile'] }); selectedHistory = r.canceled ? null : r.filePaths[0]; return selectedHistory; });
+  handle('session:choose', async () => { const r = await dialog.showOpenDialog(window, { title: '选择 OMP 会话并导入副本（原件保留）', filters: [{ name: 'OMP session', extensions: ['jsonl'] }], properties: ['openFile'] }); selectedHistory = r.canceled ? null : r.filePaths[0]; return selectedHistory; });
   handle('session:list', async root => {
     const works = await listWorks();
     if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
@@ -155,12 +179,51 @@ app.whenReady().then(async () => {
     const result = wsl.status === 'fulfilled' ? wsl.value : {sessions: [], total: 0};
     // A late response for another work must not invalidate the current list.
     for (const [source, owner] of listedHistory) if (owner.root === root) listedHistory.delete(source);
-    for (const item of result.sessions) listedHistory.set(item.path, {root,runtime:'wsl'});
+    for (const item of result.sessions) listedHistory.set(item.path, {root,runtime:'wsl',entry:item});
     const managed=[...(win.status === 'fulfilled' ? win.value : []),...(linux.status === 'fulfilled' ? linux.value : []),...(native.status==='fulfilled'?native.value:[])];
     const owned=new Set(managed.map(item=>item.sessionFile));
     const originals=result.sessions.filter(item=>!owned.has(item.path));
-    for(const item of managed)listedHistory.set(item.sessionFile,{root,runtime:item.runtime});
-    return { ...result,sessions:originals, managed, warnings: sources.flatMap((source, i) => source.status === 'rejected' ? [`${['WSL 原始历史', 'Windows 客户端历史', 'WSL 客户端历史','WSL 原生新会话'][i]}读取失败：${source.reason.message}`] : []) };
+    for(const item of managed)listedHistory.set(item.sessionFile,{root,runtime:item.runtime,entry:item});
+    const trash=await historyTrash.list(root),removed=new Set(trash.map(item=>item.key));
+    const visible=item=>!removed.has(historyTrash.key(root,item.sessionFile||item.path));
+    return { ...result,sessions:originals.filter(visible), managed:managed.filter(visible),trash, warnings: sources.flatMap((source, i) => source.status === 'rejected' ? [`${['WSL 原始历史', 'Windows 客户端历史', 'WSL 客户端历史','WSL 原生新会话'][i]}读取失败：${source.reason.message}`] : []) };
+  });
+  const deletionPlan=async(source,root)=>{
+    const listed=listedHistory.get(source);
+    if(typeof source!=='string'||listed?.root!==root)throw Error('请从当前工作区的历史列表选择会话');
+    const works=await listWorks();if(!works.some(work=>work.root===root&&work.kind!=='invalid'))throw Error('无效工作根');
+    const settings=await settingsStore.get(),entry=listed.entry,locations=historyLocations(app.getPath('userData'),entry.runtime);
+    if((await fs.lstat(windowsSessionPath(source))).isSymbolicLink())throw Error('不能删除符号链接指向的会话');
+    let verified;
+    if(entry.runtime==='wsl'&&entry.agentDir?.startsWith('/'))verified=await nativeWslHistory.resolve(entry.agentDir,source,root,settings.wslAgentDir);
+    else if(path.resolve(entry.agentDir||'').toLowerCase()===path.resolve(locations.agentDir).toLowerCase())verified=await validateNativeSession(locations.agentDir,source,root);
+    else verified=await validateImportedSession(locations.historyDir,entry.agentDir,source,root);
+    const release=sessions.reserveJournal(verified.sessionFile,verified.id);release();
+    const collect=async runtime=>{const p=historyLocations(app.getPath('userData'),runtime);return [...await listImportedSessions(p.historyDir,root),...await listNativeSessions(p.agentDir,root)];};
+    const sources=await Promise.allSettled([listWslSessions(root,settings.wslAgentDir,{refresh:true}),collect('windows'),collect('wsl'),nativeWslHistory.list(root)]);
+    const catalog=sources.flatMap((result,i)=>result.status==='fulfilled'?(i===0?result.value.identities||result.value.sessions:result.value):[]);
+    return planDeletion({root,source:verified.sessionFile,workPath:wslUnc(root),journalRoot:windowsSessionPath(verified.agentDir),entry,catalog,catalogComplete:sources.every(result=>result.status==='fulfilled')});
+  };
+  handle('session:delete-preview',async(source,root)=>publicPlan(await deletionPlan(source,root)));
+  handle('session:delete', async (source,root,token) => {
+    let plan=await deletionPlan(source,root);
+    if(typeof token!=='string'||token!==plan.token)throw Error('文件或关联备忘已变化，请取消后重新确认删除范围');
+    const release=sessions.reserveJournal(plan.source,plan.entry.id);let lease;
+    try{
+      lease=await acquireHistoryLease(plan);lease.check();
+      // Fingerprints are checked again immediately before each rename.
+      const key=await historyTrash.move(plan,{check:()=>lease.check()});listedHistory.delete(source);invalidateWslHistory();
+      if(window&&!window.isDestroyed())window.webContents.send('omp:event',{type:'history_deleted',source:plan.source,workRoot:root});
+      return key;
+    }finally{await lease?.release();release();}
+  });
+  handle('session:restore', async (root,key) => {
+    if(typeof root!=='string'||typeof key!=='string')throw Error('回收站记录不存在');
+    const record=(await historyTrash.list(root)).find(item=>item.key===key);if(!record)throw Error('回收站记录不存在');
+    if(record.version!==2)return historyTrash.restore(root,key);
+    const release=sessions.reserveJournal(record.source,record.entry.id);let lease;
+    try{lease=await acquireHistoryLease({...record,files:record.files.flatMap(file=>[file,{...file,path:file.trash}])});lease.check();await historyTrash.restore(root,key,{check:()=>lease.check()});invalidateWslHistory();if(window&&!window.isDestroyed())window.webContents.send('omp:event',{type:'history_restored',source:record.source,workRoot:root});}
+    finally{await lease?.release();release();}
   });
   handle('session:import', async (source, root) => {
     if(runtimeMutation) throw new Error('运行时正在准备，请稍候重试');
@@ -262,7 +325,7 @@ app.on('window-all-closed', () => app.quit());
 let quitting=false;
 app.on('before-quit', event => {
   if(quitting)return;
-  event.preventDefault();quitting=true;pet?.dispose();terminal?.dispose();workRunner.disconnect();
+  event.preventDefault();quitting=true;feedback?.dispose();pet?.dispose();terminal?.dispose();workRunner.disconnect();
   void (sessions?.closeAll()||Promise.resolve()).finally(()=>app.quit());
 });
 app.on('before-quit', () => terminal?.dispose());

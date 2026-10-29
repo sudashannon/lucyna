@@ -1,6 +1,7 @@
 const api=window.companion,img=document.getElementById('character'),badge=document.getElementById('badge'),canvas=document.getElementById('animation');
 const Animation=window.CindyPetAnimation,atlases=window.CindyPetAtlas,assets=new Map();
-let lastHit=false,mask=null,dragging=false,start=null,moved=false,dragFrame=0,appearance='duo',layoutFrame=0,layoutRetries=0;
+const motionPreference=matchMedia('(prefers-reduced-motion: reduce)');
+let lastHit=false,mask=null,appearance='duo',layoutFrame=0,layoutRetries=0;
 let snapshot,animationKey='',clip='idle',started=0,timer=0,currentFrame=-1,currentAsset=null,geometry=null,loadRevision=0,paintCount=0;
 const report=e=>{badge.textContent='桌宠暂不可用';console.error(e);};
 const rect=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};
@@ -30,7 +31,8 @@ function loadAtlas(name){
  if(!assets.has(name))assets.set(name,new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{try{resolve({image,mask:readMask(image),atlas:atlases[name]});}catch(e){reject(e);}};image.onerror=()=>reject(Error('角色动画素材加载失败，已保留静态角色'));image.src=atlases[name].file;}));
  return assets.get(name);
 }
-function paused(){return !snapshot||snapshot.hidden||snapshot.locked||snapshot.settings.reducedMotion||dragging||document.hidden;}
+function reduced(){return !!snapshot?.settings.reducedMotion||motionPreference.matches;}
+function paused(){return !snapshot||snapshot.hidden||snapshot.locked||reduced()||snapshot.dragging||document.hidden;}
 function paint(index){
  if(!currentAsset)return;
  const surface=rect(canvas),dpr=Math.min(devicePixelRatio||1,3),w=Math.round(surface.width*dpr),h=Math.round(surface.height*dpr);
@@ -44,13 +46,13 @@ function paint(index){
 function tick(force=false){
  clearTimeout(timer);timer=0;if(canvas.hidden||!currentAsset)return;
  const frozen=paused(),step=Animation.sample(clip,performance.now()-started,frozen);
- const index=frozen&&currentFrame>=0&&!snapshot.settings.reducedMotion?currentFrame:step.frame;
+ const index=frozen&&currentFrame>=0&&!reduced()?currentFrame:step.frame;
  if(force||index!==currentFrame)paint(index);
  canvas.dataset.playing=String(!frozen&&step.delay>0);
  if(!frozen&&step.delay>0)timer=setTimeout(()=>tick(),Math.max(30,step.delay));
 }
 async function updateAnimation(s){
- const nextClip=Animation.clipFor(s),completion=s.notices?.filter(n=>n.kind==='completed').at(-1)?.id||'',key=appearance+':'+nextClip+(nextClip==='completed'?':'+completion:'');
+ const nextClip=Animation.clipFor(s),notice=s.notices?.filter(n=>n.kind===nextClip).at(-1)?.id||'',key=appearance+':'+nextClip+':'+notice;
  if(key!==animationKey){animationKey=key;clip=nextClip;started=performance.now();currentFrame=-1;}
  if(!s.settings.animated){loadRevision++;clearTimeout(timer);timer=0;currentAsset=null;canvas.hidden=true;img.style.visibility='';canvas.dataset.playing='false';staticGeometry();return;}
  const revision=++loadRevision,name=appearance;
@@ -70,25 +72,18 @@ const layoutObserver=new ResizeObserver(()=>{if(canvas.hidden)staticGeometry();e
 layoutObserver.observe(img);layoutObserver.observe(badge);
 window.addEventListener('resize',()=>{layoutRetries=0;if(canvas.hidden)staticGeometry();else tick(true);});
 document.addEventListener('visibilitychange',()=>tick());
-document.addEventListener('mousemove',e=>{if(!dragging)hit(opaque(e.clientX,e.clientY));});
-document.addEventListener('mouseleave',()=>{if(!dragging)hit(false);});
-document.addEventListener('pointerdown',e=>{
- if(e.button!==0||!opaque(e.clientX,e.clientY))return;
- start={x:e.screenX,y:e.screenY};moved=false;dragging=true;tick();document.body.setPointerCapture(e.pointerId);api.drag('start').catch(report);
-});
-document.addEventListener('pointermove',e=>{if(!dragging)return;if(Math.hypot(e.screenX-start.x,e.screenY-start.y)>4)moved=true;if(moved&&!dragFrame)dragFrame=requestAnimationFrame(()=>{dragFrame=0;api.drag('move').catch(report);});});
-function end(e){
- if(!dragging)return;dragging=false;if(dragFrame){cancelAnimationFrame(dragFrame);dragFrame=0;}
- if(document.body.hasPointerCapture(e.pointerId))document.body.releasePointerCapture(e.pointerId);
- api.drag('end').then(()=>{lastHit=false;tick();if(!moved)return api.action('inbox');}).catch(report);
-}
-document.addEventListener('pointerup',end);document.addEventListener('pointercancel',e=>{moved=true;end(e);});
+motionPreference.addEventListener('change',()=>{if(snapshot)render(snapshot);});
+document.addEventListener('mousemove',e=>{if(!snapshot?.dragging)hit(opaque(e.clientX,e.clientY));});
+document.addEventListener('mouseleave',()=>{if(!snapshot?.dragging)hit(false);});
+// The character uses Electron's native window drag region. The status chip is
+// a normal button, so moving the pet never accidentally opens the inbox.
+badge.addEventListener('click',()=>api.action('inbox').catch(report));
 document.addEventListener('contextmenu',e=>{e.preventDefault();api.action('inbox').catch(report);});
 const labels={idle:'准备好了',connecting:'正在连接 OMP',disconnected:'连接已结束',working:'正在工作',thinking:'正在思考',attention:'等待你处理',completed:'本轮已完成',aborted:'已停止',error:'需要检查',retrying:'正在重试',compacting:'整理上下文',settling:'正在收尾',background:'等待后续任务',stopping:'正在停止'};
 function render(s){
- snapshot=s;appearance=s.settings.appearance;document.body.dataset.theme=s.theme;document.body.dataset.phase=s.phase;document.body.dataset.reduced=String(s.settings.reducedMotion||s.hidden||s.locked);
+ snapshot=s;appearance=s.settings.appearance;document.body.dataset.theme=s.theme;document.body.dataset.phase=s.phase;document.body.dataset.reduced=String(reduced()||s.hidden||s.locked);
  const src=appearance==='cat'?'assets/cat.png':'assets/companions.png';if(img.getAttribute('src')!==src){mask=null;img.src=src;}
  badge.textContent=s.settings.quiet?(s.pendingCount?`勿扰 · ${s.pendingCount} 条待办`:'勿扰中'):s.pendingCount?`${s.pendingCount} 条待处理`:s.activeCount?`${s.activeCount} 个运行中`:(labels[s.phase]||'准备好了');
- img.title=canvas.title='点击查看待办 · 拖动移动';void updateAnimation(s);
+ img.title=canvas.title='拖动角色移动 · 点击下方状态查看待办';void updateAnimation(s);
 }
 api.subscribe(render);api.snapshot().then(render).catch(report);
