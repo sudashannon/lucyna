@@ -45,6 +45,7 @@ export interface Desktop {
   copyText(text: string): Promise<void>;
   listWorks(): Promise<Work[]>; readWork(root: string): Promise<string>;
   context(query: string): Promise<OmpEvent>; start(options: OmpEvent): Promise<unknown>;
+  prepareTextAttachments(id:string,files:{id:string;text:string}[]):Promise<import('./text-attachments').PreparedTextAttachment[]>;
   request(type: string, data?: OmpEvent, id?: string): Promise<OmpEvent>; respond(data: OmpEvent,id?:string): Promise<unknown>; close(id?:string): Promise<unknown>;
   listConnections?(): Promise<OmpEvent[]>;
   chooseSession(): Promise<string | null>; listHistory(root: string): Promise<History>;

@@ -43,8 +43,24 @@ function setup(){
  async start(options){calls.push({type:'start',...options});states.set(options.clientSessionId,{sessionId:options.clientSessionId,sessionFile:options.resume||'C:/'+options.clientSessionId+'.jsonl',model:{name:'native'}});setImmediate(()=>emit({type:'ready',clientSessionId:options.clientSessionId,runtime:'wsl'}));return {runtime:'wsl',agentDir:'C:/agent'};},
  async request(type,data,id){calls.push({type,id,data});if(type==='get_state')return states.get(id);if(type==='get_messages')return {messages:messages.get(id)||[]};if(type==='prompt'){emit({clientSessionId:id,type:'agent_start'});return {};}if(type==='abort_and_restore_queue'){emit({clientSessionId:id,type:'prompt_result',status:'aborted'});return {followUp:[{text:'queued for '+id}]};}return {};},
  async close(id){calls.push({type:'close',id});emit({clientSessionId:id,type:'process_exit',code:0});},respond:async(data,id)=>{calls.push({type:'answer',id,data});}};
- const store=new Workbench(api);store.connect();return {store,works,calls,states,messages,emit:e=>emit(e)};
+ const store=new Workbench(api);store.connect();return {store,api,works,calls,states,messages,emit:e=>emit(e)};
 }
+
+test('text attachments save before prompt, keep ownership across work switches, and restore queue as native local references',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;let release;
+ f.api.prepareTextAttachments=(id,files)=>{f.calls.push({type:'prepare',id,files});return new Promise(r=>release=()=>r(files.map(file=>({id:file.id,url:'local://paste-lucyna-'+'a'.repeat(32)+'.md'}))));};
+ const sent=a.send('read attachment',[],[{id:'text-a',name:'text.md',text:'private content'.repeat(100),mode:'file'}]);
+ while(!release)await tick();assert.equal(f.calls.filter(c=>c.type==='prompt').length,0);assert.equal(await a.close(),false);
+ await f.store.selectWork(f.works[1]);const b=f.store.active;await b.send('peer');release();assert.equal(await sent,true);
+ const prompt=f.calls.find(c=>c.type==='prompt'&&c.id===a.id);assert.ok(prompt.data.message.includes('local://'));assert.ok(!prompt.data.message.includes('private content'));assert.equal(prompt.data.streamingBehavior,'followUp');assert.equal(f.store.active.id,b.id);
+ f.api.request=async(type,data,id)=>type==='abort_and_restore_queue'?{followUp:[{text:prompt.data.message}]}:{};
+ assert.equal((await a.stop())[0].text,prompt.data.message);f.store.dispose();
+});
+test('failed attachment storage never prompts; retry keeps same attachment and inline mode bypasses disk',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active,files=[{id:'text-a',name:'a.md',text:'unchanged\r\n'.repeat(100),mode:'file'}];
+ f.api.prepareTextAttachments=async()=>{throw Error('disk failed');};assert.equal(await a.send('body',[],files),false);assert.equal(f.calls.filter(c=>c.type==='prompt').length,0);assert.ok(a.error.includes('disk failed'));assert.equal(a.view.messages.length,0);
+ assert.equal(await a.send('body',[],[{...files[0],mode:'inline'}]),true);assert.equal(f.calls.find(c=>c.type==='prompt').data.message,'body\n\n'+files[0].text);f.store.dispose();
+});
 
 test('recycled open tab preserves its transcript and draft identity, blocks reconnect, and becomes resumable after restore',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;await a.send('keep draft identity');await a.stop();await a.close();const source=a.sessionFile,draftKey=a.draftKey,messages=a.view.messages;

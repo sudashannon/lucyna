@@ -28,6 +28,8 @@
     "test:pet:animation": "electron test/pet-animation-desktop.cjs",
     "test:feedback": "electron test/feedback-desktop.cjs",
     "test:typography": "electron test/brand-typography-desktop.cjs",
+    "test:attachments": "electron test/text-attachments-desktop.cjs",
+    "test:attachments:native": "node test/text-attachments-native.cjs",
     "test:sessions": "electron test/session-monitor-desktop.cjs",
     "test:knowledge:sidebar": "electron test/knowledge-sidebar-desktop.cjs",
     "test:pet:layout": "electron test/pet-layout-desktop.cjs",

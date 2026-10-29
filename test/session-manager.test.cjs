@@ -1,6 +1,15 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {SessionManager}=require('../src/session-manager.cjs');
 
+test('attachment preparation derives native paths from its owner; invalid or disconnected requests never write',async()=>{
+ const {manager,native,start}=fixture(),writes=[];await start('a');await start('b');
+ native[0].request=async()=>({sessionFile:'/home/user/native/a.jsonl',sessionId:'native-a'});
+ manager.writeAttachments=async(state,files)=>{writes.push({state,files});return [{id:files[0].id,url:'local://paste.md'}];};
+ const files=[{id:'paste-a',text:'内容',sessionFile:'C:/injected.jsonl'}];await manager.prepareTextAttachments('a',files);
+ assert.equal(writes[0].state.sessionId,'native-a');assert.equal(writes[0].state.runtime,'wsl');assert.ok(writes[0].state.sessionFile.includes('native\\a.jsonl'));assert.equal(writes[0].files[0].sessionFile,undefined);assert.equal(native[1].last,undefined);
+ await assert.rejects(manager.prepareTextAttachments('b',[{id:'../bad',text:'x'}]));assert.equal(writes.length,1);
+ await manager.close('a');await assert.rejects(manager.prepareTextAttachments('a',files),/连接已变更/);assert.equal(writes.length,1);await manager.closeAll();
+});
 function fixture(){const events=[],native=[];const manager=new SessionManager({send:e=>events.push(e),create:send=>{const session={child:null,ready:true,async start(o){this.options=o;this.child={pid:native.length};return {pid:this.child.pid};},async request(type){this.last=type;return type==='get_state'?{sessionFile:this.options.resume||`C:/sessions/${this.child.pid}.jsonl`}:{ok:true};},messages:async()=>({messages:[]}),sendFrame(data){this.frame=data;},async close(){this.child=null;send({type:'process_exit',code:0});},emit:send};native.push(session);return session;}});const start=(id,resume)=>manager.start(id,run=>run({root:'/work/'+id,agentDir:'C:/agent',settings:{runtime:'wsl'},resume}));return{manager,native,events,start};}
 
 test('recycling reserves a journal against concurrent resume and refuses connected sessions without stopping peers',async()=>{

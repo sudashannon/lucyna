@@ -163,6 +163,7 @@ app.whenReady().then(async () => {
     } finally {releasePreparation();}
     }));
   });
+  handle('omp:prepare-text', (id,files) => sessions.prepareTextAttachments(id,files));
   handle('omp:request', (type, data, id) => { if (!['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command'); return sessions.request(id,type,data); });
   handle('omp:ui-response', (data,id) => { if (!data || data.type !== 'extension_ui_response' || typeof data.id !== 'string') throw new Error('Invalid UI response'); return sessions.respond(id,data); });
   handle('omp:close', id => sessions.close(id));

@@ -1,0 +1,13 @@
+.text-attachments{display:grid;gap:6px;max-height:190px;overflow:auto;padding:12px 16px 4px;min-width:0}
+.text-attachment{display:flex;align-items:center;gap:8px;min-width:0;padding:7px 8px;border:1px solid var(--soft-border);border-radius:12px;background:var(--surface-hover-soft)}
+.text-attachment-preview{display:flex;align-items:center;gap:9px;flex:1;min-width:0;text-align:left;background:none;border:0;color:inherit;padding:3px}
+.text-attachment-preview>svg{flex-shrink:0;color:var(--muted-readable)}
+.text-attachment-preview>span{min-width:0;display:grid;gap:2px}
+.text-attachment-preview strong{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.text-attachment-preview small{font-size:11px;color:var(--muted-readable)}
+.text-attachment select{max-width:95px;font:inherit;font-size:11px;background:transparent;border:1px solid var(--soft-border);border-radius:7px;color:inherit;padding:4px}
+.text-attachment-modal{max-width:760px;width:calc(100vw - 32px)}
+.text-attachment-modal pre{max-height:55vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-hover-soft);border:1px solid var(--soft-border);border-radius:10px;padding:14px;font-size:12px;line-height:1.7;tab-size:4}
+.text-attachment-modal nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;color:var(--muted-readable)}
+.text-attachment-modal nav button{border:1px solid var(--soft-border);border-radius:8px;padding:5px 10px;background:none;color:inherit}
+@media(max-width:520px){.text-attachment{gap:4px;padding:5px}.text-attachment-preview{gap:6px}.text-attachment-preview small{font-size:10px}.text-attachment select{max-width:78px}}

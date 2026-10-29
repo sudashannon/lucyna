@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('desktop', {
   knowledgeSaveFile: (name,bytes) => ipcRenderer.invoke('stele:save-file',name,bytes),
   onKnowledge: fn => {const listener=(_event,data)=>fn(data);ipcRenderer.on('stele:knowledge-event',listener);return()=>ipcRenderer.removeListener('stele:knowledge-event',listener);},
   start: options => ipcRenderer.invoke('omp:start', options),
+  prepareTextAttachments: (id,files) => ipcRenderer.invoke('omp:prepare-text',id,files),
   request: (type, data = {}, id) => ipcRenderer.invoke('omp:request', type, data, id),
   respond: (data,id) => ipcRenderer.invoke('omp:ui-response', data,id),
   close: id => ipcRenderer.invoke('omp:close',id),

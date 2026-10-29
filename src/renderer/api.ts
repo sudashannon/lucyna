@@ -10,7 +10,7 @@ const defaults: Desktop = {
   getSettings: unavailable, checkSettings: unavailable, saveSettings: unavailable,
   copyText: text => navigator.clipboard.writeText(text),
   listWorks: async () => [], readWork: unavailable, context: unavailable, start: unavailable,
-  request: unavailable, respond: unavailable, close: unavailable, chooseSession: unavailable,
+  request: unavailable, prepareTextAttachments:unavailable, respond: unavailable, close: unavailable, chooseSession: unavailable,
   listHistory: unavailable, previewHistoryDeletion:unavailable, deleteHistory:unavailable, restoreHistory:unavailable, importSession: unavailable, terminal: unavailable,
   startTerminal: unavailable, terminalInput: unavailable, terminalResize: unavailable, closeTerminal: unavailable,
   onTerminal: () => () => {}, onEvent: () => () => {}, choosePreview: unavailable, readPreview: unavailable, listFiles: unavailable, webPreview: unavailable,

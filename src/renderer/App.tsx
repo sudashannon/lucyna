@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ClipboardEvent } from 'react';
 import {useStoredDrafts} from './useStoredDrafts';
 import {readImage,validateInput,nativeImages,type DraftImage} from './composer-input';
+import {shouldAttachText,validateTextAttachments,composeTextPrompt,type DraftTextAttachment} from './text-attachments';
+import {TextAttachments} from './components/TextAttachments';
 import { ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, CircleX, Clock3, Code2, FileImage, FileText, Folder, FolderOpen, Globe2, History as HistoryIcon, Import, Layers2, ListFilter, MessageSquare, Moon, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, SlidersHorizontal, Square, Sun, TerminalSquare, X, Zap } from 'lucide-react';
 import { Button } from '@cindy/components/ui/button';
 import { Input } from '@cindy/components/ui/input';
@@ -52,6 +54,7 @@ const dateLabel = (entry: HistoryEntry) => {
 };
 const sidebarDefaultWidth = 224, sidebarMinWidth = 200, sidebarMaxWidth = 420;
 const noImages:DraftImage[]=[];
+const noTextAttachments:DraftTextAttachment[]=[];
 export function App() {
   useFeedback();
   const w = useWorkbench();
@@ -67,6 +70,7 @@ export function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('omp.theme') === 'dark' ? 'dark' : 'light');
   const {draft, setDraft,setDraftForKey, error: draftError,values:allDrafts,loaded:draftsLoaded,retry:retryDrafts} = useDrafts(w.draftKey);
   const {value:images,set:setImages,setForKey:setImagesForKey,error:imageError,values:allImages,loaded:imagesLoaded,retry:retryImages}=useStoredDrafts<DraftImage[]>('images',w.draftKey,()=>({}),noImages);
+  const {value:textAttachments,set:setTextAttachments,error:textAttachmentError,values:allTextAttachments,loaded:textAttachmentsLoaded,retry:retryTextAttachments}=useStoredDrafts<DraftTextAttachment[]>('textAttachments',w.draftKey,()=>({}),noTextAttachments);
   const [imageBusy,setImageBusy]=useSessionState(w.id,false),imagePicker=useRef<HTMLInputElement>(null);
   const [palette, setPalette] = useState(false), [filter, setFilter] = useState('');
   const [web, setWeb] = useState(false), [url, setUrl] = useState(''), [webBusy, setWebBusy] = useState(false), [webError, setWebError] = useState('');
@@ -77,10 +81,10 @@ export function App() {
   const importBusy=dialogBusy||w.importing;
   const [deleteTarget,setDeleteTarget]=useState<{entry:HistoryEntry;root:string}|null>(null),[trashOpen,setTrashOpen]=useState(false),[trashBusy,setTrashBusy]=useState(false),[trashError,setTrashError]=useState('');
   useEffect(()=>{
-    if(!draftsLoaded||!imagesLoaded||draftError||imageError)return;
-    const protectedKeys=new Set([...Object.keys(allDrafts).filter(key=>!!allDrafts[key]),...Object.keys(allImages).filter(key=>allImages[key]?.length)]);
+    if(!draftsLoaded||!imagesLoaded||!textAttachmentsLoaded||draftError||imageError||textAttachmentError)return;
+    const protectedKeys=new Set([...Object.keys(allDrafts).filter(key=>!!allDrafts[key]),...Object.keys(allImages).filter(key=>allImages[key]?.length),...Object.keys(allTextAttachments).filter(key=>allTextAttachments[key]?.length)]);
     w.pruneEmpty(protectedKeys,new Set(Object.keys(terminals)));
-  },[w.id,w.sessions.length,w.pruneEmpty,allDrafts,allImages,draftsLoaded,imagesLoaded,draftError,imageError,terminals]);
+  },[w.id,w.sessions.length,w.pruneEmpty,allDrafts,allImages,allTextAttachments,draftsLoaded,imagesLoaded,textAttachmentsLoaded,draftError,imageError,textAttachmentError,terminals]);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false),[clientSettings,setClientSettings]=useState<ClientSettings|null>(null);
   const runtime=clientSettings?.runtime || 'windows', runtimeLabel=(w.runtime || runtime)==='wsl'?'WSL OMP':'Windows OMP';
@@ -184,16 +188,22 @@ export function App() {
   const attachImages=async(files:File[])=>{setImageBusy(true);try{const added=await Promise.all(files.map(readImage));addImages(added);}catch(e){w.report(e);}finally{setImageBusy(false);}};
   const paste=(e:ClipboardEvent<HTMLTextAreaElement>)=>{
     const files=Array.from(e.clipboardData.files),text=e.clipboardData.getData('text/plain');if(!files.length&&!text)return;e.preventDefault();
-    if(text){const el=e.currentTarget,start=el.selectionStart,end=el.selectionEnd;const next=el.value?draft.slice(0,start)+text+draft.slice(end):draft+text;if(new TextEncoder().encode(next).length>4*1024*1024)w.report('粘贴的文本超过 4 MiB，请拆分；当前草稿和剪贴板原文均保留。');else setDraft(next);}
+    if(text){const el=e.currentTarget,start=el.selectionStart,end=el.selectionEnd;try{
+      if(shouldAttachText(text)){
+        const next=el.value?draft.slice(0,start)+draft.slice(end):draft;
+        const added:DraftTextAttachment={id:crypto.randomUUID(),name:`粘贴文本 ${textAttachments.length+1}.md`,text,mode:'file'};
+        validateTextAttachments(next,[...textAttachments,added]);setDraft(next);setTextAttachments(previous=>[...previous,added]);
+      }else{const next=el.value?draft.slice(0,start)+text+draft.slice(end):draft+text;validateTextAttachments(next,textAttachments);setDraft(next);}
+    }catch(error){w.report(error);}}
     if(files.length)void attachImages(files);
   };
   const send = async () => {
     const text = draft;
-    if ((!text.trim()&&!images.length) || !workValid || imageBusy || sendPending.current.has(w.id) || w.connection === 'closing' || importBusy) return;
-    try{validateInput(text,images);}catch(e){w.report(e);return;}
+    if ((!text.trim()&&!images.length&&!textAttachments.length) || !workValid || imageBusy || sendPending.current.has(w.id) || w.connection === 'closing' || importBusy) return;
+    try{validateTextAttachments(text,textAttachments);validateInput(composeTextPrompt(text,textAttachments.filter(f=>f.mode==='inline')),images);}catch(e){w.report(e);return;}
     const local = /^\/(resume|model|models|new)(?:\s+([\s\S]*))?$/.exec(text);
     if (local) {
-      if(images.length){w.setError('此界面命令不接收图片，请先发送图片或移除附件。');return;}
+      if(images.length||textAttachments.length){w.setError('此界面命令不接收附件，请先发送或移除附件。');return;}
       if (local[2]?.trim()) {w.setError(`/${local[1]} 请通过打开的面板操作，不接收文本参数。`); return;}
       if (local[1] === 'resume') {openPanel('history'); void w.refreshHistory(); setDraft(''); return;}
       if (local[1] === 'new') {if (await newConversation()) setDraft(''); return;}
@@ -201,7 +211,11 @@ export function App() {
       setModelsOpen(true); setDraft(''); return;
     }
     sendPending.current.add(w.id); setDraft('');setImages([]);latest();
-    try {if (!await w.send(text,nativeImages(images))) {setDraft(previous => previous ? `${text}\n${previous}` : text);setImages(previous=>[...images,...previous]);}} finally {sendPending.current.delete(w.id);}
+    // Keep raw text attachments in durable drafts until native prompt acceptance.
+    // New attachments pasted while a send is pending belong to the next message.
+    try {if (await w.send(text,nativeImages(images),textAttachments)) {setTextAttachments(previous=>previous.filter(f=>!textAttachments.some(sent=>sent.id===f.id)));}
+      else {setDraft(previous => previous ? `${text}\n${previous}` : text);setImages(previous=>[...images,...previous]);}}
+    finally {sendPending.current.delete(w.id);}
   };
   const stop = async (id=w.id) => {
     const target=w.sessions.find(s=>s.id===id);if(!target)return;
@@ -285,7 +299,7 @@ export function App() {
       </div></header>
       {previewMode && <div className="preview-banner">浏览器外观预览 · 会话与 WSL 功能请在桌面客户端使用</div>}
       <WorkHealthNotice work={w.work} onOpen={() => setWorkChecksOpen(true)}/>
-      {(draftError||imageError) && <div className="notice" role="alert"><CircleX size={16}/><span>{draftError||imageError}</span><Button compact variant="secondary" onClick={()=>{retryDrafts();retryImages();}}>重试读取与保存</Button></div>}
+      {(draftError||imageError||textAttachmentError) && <div className="notice" role="alert"><CircleX size={16}/><span>{draftError||imageError||textAttachmentError}</span><Button compact variant="secondary" onClick={()=>{retryDrafts();retryImages();retryTextAttachments();}}>重试读取与保存</Button></div>}
       {w.error && <div className="notice" role="alert"><CircleX size={16}/><span>{w.error}</span><button className="icon-button" onClick={() => w.setError('')} aria-label="关闭错误提示"><X size={15}/></button></div>}
       {w.questions[0]&&deferredQuestion===w.questions[0].id&&<div className="pending-question"><span>此会话正在等待你的回复</span><Button compact variant="secondary" onClick={()=>setDeferredQuestion('')}>查看问题</Button></div>}
       {w.connection==='starting'&&<ConnectionProgress phase={w.connectionPhase} started={w.connectionStarted||Date.now()}/>}
@@ -299,6 +313,8 @@ export function App() {
           {awayFromLatest && <button type="button" className="jump-latest" onClick={latest}>回到最新消息 <ChevronDown size={13}/></button>}
           {w.queued.length > 0 && <div className="queued-messages" aria-label="OMP 待处理消息"><div className="queue-caption"><Clock3 size={12}/>OMP 待处理 · {w.queued.length}</div>{w.queued.map((item, i) => <div className="queued-message" key={`${item.queue}-${i}`}><span title={item.message}>{item.message}</span><button type="button" aria-label={`移除待处理消息 ${i + 1}`} onClick={() => void w.removeQueued(item)}><X size={13}/></button></div>)}</div>}
           <form className="composer" onSubmit={e => {e.preventDefault(); void send();}}>
+          <TextAttachments key={'texts-'+w.id} files={textAttachments} onChange={setTextAttachments} pending={w.sending}/>
+          {w.sending&&textAttachments.length>0&&<p className="attachment-loading" role="status"><Spinner size={12}/> 正在提交文本附件…</p>}
           {images.length>0&&<div className="composer-attachments" aria-label="待发送图片">{images.map(img=><div key={img.id}><button type="button" title={img.name} aria-label={`预览附件 ${img.name}`} onClick={()=>setZoom(`data:${img.mimeType};base64,${img.data}`)}><img src={`data:${img.mimeType};base64,${img.data}`} alt={img.name}/></button><button type="button" aria-label={`移除附件 ${img.name}`} onClick={()=>setImages(previous=>previous.filter(x=>x.id!==img.id))}><X size={12}/></button></div>)}</div>}
           {imageBusy&&<p className="attachment-loading" role="status">正在读取图片…</p>}
           <input ref={imagePicker} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void attachImages(files);}}/>
@@ -308,7 +324,7 @@ export function App() {
             nativeCommands={w.nativeCommands} status={w.commandsStatus} error={w.commandsError} loadCommands={w.loadCommands}
             disabled={!workValid || importBusy || w.connection === 'closing'} placeholder={!workValid ? '先从左侧选择工作区…' : w.busy ? '补充下一条消息，OMP 会在当前任务后处理…' : '交给 OMP 一个任务，或输入 / 使用技能…'}/>
           <div className="composer-toolbar"><div className="composer-tools"><Tip text="添加图片，也可直接粘贴"><button type="button" className="icon-button" aria-label="添加图片" disabled={!workValid||imageBusy||importBusy} onClick={()=>imagePicker.current?.click()}><FileImage size={17}/></button></Tip><Tip text="技能与命令 · 输入 /"><button type="button" className="icon-button" aria-label="技能与命令" disabled={!workValid || importBusy || w.connection === 'closing'} onClick={() => setCommandOpenRequest(v => v + 1)}><Plus size={18}/></button></Tip><button type="button" className="composer-chip" onClick={() => setPalette(true)}><Folder size={13}/><span>{selectedName}</span><ChevronDown size={11}/></button></div>
-            <div className="composer-tools"><Tip text="选择 OMP 原生模型"><button type="button" className="model-control" disabled={!workValid || w.busy || importBusy || w.connection === 'starting' || w.connection === 'closing'} onClick={() => setModelsOpen(true)}><Zap size={12}/><span>{w.model}</span><ChevronDown size={11}/></button></Tip>{w.busy && w.connection === 'ready' && <button type="button" className="send-button stop-button" aria-label="停止生成" disabled={w.run?.phase === 'stopping'} onClick={() => void stop()}>{w.run?.phase === 'stopping' ? <Spinner size={14}/> : <Square size={14} fill="currentColor"/>}</button>}{(!w.busy || !!draft.trim() || images.length>0 || w.connection === 'starting') && <button type="submit" className="send-button" aria-label={w.busy && w.connection === 'ready' ? '加入待处理消息' : '发送消息'} disabled={(!draft.trim()&&!images.length) || imageBusy || !workValid || importBusy || (w.connection === 'starting' && w.busy) || w.connection === 'closing' || w.run?.phase === 'stopping'}>{w.connection === 'starting' ? <Spinner size={16}/> : <ArrowUp size={18}/>}</button>}</div>
+            <div className="composer-tools"><Tip text="选择 OMP 原生模型"><button type="button" className="model-control" disabled={!workValid || w.busy || importBusy || w.connection === 'starting' || w.connection === 'closing'} onClick={() => setModelsOpen(true)}><Zap size={12}/><span>{w.model}</span><ChevronDown size={11}/></button></Tip>{w.busy && w.connection === 'ready' && <button type="button" className="send-button stop-button" aria-label="停止生成" disabled={w.run?.phase === 'stopping'} onClick={() => void stop()}>{w.run?.phase === 'stopping' ? <Spinner size={14}/> : <Square size={14} fill="currentColor"/>}</button>}{(!w.busy || !!draft.trim() || images.length>0 || textAttachments.length>0 || w.connection === 'starting') && <button type="submit" className="send-button" aria-label={w.busy && w.connection === 'ready' ? '加入待处理消息' : '发送消息'} disabled={(!draft.trim()&&!images.length&&!textAttachments.length) || w.sending || imageBusy || !workValid || importBusy || (w.connection === 'starting' && w.busy) || w.connection === 'closing' || w.run?.phase === 'stopping'}>{w.connection === 'starting' ? <Spinner size={16}/> : <ArrowUp size={18}/>}</button>}</div>
           </div>
         </form><div className="composer-footnote"><span>{w.connection === 'starting' && <Spinner size={11}/>} {status}</span><span>{completionActive ? 'Tab / Enter 补全' : w.busy ? 'Enter 加入待处理' : 'Enter 发送'} <span className="footnote-separator">·</span> Shift Enter 换行</span></div>
           {!w.messages.length && <div className="starter-actions"><button disabled={!workValid} onClick={() => {setDraft('/work-review'); composer.current?.focus();}}><Check size={14}/>检查工作状态</button><button disabled={!workValid} onClick={() => openPanel('history')}><Clock3 size={14}/>继续历史会话</button><button onClick={() => openPanel('memory')}><BookOpen size={14}/>检索 Stele 记忆</button></div>}

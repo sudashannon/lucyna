@@ -2,6 +2,7 @@ const path = require('node:path');
 const {windowsSessionPath,wslSessionPath} = require('./client-settings.cjs');
 const {validatePrompt}=require('./prompt-input.cjs');
 const {resultExcerpt}=require('./result-excerpt.cjs');
+const {validateAttachments,writeTextAttachments,restoreTextAttachments}=require('./text-attachments.cjs');
 const sessionKey = value => {const normalized=windowsSessionPath(value);return /^\\\\(?:wsl\.localhost|wsl\$)\\/i.test(normalized)?'wsl:'+wslSessionPath(normalized):path.resolve(normalized).toLowerCase();};
 function clientId(value = 'legacy') {
   if (typeof value !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(value)) throw new Error('无效客户端会话标识');
@@ -11,7 +12,7 @@ function clientId(value = 'legacy') {
 // One native harness per conversation. This layer only owns routing and lifetime;
 // prompt admission, queues, tools and cancellation remain native OMP operations.
 class SessionManager {
-  constructor({create, send,onState=async()=>{}}) {this.create=create; this.send=send; this.onState=onState;this.records=new Map(); this.files=new Map(); this.starting=new Set();this.journalMutations=new Map();}
+  constructor({create, send,onState=async()=>{},writeAttachments=writeTextAttachments,restoreAttachments=restoreTextAttachments}) {this.create=create; this.send=send; this.onState=onState;this.writeAttachments=writeAttachments;this.restoreAttachments=restoreAttachments;this.records=new Map(); this.files=new Map(); this.starting=new Set();this.journalMutations=new Map();}
   reserveJournal(file,id) {
     const key=sessionKey(file);
     if(this.journalMutations.has(key))throw Error('该会话正在移入回收站或恢复，请稍候');
@@ -81,6 +82,7 @@ class SessionManager {
     if(type==='get_state'&&result?.sessionFile){
       if(record.expectedResume&&sessionKey(record.expectedResume)!==sessionKey(result.sessionFile))throw Error('OMP 未在所选原会话中续聊，可能被另一进程占用或已迁出。请先结束原会话的其他连接，再重试；原记录和草稿已保留。');
       this.ownIdentity(record,result.sessionId);this.ownFile(record,result.sessionFile);result.sessionFile=record.sessionFile;await this.onState(record);record.expectedResume=undefined;
+      if(record.settings.runtime==='windows'&&record.attachmentsRestored!==record.sessionFile){await this.restoreAttachments({sessionFile:record.sessionFile,sessionId:record.nativeId,runtime:'windows'});record.attachmentsRestored=record.sessionFile;}
     }
     if(type==='get_state')this.emit(record,{type:'session_state',sessionName:result?.sessionName||'',isSettled:result?.isSettled});
     if(type==='get_messages'){
@@ -89,6 +91,15 @@ class SessionManager {
       if(titleHint)this.emit(record,{type:'session_metadata',titleHint});
     }
     return result;
+  }
+  async prepareTextAttachments(id,files){
+    const input=validateAttachments(files),record=this.get(id);
+    await this.request(id,'get_state');
+    if(this.records.get(id)!==record||!record.session.child)throw Error('会话连接已变更，文本附件仍保留在草稿中');
+    const state={sessionFile:record.sessionFile,sessionId:record.nativeId,runtime:record.settings.runtime};
+    const saved=await this.writeAttachments(state,input);
+    if(this.records.get(id)!==record||!record.session.child||record.sessionFile!==state.sessionFile)throw Error('会话连接已变更，文本附件仍保留在草稿中');
+    return saved;
   }
   respond(id,data){const record=this.get(id);if(!record.questions.has(data.id))throw new Error('该问题不属于当前会话或已结束');record.session.sendFrame(data);record.questions.delete(data.id);this.emit(record,{type:'question_resolved',id:data.id});}
   close(id){const record=this.records.get(clientId(id));if(record)this.emit(record,{type:'client_closing'});return record?record.session.close():Promise.resolve();}

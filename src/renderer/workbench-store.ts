@@ -4,6 +4,8 @@ import {normalizeCommands, type SlashCommand} from './command-completion';
 import {errorText} from './errors';
 import {resultExcerpt} from '../result-excerpt.cjs';
 import {historyFileKey as fileKey,copiesHistory} from './history-entry';
+import {composeTextPrompt,validateTextAttachments,type DraftTextAttachment} from './text-attachments';
+import {validateInput,type PromptImage} from './composer-input';
 const uid = () => crypto.randomUUID();
 const label = (s: OmpEvent) => typeof s.model === 'string' ? s.model : s.model?.name || s.model?.id || 'OMP 默认模型';
 type WorkData = {history: History|null; historyError:string; document:string; documentError:string; documentLoading:boolean; documentUpdated:string; historyRevision:number; documentRevision:number};
@@ -138,14 +140,20 @@ class Conversation {
     this.commandsStatus='loading';this.commandsError='';this.changed();
     this.commandTask=(async()=>{try{await this.start();const result=await this.request('get_available_commands');this.nativeCommands=normalizeCommands(result.commands);this.commandsStatus='ready';}catch(e){this.commandsStatus='error';this.commandsError=errorText(e);}finally{this.commandTask=null;this.changed();}})();return this.commandTask;
   };
-  send=async(text:string,images:OmpEvent[]=[])=>{
+  send=async(text:string,images:OmpEvent[]=[],attachments:DraftTextAttachment[]=[])=>{
     if(this.sending||this.connection==='closing'||this.importing||this.view.run?.phase==='stopping')return false;
-    this.sending=true;this.error='';const queued=this.busy,id=uid();
-    if(!queued)this.dispatch({type:'local_send',id,text,images,connecting:this.connection!=='ready'});
-    try{await this.start();const result=await this.request('prompt',{message:text,images,streamingBehavior:'followUp'});
+    this.sending=true;this.error='';const queued=this.busy,id=uid();let optimistic=false;
+    if(!queued&&!attachments.length){this.dispatch({type:'local_send',id,text,images,connecting:this.connection!=='ready'});optimistic=true;}
+    this.changed();
+    try{validateTextAttachments(text,attachments);await this.start();
+      const files=attachments.filter(a=>a.mode==='file');
+      const saved=files.length?await this.owner.api.prepareTextAttachments(this.id,files.map(({id,text})=>({id,text}))):[];
+      text=composeTextPrompt(text,attachments,saved);validateInput(text,images as PromptImage[]);
+      if(!queued&&!optimistic){this.dispatch({type:'local_send',id,text,images,connecting:false});optimistic=true;}
+      const result=await this.request('prompt',{message:text,images,streamingBehavior:'followUp'});
       if(result?.agentInvoked===false){if(!queued)this.dispatch({type:'local_command_complete',id});void this.request('get_state').then(this.syncState).catch(()=>{});}
       this.log(queued?'消息已加入 OMP 待处理队列':'消息已提交');this.owner.persist();return true;
-    }catch(e){if(!queued)this.dispatch({type:'local_send_failed',id});this.report(e);return false;}finally{this.sending=false;this.changed();}
+    }catch(e){if(optimistic)this.dispatch({type:'local_send_failed',id});this.report(e);return false;}finally{this.sending=false;this.changed();}
   };
   close=():Promise<boolean>=>{
     if(this.closing)return this.closing;
@@ -252,7 +260,7 @@ export class Workbench {
   };
   view(){
     const s=this.active,d=this.workData(s.work.root);
-    return {works:this.works,loading:this.loading,work:s.work.root?s.work:null,...d,...s.view,connection:s.connection,busy:s.busy,model:s.model,error:s.error,events:s.events,questions:s.questions,title:s.title,sessionFile:s.sessionFile,
+    return {works:this.works,loading:this.loading,work:s.work.root?s.work:null,...d,...s.view,connection:s.connection,busy:s.busy,sending:s.sending,model:s.model,error:s.error,events:s.events,questions:s.questions,title:s.title,sessionFile:s.sessionFile,
       id:s.id,timelineRevision:s.timelineRevision,draftKey:s.draftKey,runtime:s.runtime,importing:s.importing,connectionPhase:s.connectionPhase,connectionStarted:s.connectionStarted,pruneEmpty:this.pruneEmpty,sessions:[...this.sessions.values()].map(c=>({id:c.id,root:c.work.root,workName:c.work.name,title:c.title,draftKey:c.draftKey,busy:c.busy,connection:c.connection,unread:c.unread,questions:c.questions.length,error:!!c.error,errorText:c.error,summary:c.summary,model:c.model,runtime:c.runtime,run:c.view.run,queued:c.view.queued.length,connectionPhase:c.connectionPhase,outcome:c.view.run?.outcome,report:c.report,stop:c.stop,close:c.close})),
       report:s.report,setError:s.setError,log:s.log,loadWorks:this.loadWorks,selectWork:this.selectWork,selectSession:this.selectSession,newSession:this.newSession,dismiss:this.dismiss,setConversationVisible:this.setConversationVisible,
       refreshHistory:this.refreshHistory,refreshDocument:this.refreshDocument,start:s.start,send:s.send,resume:this.resume,close:s.close,stop:s.stop,answer:s.answer,changeModel:s.changeModel,removeQueued:s.removeQueued,request:s.request,

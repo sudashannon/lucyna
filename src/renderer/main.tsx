@@ -13,6 +13,7 @@ import './brand.css';
 import './pet-settings.css';
 import './feedback.css';
 import './context-sidebar.css';
+import './text-attachments.css';
 import { App } from './App';
 i18n.use(initReactI18next).init({ lng: 'zh', fallbackLng: 'zh', interpolation: { escapeValue: false }, resources: { zh: { translation: {
   settings: { apiKey: { hideKey: '隐藏', showKey: '显示' } },

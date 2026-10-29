@@ -21,7 +21,7 @@ app.whenReady().then(async()=>{const timer=setTimeout(()=>app.exit(2),90000);try
  }
  blocked=true;
  const length=await js(`(()=>{const text='长文本粘贴回归 0123456789\\n'.repeat(18000),data=new DataTransfer();data.setData('text/plain',text);document.querySelector('#message-input').dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}));return text.length;})()`);
- await until('document.querySelector(".large-paste")','collapsed long draft');await click('.send-button');
+ await until('document.querySelector(".text-attachment")','long text attachment');await js(`(()=>{const el=document.querySelector('.text-attachment select');el.value='inline';el.dispatchEvent(new Event('change',{bubbles:true}));})()`);await click('.send-button');
  await until('document.querySelector(".run-mascot")','waiting state');await pause(500);assert.equal(prompt.length,length);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));checks.push('Full long-text paste reaches native prompt interface and stays within window.');
  if(baseline){assert.ok(await js('(()=>{const image=document.querySelector(".run-mascot img");return image&&image.complete&&image.naturalWidth===0})()'));checks.push('Reproduced screenshot: missing brand resource leaves broken-image icon after paste/send.');await shot('baseline-missing-cat');}
  else{
