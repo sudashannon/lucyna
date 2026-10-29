@@ -2,8 +2,7 @@ const path = require('node:path');
 
 // Stele owns indexing, file boundaries and knowledge semantics. This adapter is
 // deliberately a bounded, read-only bridge, never a second knowledge store.
-function createKnowledgeReader(fetchImpl = fetch) {
-  const origin = 'http://127.0.0.1:18989';
+function createKnowledgeReader(fetchImpl = fetch, {origin = 'http://127.0.0.1:18989'} = {}) {
   let catalog, loaded = 0, pending;
   async function read(route, params, format = 'json', limit = 8 * 1024 * 1024) {
     const url = new URL(route, origin);

@@ -25,7 +25,7 @@ import { RunActivity, SessionTranscript } from './components/SessionTranscript';
 import { phaseLabels } from './session-view';
 import { CommandInput } from './components/CommandInput';
 import { DocumentReader, EventsPanel, MemoryResults, PanelPage, PreviewPane, WorkSummary } from './components/ToolPanels';
-import { KnowledgePanel } from './components/KnowledgePanel';
+import { KnowledgeWorkspace as KnowledgePanel } from './components/KnowledgeWorkspace';
 import { TriangleAlert, Info, ClipboardCheck } from 'lucide-react';
 import { WorkDiagnostics, WorkHealthNotice, workIssues } from './components/WorkDiagnostics';
 import { BrandLogo, BrandCompanions } from './components/BrandVisuals';

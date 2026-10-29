@@ -66,7 +66,7 @@ npm start
 
 自动安装适配前，确认 `skillDirectory/worktree-session/scripts/worktree-work.py` 和原生 OMP 的 `commands/work-{start,continue,review,end}.md` 已存在，且 Stele 服务已配置。将 `installWorkIntegration` 设为 `true` 后，启动会添加受管理的桥接配置；安装/恢复逻辑会校验内容，避免覆盖手工修改。该功能不安装或启动 Stele，也不附带 Work 技能本体。
 
-Work 保存当前任务、SESSION 与共享笔记；L3 长期知识交给 Stele，读取和受控写入通过 MCP 提供给 agent。界面知识库主要用于浏览、检索、关联阅读与引用。
+Work 保存当前任务、SESSION 与共享笔记；L3 长期知识交给 Stele，读取和受控写入通过 MCP 提供给 agent。知识库界面通过主进程的固定操作接口接入 Stele，包含检索、图谱、来源资料、候选/复核、待办、报告、问答和恢复。文档编辑使用强 ETag，候选和复核提交服务端当前版本；冲突时保留编辑并提示重新核对。模型生成在明确点击后执行，使用 Stele 已配置的模型。恢复先预览范围和冲突、暂存归档，Stele 下次启动时应用。
 
 ## 数据与回退
 

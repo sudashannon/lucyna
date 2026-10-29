@@ -1,5 +1,6 @@
 import {memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {ArrowLeft, ArrowUpRight, BookOpen, ChevronLeft, ChevronRight, FileText, Link2, RefreshCw, Search, X} from 'lucide-react';
+import {createPortal} from 'react-dom';
+import {ArrowUpRight, BookOpen, ChevronLeft, ChevronRight, FileText, Link2, RefreshCw, Search, X} from 'lucide-react';
 import {Button} from '@cindy/components/ui/button';
 import {Input} from '@cindy/components/ui/input';
 import {Spinner} from '@cindy/components/ui/spinner';
@@ -26,7 +27,7 @@ const normalPath = (base:string, href:string) => {
   return '/'+out.join('/');
 };
 
-export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onBack,onQuote}:{active:boolean;workName:string;onBack:()=>void;onQuote:(text:string)=>void}) {
+export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onQuote,navigateTo,refreshKey=0,onAsk,onEdit,onSummary,onSession,sidebarTarget}:{sidebarTarget?:HTMLElement|null;active:boolean;workName:string;onQuote:(text:string)=>void;navigateTo?:string;refreshKey?:number;onAsk?:(doc:KnowledgeDocument)=>void;onEdit?:(doc:KnowledgeDocument)=>void;onSummary?:(doc:KnowledgeDocument)=>void;onSession?:(id:string)=>void}) {
   const [catalog,setCatalog]=useState<KnowledgeCatalog|null>(null),[loading,setLoading]=useState(false),[catalogError,setCatalogError]=useState('');
   const [view,setView]=useState<View>('documents'),[query,setQuery]=useState(''),[workspace,setWorkspace]=useState(''),[type,setType]=useState('knowledge'),[sort,setSort]=useState('recent');
   const [candidates,setCandidates]=useState<KnowledgeCandidate[]|null>(null),[reviews,setReviews]=useState<KnowledgeReview[]|null>(null),[extraLoading,setExtraLoading]=useState(false),[extraError,setExtraError]=useState('');
@@ -35,8 +36,10 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onBa
   const [loadedDetail,setDetail]=useState<KnowledgeDetail|null>(null),[detailBusy,setDetailBusy]=useState(false),[detailError,setDetailError]=useState(''),[actionError,setActionError]=useState('');
   const [reload,setReload]=useState(0),[relatedMore,setRelatedMore]=useState(false);
   const list=useRef<HTMLDivElement>(null),reader=useRef<HTMLDivElement>(null),reading=useRef(new Map<string,number>()),request=useRef(0),extraRequest=useRef(0);
-  const catalogRequested=useRef(false);
-  const loadCatalog=useCallback(async(refresh=false)=>{setLoading(true);setCatalogError('');try{setCatalog(await api.knowledgeCatalog(refresh));}catch(e){setCatalogError(errorText(e));}finally{setLoading(false);}},[]);
+  const listPosition=useRef(0);
+  useLayoutEffect(()=>{if(active&&list.current)list.current.scrollTop=listPosition.current;},[active,sidebarTarget]);
+  const catalogRequested=useRef(false),catalogBusy=useRef(false);
+  const loadCatalog=useCallback(async(refresh=false)=>{if(catalogBusy.current)return;catalogBusy.current=true;setLoading(true);setCatalogError('');try{setCatalog(await api.knowledgeCatalog(refresh));}catch(e){setCatalogError(errorText(e));}finally{catalogBusy.current=false;setLoading(false);}},[]);
   useEffect(()=>{if(active&&!catalogRequested.current){catalogRequested.current=true;void loadCatalog();}},[active,loadCatalog]);
   const loadExtra=useCallback(async(next:View)=>{
     if(next==='documents')return;
@@ -45,6 +48,7 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onBa
     catch(e){if(token===extraRequest.current)setExtraError(errorText(e));}finally{if(token===extraRequest.current)setExtraLoading(false);}
   },[]);
   useEffect(()=>{++extraRequest.current;setExtraLoading(false);setExtraError('');if(view==='candidates'&&!candidates||view==='reviews'&&!reviews)void loadExtra(view);},[view,loadExtra]);
+  useEffect(()=>{if(!active)return;const timer=window.setInterval(()=>{if(document.visibilityState!=='visible')return;void loadCatalog(true);if(view!=='documents')void loadExtra(view);},60000);return()=>window.clearInterval(timer);},[active,view,loadCatalog,loadExtra]);
   const documents=catalog?.documents||[];
   const byId=useMemo(()=>new Map(documents.map(d=>[d.id,d])),[documents]);
   const selectedId=selected[view], selectedCandidate=candidates?.find(c=>c.id===selectedId), selectedReview=reviews?.find(r=>r.id===selectedId);
@@ -66,10 +70,12 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onBa
     return (reviews||[]).filter(r=>(!workspace||r.workspace===workspace)&&(showDismissed||!r.dismissed)&&match([r.issue.detail,r.issue.componentId,byId.get(r.issue.componentId)?.title||'',r.issue.rule].join(' '))).map(r=>({id:r.id,title:byId.get(r.issue.componentId)?.title||basename(r.issue.componentId),workspace:r.workspace,meta:r.dismissed?'已忽略':rules[r.issue.rule]||r.issue.rule,description:r.issue.detail,time:'',tags:[] as string[]}));
   },[view,documents,candidates,reviews,normalized,workspace,type,sort,status,showDismissed,byId]);
   const maxPage=Math.max(0,Math.ceil(rows.length/pageSize)-1),currentPage=Math.min(page,maxPage),visible=rows.slice(currentPage*pageSize,(currentPage+1)*pageSize);
-  const resetPage=()=>{setPage(0);if(list.current)list.current.scrollTop=0;};
+  const resetPage=()=>{listPosition.current=0;setPage(0);if(list.current)list.current.scrollTop=0;};
   const changeView=(next:View)=>{setView(next);setReaderOpen(false);setActionError('');resetPage();};
-  const choose=(id:string)=>{setSelected(s=>({...s,[view]:id}));setReaderOpen(true);setActionError('');};
-  const openDocument=(id:string)=>{setView('documents');setSelected(s=>({...s,documents:id}));setReaderOpen(true);setActionError('');};
+  const choose=(id:string)=>{if(view==='documents'&&byId.get(id)?.type==='session'&&onSession){onSession(id);return;}setSelected(s=>({...s,[view]:id}));setReaderOpen(true);setActionError('');};
+  const openDocument=(id:string)=>{if(byId.get(id)?.type==='session'&&onSession){onSession(id);return;}setView('documents');setSelected(s=>({...s,documents:id}));setReaderOpen(true);setActionError('');};
+  useEffect(()=>{if(navigateTo)openDocument(navigateTo);},[navigateTo]);
+  useEffect(()=>{if(refreshKey){void loadCatalog(true);if(docId)setReload(v=>v+1);}},[refreshKey,loadCatalog]);
   const refresh=()=>{void loadCatalog(true);if(view!=='documents')void loadExtra(view);if(docId)setReload(v=>v+1);};
   const native=()=>{void api.webPreview('http://127.0.0.1:18989').catch(e=>setActionError(errorText(e)));};
   const selectedDoc=detail?.component||byId.get(docId);
@@ -88,22 +94,23 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onBa
     const source=view==='candidates'?`候选 ${selectedCandidate?.id}（${candidateNames[selectedCandidate?.status||'']||'尚未审核'}）`:selectedDoc?.path||docId;
     onQuote(`参考 Stele ${view==='candidates'?'候选知识':'知识'}：${title||source}\n来源：${source}\n知识库：${currentWorkspace||'未知'}\n\n${excerpt}${!selectedText&&docBody.length>2000?'\n（已截取前 2,000 字符，请按来源读取全文）':''}`);
   };
-  return <section hidden={!active} className={`knowledge-screen ${readerOpen?'knowledge-reading':''}`} aria-label="知识库">
-    <header className="knowledge-header"><div><BookOpen size={19} aria-hidden="true"/><h1>知识库</h1><span className="knowledge-origin">Stele</span></div><Button variant="secondary" compact onClick={onBack}><ArrowLeft size={14} aria-hidden="true"/>返回工作台</Button></header>
-    <div className="knowledge-toolbar"><SegmentedControl value={view} onValueChange={changeView} options={views} role="tablist" aria-label="知识库视图"/><div className="knowledge-tools"><span className="knowledge-sync" title={catalog?.fetchedAt?`读取于 ${new Date(catalog.fetchedAt).toLocaleString('zh-CN')}`:''}>{catalog?`${catalog.workspaces.length} 个来源`:'连接 Stele'}</span><button className="icon-button" aria-label="刷新知识库" disabled={loading||extraLoading} onClick={refresh}>{loading||extraLoading?<Spinner size={15}/>:<RefreshCw size={15}/>}</button><Button variant="secondary" compact onClick={native}>在 Stele 中管理<ArrowUpRight size={13} aria-hidden="true"/></Button></div></div>
-    {catalogError&&<div className="knowledge-alert" role="alert"><span>{catalogError}</span><Button variant="secondary" compact onClick={()=>void loadCatalog(true)} disabled={loading}>重试连接</Button></div>}
-    {actionError&&<div className="knowledge-alert" role="alert"><span>{actionError}</span><button className="icon-button" aria-label="关闭知识库提示" onClick={()=>setActionError('')}><X size={15}/></button></div>}
-    <div className="knowledge-body">
-      <section className="knowledge-library" aria-label="知识列表">
+  const library=<section className="knowledge-library" hidden={!active} aria-label="知识列表">
         <div className="knowledge-filters"><div className="knowledge-search"><Search size={15} aria-hidden="true"/><Input aria-label="搜索知识库" placeholder={view==='documents'?'搜索标题、路径或标签…':'搜索标题或内容…'} value={query} onChange={v=>{setQuery(v);resetPage();}} trailing={query?<button className="icon-button" aria-label="清空知识库搜索" onClick={()=>{setQuery('');resetPage();}}><X size={13}/></button>:undefined}/></div>
           <div className="knowledge-filter-row"><select aria-label="知识库来源" value={workspace} onChange={e=>{setWorkspace(e.target.value);resetPage();}}><option value="">全部来源</option>{catalog?.workspaces.map(s=><option key={s.alias} value={s.alias}>{s.alias}</option>)}</select>{view==='documents'?<select aria-label="文档类型" value={type} onChange={e=>{setType(e.target.value);resetPage();}}><option value="">全部类型</option>{[...new Set(documents.map(d=>d.type))].sort().map(t=><option key={t} value={t}>{typeNames[t]||t}</option>)}</select>:view==='candidates'?<select aria-label="候选状态" value={status} onChange={e=>{setStatus(e.target.value);resetPage();}}><option value="all">全部状态</option>{Object.entries(candidateNames).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select>:<label className="knowledge-checkbox"><input type="checkbox" checked={showDismissed} onChange={e=>{setShowDismissed(e.target.checked);resetPage();}}/>包含已忽略</label>}</div>
           <div className="knowledge-result-caption"><span role="status">{loading&&!catalog||extraLoading?'正在读取…':`${rows.length.toLocaleString()} ${view==='reviews'?'项待核实':view==='candidates'?'条候选':'篇文档'}`}</span>{view==='documents'&&<select aria-label="知识排序" value={sort} onChange={e=>{setSort(e.target.value);resetPage();}}><option value="recent">最近更新</option><option value="title">标题排序</option></select>}</div>
         </div>
-        <div key={view} className="knowledge-list" data-view={view} ref={list}>{extraError?<div className="knowledge-empty" role="alert"><p>{extraError}</p><Button variant="secondary" compact onClick={()=>void loadExtra(view)}>重试读取</Button></div>:loading&&!catalog||extraLoading?<div className="knowledge-empty" role="status"><Spinner size={20}/><p>正在读取 Stele…</p></div>:!visible.length?<div className="knowledge-empty"><Search size={24} aria-hidden="true"/><h2>{query||workspace?'没有匹配的内容':view==='reviews'?'暂无待核实项':view==='candidates'?'暂无候选知识':'暂无文档'}</h2><p>{query||workspace?'换个关键词，或调整来源和类型。':'内容来自 Stele 的原生索引。'}</p>{(query||workspace||type)&&<Button variant="secondary" compact onClick={()=>{setQuery('');setWorkspace('');setType('');setStatus('all');resetPage();}}>清除筛选</Button>}</div>:visible.map(row=><button key={`${view}:${row.id}`} className={`knowledge-row ${row.id===selectedId?'selected':''}`} aria-current={row.id===selectedId?'true':undefined} onClick={()=>choose(row.id)} title={row.title}><span className="knowledge-row-meta"><span>{row.workspace}</span><span>{row.meta}</span></span><strong>{row.title}</strong><span className="knowledge-row-description">{view==='documents'?row.description.split('/').slice(-3).join('/'):row.description}</span><span className="knowledge-row-bottom"><time>{row.time}</time>{row.tags.length>0&&<span>{row.tags.slice(0,2).join(' / ')}</span>}</span></button>)}</div>
+        <div key={view} className="knowledge-list" data-view={view} ref={list} onScroll={()=>{if(active&&list.current)listPosition.current=list.current.scrollTop;}}>{extraError?<div className="knowledge-empty" role="alert"><p>{extraError}</p><Button variant="secondary" compact onClick={()=>void loadExtra(view)}>重试读取</Button></div>:loading&&!catalog||extraLoading?<div className="knowledge-empty" role="status"><Spinner size={20}/><p>正在读取 Stele…</p></div>:!visible.length?<div className="knowledge-empty"><Search size={24} aria-hidden="true"/><h2>{query||workspace?'没有匹配的内容':view==='reviews'?'暂无待核实项':view==='candidates'?'暂无候选知识':'暂无文档'}</h2><p>{query||workspace?'换个关键词，或调整来源和类型。':'内容来自 Stele 的原生索引。'}</p>{(query||workspace||type)&&<Button variant="secondary" compact onClick={()=>{setQuery('');setWorkspace('');setType('');setStatus('all');resetPage();}}>清除筛选</Button>}</div>:visible.map(row=><button key={`${view}:${row.id}`} className={`knowledge-row ${row.id===selectedId?'selected':''}`} aria-current={row.id===selectedId?'true':undefined} onClick={()=>choose(row.id)} title={row.title}><span className="knowledge-row-meta"><span>{row.workspace}</span><span>{row.meta}</span></span><strong>{row.title}</strong><span className="knowledge-row-description">{view==='documents'?row.description.split('/').slice(-3).join('/'):row.description}</span><span className="knowledge-row-bottom"><time>{row.time}</time>{row.tags.length>0&&<span>{row.tags.slice(0,2).join(' / ')}</span>}</span></button>)}</div>
         <div className="knowledge-pagination"><span>{rows.length?`${currentPage*pageSize+1}–${Math.min((currentPage+1)*pageSize,rows.length)} / ${rows.length}`:'0 条'}</span><div><button className="icon-button" aria-label="知识上一页" disabled={!currentPage} onClick={()=>{setPage(currentPage-1);list.current?.scrollTo(0,0);}}><ChevronLeft size={16}/></button><button className="icon-button" aria-label="知识下一页" disabled={currentPage>=maxPage} onClick={()=>{setPage(currentPage+1);list.current?.scrollTo(0,0);}}><ChevronRight size={16}/></button></div></div>
-      </section>
+      </section>;
+  return <section hidden={!active} className={`knowledge-screen ${readerOpen?'knowledge-reading':''} ${sidebarTarget?'knowledge-docked':''}`} aria-label="知识库">
+    <header className="knowledge-header"><div><BookOpen size={19} aria-hidden="true"/><h1>知识库</h1><span className="knowledge-origin">Stele</span></div></header>
+    <div className="knowledge-toolbar"><SegmentedControl value={view} onValueChange={changeView} options={views} role="tablist" aria-label="知识库视图"/><div className="knowledge-tools"><span className="knowledge-sync" title={catalog?.fetchedAt?`读取于 ${new Date(catalog.fetchedAt).toLocaleString('zh-CN')}`:''}>{catalog?`${catalog.workspaces.length} 个来源`:'连接 Stele'}</span><button className="icon-button" aria-label="刷新知识库" disabled={loading||extraLoading} onClick={refresh}>{loading||extraLoading?<Spinner size={15}/>:<RefreshCw size={15}/>}</button><Button variant="secondary" compact onClick={native}>在 Stele 中管理<ArrowUpRight size={13} aria-hidden="true"/></Button></div></div>
+    {catalogError&&<div className="knowledge-alert" role="alert"><span>{catalogError}</span><Button variant="secondary" compact onClick={()=>void loadCatalog(true)} disabled={loading}>重试连接</Button></div>}
+    {actionError&&<div className="knowledge-alert" role="alert"><span>{actionError}</span><button className="icon-button" aria-label="关闭知识库提示" onClick={()=>setActionError('')}><X size={15}/></button></div>}
+    <div className="knowledge-body">
+      {sidebarTarget?createPortal(library,sidebarTarget):library}
       <section className="knowledge-detail" aria-label="知识详情">
-        <div className="knowledge-detail-toolbar"><button className="knowledge-back" onClick={()=>setReaderOpen(false)}><ChevronLeft size={15} aria-hidden="true"/>返回列表</button><span>{selectedId?'来源与正文':'阅读知识'}</span><Button compact disabled={!docBody||!workName||detailBusy} onClick={quote} title={workName?`追加到 ${workName} 的草稿；选中文本可仅引用选段`:'先选择一个工作区'}><Link2 size={13} aria-hidden="true"/>引用到对话</Button></div>
+        <div className="knowledge-detail-toolbar"><button className="knowledge-back" onClick={()=>setReaderOpen(false)}><ChevronLeft size={15} aria-hidden="true"/>返回列表</button><span>{selectedId?'来源与正文':'阅读知识'}</span>{onEdit&&selectedDoc&&<Button compact variant="secondary" disabled={detailBusy} onClick={()=>onEdit(selectedDoc)}>编辑</Button>}{onSummary&&selectedDoc&&<Button compact variant="secondary" disabled={detailBusy} onClick={()=>onSummary(selectedDoc)}>摘要</Button>}{onAsk&&selectedDoc&&<Button compact variant="secondary" disabled={detailBusy} onClick={()=>onAsk(selectedDoc)}>询问文档</Button>}<Button compact disabled={!docBody||!workName||detailBusy} onClick={quote} title={workName?`追加到 ${workName} 的草稿；选中文本可仅引用选段`:'先选择一个工作区'}><Link2 size={13} aria-hidden="true"/>引用到对话</Button></div>
         <div className="knowledge-reader" ref={reader} onScroll={()=>{if(active&&readingReady&&reader.current)reading.current.set(readingKey,reader.current.scrollTop);}} tabIndex={0}>
           {!selectedId?<div className="knowledge-empty knowledge-reader-empty"><BookOpen size={32} strokeWidth={1.4} aria-hidden="true"/><h2>把知识带回正在做的事</h2><p>从左侧选择一篇文档，阅读来源与关联内容。<br/>选取需要的段落，引用到工作台的草稿。</p><span className="knowledge-empty-note">{workName?`当前工作区：${workName}`:'选择工作区后即可引用知识'}</span></div>:<>
             {selectedReview&&<div className="knowledge-review-note"><strong>{rules[selectedReview.issue.rule]||selectedReview.issue.rule}</strong><p>{selectedReview.issue.detail}</p><span>Stele 自动检查结果，需结合原文核实。</span></div>}

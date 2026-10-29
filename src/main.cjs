@@ -17,7 +17,7 @@ const {PetController}=require('./pet/controller.cjs');
 const {applicationIcon}=require('./app-icon.cjs');
 const { listDirectory, previewKind, IMAGE_MIME, within } = require('./file-browser.cjs');
 const {SettingsStore, checkSettings, validateSettings, historyLocations, sessionDirectory, windowsSessionPath} = require('./client-settings.cjs');
-const knowledge = require('./knowledge.cjs').createKnowledgeReader();
+const knowledge = require('./knowledge-service.cjs').createKnowledgeService();
 
 let window, sessions, pet, selectedHistory, listedHistory = new Map(), terminal, runtimeMutation = false;
 let windowsPreparation = Promise.resolve();
@@ -77,7 +77,13 @@ app.whenReady().then(async () => {
   });
   handle('work:read', async root => { const works = await listWorks(); if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根'); return (await readBounded(path.join(wslUnc(root), 'SESSION.md'), 512 * 1024, 'SESSION.md')).toString('utf8'); });
   handle('stele:context', query => { if (typeof query !== 'string' || !query.trim() || query.length > 2000) throw new Error('请输入查询内容'); return steleCall('wiki_context', { query: query.trim() }); });
-  handle('stele:knowledge', knowledge);
+  handle('stele:knowledge', (kind,args) => knowledge(kind,args,event=>{if(window&&!window.isDestroyed())window.webContents.send('stele:knowledge-event',{requestId:args?.requestId,event});}));
+  handle('stele:save-file', async (name,bytes) => {
+    if(typeof name!=='string'||name.length>255||!(bytes instanceof Uint8Array)||bytes.length>64*1024*1024)throw Error('无效的知识导出内容');
+    const result=await dialog.showSaveDialog(window,{defaultPath:path.basename(name)});
+    if(result.canceled||!result.filePath)return false;
+    await fs.writeFile(result.filePath,bytes);return true;
+  });
   handle('omp:start', async options => {
     if (!options || typeof options.root !== 'string') throw new Error('请选择工作根');
     return sessions.start(options.clientSessionId, async startNative => {

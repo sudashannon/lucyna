@@ -1,0 +1,30 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand Cindy · states: loading, empty, error, selected · v2.0.0 */
+/* Hallmark · pre-emit critique: actual graph relationships, quiet source controls, accessible node selection and document detail. */
+.knowledge-network {display:grid;grid-template-columns:minmax(0,1fr) 288px;min-height:0;height:100%;background:var(--surface);}
+.knowledge-network-main {display:flex;flex-direction:column;min-width:0;min-height:0;}
+.knowledge-network-filters {display:flex;gap:var(--space-3);align-items:center;padding:var(--space-4) var(--space-5);flex-wrap:wrap;}
+.knowledge-network-filters>label {display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-12);color:var(--muted-readable);white-space:nowrap;}
+.knowledge-network-search {display:flex;align-items:center;gap:var(--space-2);flex:1;min-width:0;max-width:360px;}
+.knowledge-network-search>div {flex:1;min-width:0;}
+.knowledge-network-search input {border-color:var(--input-border);}
+.knowledge-network-caption {display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);padding:0 var(--space-5) var(--space-3);font-size:var(--text-12);color:var(--muted-readable);}
+.knowledge-network-canvas {position:relative;flex:1;min-height:300px;background:var(--surface);}
+.knowledge-network-canvas[hidden] {display:none;}
+.knowledge-network-controls {display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-5);border-top:1px solid var(--soft-border);}
+.knowledge-network-controls>div,.knowledge-network-controls label {display:flex;gap:var(--space-2);align-items:center;min-width:0;font-size:var(--text-12);}
+.knowledge-network-controls label {flex:1;}
+.knowledge-network-controls select {max-width:260px;min-width:0;flex:1;}
+.knowledge-network-controls>div>span {min-width:40px;text-align:center;font-variant-numeric:tabular-nums;font-size:var(--text-11);color:var(--muted-readable);}
+.knowledge-network-legend {padding:0 var(--space-5) var(--space-3);font-size:var(--text-11);color:var(--muted-readable);}
+.knowledge-network-detail {padding:var(--space-6);border-left:1px solid var(--soft-border);background:var(--surface-elevated);overflow:auto;}
+.knowledge-network-detail h2 {font-size:var(--text-18);font-weight:600;line-height:1.7;overflow-wrap:anywhere;margin-bottom:var(--space-4);}
+.knowledge-network-detail>p {color:var(--muted-readable);font-size:var(--text-13);line-height:1.9;margin-bottom:var(--space-5);}
+.knowledge-network-detail h3 {font-size:var(--text-14);font-weight:500;margin:var(--space-6) 0 var(--space-3);}
+.knowledge-network-relations {display:grid;gap:var(--space-2);margin-top:var(--space-5);}
+.knowledge-network-relations button {display:flex;align-items:flex-start;gap:var(--space-2);padding:var(--space-3) var(--space-2);text-align:left;font-size:var(--text-13);line-height:1.7;border-radius:6px;overflow-wrap:anywhere;}
+.knowledge-network-relations button:hover {background:var(--surface-hover-soft);}
+.knowledge-network-relations button:active {background:var(--sidebar-selection);}
+.knowledge-network-relations small {display:block;color:var(--muted-readable);font-size:var(--text-11);}
+.knowledge-network-error {color:var(--text-danger);padding:var(--space-5);}
+.knowledge-network button:disabled,.knowledge-network select:disabled {opacity:.55;cursor:not-allowed;}
+@container (max-width:900px) {.knowledge-network {display:block;overflow:auto;height:100%;min-height:0;}.knowledge-network-main {display:block;}.knowledge-network-canvas {height:450px;flex:none;}.knowledge-network-detail {border-left:0;border-top:1px solid var(--soft-border);}.knowledge-network-controls {flex-wrap:wrap;}.knowledge-network-controls label {flex-basis:100%;}}

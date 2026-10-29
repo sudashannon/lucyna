@@ -23,6 +23,9 @@ export interface Desktop {
   knowledgeCandidates():Promise<KnowledgeCandidate[]>;
   knowledgeReviews():Promise<KnowledgeReview[]>;
   knowledgeImage(id:string,src:string):Promise<string>;
+  knowledgeRequest(kind:string,args?:Record<string,unknown>):Promise<any>;
+  knowledgeSaveFile(name:string,bytes:Uint8Array):Promise<boolean>;
+  onKnowledge(fn:(data:{requestId:string;event:{type:string;content?:string;references?:import('./knowledge-types').KnowledgeEvidence[]}})=>void):()=>void;
   getSettings(): Promise<SettingsInfo>; checkSettings(settings:ClientSettings): Promise<EnvironmentCheck>; saveSettings(settings:ClientSettings): Promise<ClientSettings>;
   copyText(text: string): Promise<void>;
   listWorks(): Promise<Work[]>; readWork(root: string): Promise<string>;

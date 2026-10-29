@@ -59,6 +59,8 @@ test/*
 !test/pet-performance.cjs
 !test/screenshot-gallery.cjs
 !test/screenshot-preload.cjs
+!test/knowledge-native-desktop.cjs
+!test/knowledge-native-preload.cjs
 
 # Superseded local harness and unused intermediate artwork.
 test/renderer-behavior.cjs
