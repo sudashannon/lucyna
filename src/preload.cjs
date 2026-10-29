@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
+  workRun:(operation,data)=>ipcRenderer.invoke('work:run',operation,data),
   getPet:()=>ipcRenderer.invoke('pet:get'),
   savePet:patch=>ipcRenderer.invoke('pet:settings',patch),
   resetPetPosition:()=>ipcRenderer.invoke('pet:reset-position'),

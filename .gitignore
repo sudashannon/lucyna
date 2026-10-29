@@ -51,6 +51,8 @@ test/*
 !test/setup.cjs
 !test/runtime-config.test.cjs
 !test/work_inventory_test.py
+!test/work_runner_test.py
+!test/work_evolution_test.py
 !test/fixtures/
 !test/fixtures/**
 !test/renderer-behavior.cjs

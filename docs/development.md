@@ -1,5 +1,17 @@
 # 开发与验证
 
+## Work Runner
+
+`tools/work-runner/` 核心是 Python 3.10 标准库服务，`src/work-runner.cjs` 是可断开的 WSL stdio 连接，`WorkRuns.tsx` / `WorkRunVisuals.tsx` 提供 Work 内入口、阶段时间线、候选分数和差异。服务 SQLite 采用 WAL/FULL，派发前保存意图；systemd 持有进程，socket 0600。模型调用沿用 WSL 认证环境，不把环境或模型认证字段存入运行数据库。
+
+OMP 18.13.3 的 `--no-tools` 不排除后加载的 MCP 或自动学习工具。任务 overlay 关闭 autolearn 和 memory backend；服务自带 `policy.mjs` 显式加载并完成握手，每轮启用登记的 Work 工具，执行前阻止其他工具和模型自行替换 goal 预算。恢复 goal 时必须重新启用已登记工具，不能只过滤当时的活动集合。
+
+`capabilities.py` 提供受控搜索、公共 skill 读取、Stele 读取白名单、隔离命令和成员 Git 查看。不是启用原生通用 bash 后靠提示约束；公共 home 不挂载给命令，固定验收文件与 Work 身份文件只读。`evolution.py` 管理快照、worker、采纳日志与回退，`evo_worker.py` 在独立 venv 中实际调用 AntOmniEvo `Optimizer`、`ParetoFrontierEvolutionAlgorithm` 和 `LocalCandidateStore`；`OmpProposer` 用原生 RPC/goal 和目标文件白名单生成变更，`WorkSystem` / `WorkEvaluator` 运行冻结检查并映射归一化分数。并发候选数为 1，训练反馈送入 proposer，留出结果只用于评估/选择和用户展示。留出集参与多轮选择，不等于完全未触及的最终泛化测试集。
+
+离线回归：`node --require ./test/setup.cjs --test test/work-runner.test.cjs`；WSL 中运行 `python3 test/work_runner_test.py -v` 和 `python3 test/work_evolution_test.py -v`。Python 测试需要 bwrap，使用临时文件和假 RPC，不访问真实 Work、不调用模型。真实模型、Ant 优化器、Electron 采纳/回退及服务 SIGKILL 验收使用独立临时 Work、服务单元和客户端 profile，不进入默认测试。
+
+不宣称普通原生会话热迁移、外部副作用自动重放、多仓 Git 写入或长期进化收益。维护协议时检查 v2 分块、问题代次、同 Work 准入、冻结输入、候选快照漂移、采纳中断与故障后的旧进程身份。源快照最多 100 MiB/10000 文件，忽略 node_modules、.agent-tmp、__pycache__ 和私有路径；实验依赖应放在可复制输入中。候选库保留用于审计，不自动清理。
+
 ```text
 src/                 Electron 主进程、预加载、会话与文件服务
   renderer/          React UI、阅读器、知识库、Cindy 组件

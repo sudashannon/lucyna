@@ -26,6 +26,7 @@ import { phaseLabels } from './session-view';
 import { CommandInput } from './components/CommandInput';
 import { DocumentReader, EventsPanel, MemoryResults, PanelPage, PreviewPane, WorkSummary } from './components/ToolPanels';
 import { KnowledgeWorkspace as KnowledgePanel } from './components/KnowledgeWorkspace';
+import { WorkRuns } from './components/WorkRuns';
 import { TriangleAlert, Info, ClipboardCheck } from 'lucide-react';
 import { WorkDiagnostics, WorkHealthNotice, workIssues } from './components/WorkDiagnostics';
 import { BrandLogo, BrandCompanions } from './components/BrandVisuals';
@@ -268,6 +269,7 @@ export function App() {
       </PanelPage>
       <PanelPage name="work" active={panel && tab === 'work'} identity={w.work?.root || ''}>
         {w.work ? <WorkSummary work={w.work} content={w.document} loading={w.documentLoading} error={w.documentError} updated={w.documentUpdated} refresh={() => void w.refreshDocument()} onRead={() => setWorkReading(true)}/> : <Empty icon={FolderOpen} title="选择工作区" description="这里显示工作概览与文档待办。"/>}
+        {w.work && <details className="source-details"><summary>后台任务</summary><WorkRuns key={w.work.root} root={w.work.root} active={panel && tab === 'work'}/></details>}
       </PanelPage>
       <PanelPage name="preview" active={panel && tab === 'preview'} identity={w.work?.root || ''}>
         {w.sessions.map(s=><div key={s.id} hidden={s.id!==w.id} className="session-preview"><PreviewPane selected={sessionFiles[s.id]||null} root={s.root} active={s.id===w.id&&panel&&tab==='preview'} choose={() => void chooseFile()} onError={s.report} onImage={setZoom}/></div>)}

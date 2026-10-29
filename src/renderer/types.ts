@@ -13,6 +13,7 @@ export interface WorkEvent { id: string; time: string; text: string; level: 'inf
 // OMP extension events and message blocks are owned by the native protocol.
 export type OmpEvent = Record<string, any>;
 export interface Desktop {
+  workRun(operation:string,data?:Record<string,unknown>):Promise<any>;
   getPet?():Promise<{settings:PetSettings;warning:string;sessions:{id:string;title:string}[]}>;
   savePet?(patch:Partial<PetSettings>):Promise<PetSettings>;
   resetPetPosition?():Promise<PetSettings>;

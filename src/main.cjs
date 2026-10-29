@@ -18,6 +18,7 @@ const {applicationIcon}=require('./app-icon.cjs');
 const { listDirectory, previewKind, IMAGE_MIME, within } = require('./file-browser.cjs');
 const {SettingsStore, checkSettings, validateSettings, historyLocations, sessionDirectory, windowsSessionPath} = require('./client-settings.cjs');
 const knowledge = require('./knowledge-service.cjs').createKnowledgeService();
+const {WorkRunner}=require('./work-runner.cjs');
 
 let window, sessions, pet, selectedHistory, listedHistory = new Map(), terminal, runtimeMutation = false;
 let windowsPreparation = Promise.resolve();
@@ -28,6 +29,7 @@ if (process.env.OMP_CINDY_USERDATA) {
 }
 app.setPath('userData', resolveDataRoot(app.getPath('userData')));
 const settingsStore = new SettingsStore(app.getPath('userData'));
+const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get()});
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const onlyMain = event => { if (!window || event.sender !== window.webContents) throw new Error('Unauthorized IPC sender'); };
 async function readBounded(filePath, limit, label) {
@@ -71,6 +73,7 @@ app.whenReady().then(async () => {
     finally {runtimeMutation=false;}
   });
   handle('works:list', () => listWorks({refresh: true}));
+  handle('work:run', (operation,data) => workRunner.call(operation,data));
   handle('clipboard:write-text', async text => {
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 4 * 1024 * 1024) throw new Error('复制内容超过 4 MiB，请分段复制');
     await clipboard.writeText(text);
@@ -86,7 +89,7 @@ app.whenReady().then(async () => {
   });
   handle('omp:start', async options => {
     if (!options || typeof options.root !== 'string') throw new Error('请选择工作根');
-    return sessions.start(options.clientSessionId, async startNative => {
+    return workRunner.interactive(options.root,()=>sessions.start(options.clientSessionId, async startNative => {
     const defaults=await settingsStore.get();
     const settings={...defaults,runtime:options.resume&&['wsl','windows'].includes(options.runtime)?options.runtime:defaults.runtime};
     const locations=historyLocations(app.getPath('userData'),settings.runtime);
@@ -134,7 +137,7 @@ app.whenReady().then(async () => {
     try { return await startNative(safe); }
     finally { auth.release(); safe.env = undefined; }
     } finally {releasePreparation();}
-    });
+    }));
   });
   handle('omp:request', (type, data, id) => { if (!['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command'); return sessions.request(id,type,data); });
   handle('omp:ui-response', (data,id) => { if (!data || data.type !== 'extension_ui_response' || typeof data.id !== 'string') throw new Error('Invalid UI response'); return sessions.respond(id,data); });
@@ -259,7 +262,7 @@ app.on('window-all-closed', () => app.quit());
 let quitting=false;
 app.on('before-quit', event => {
   if(quitting)return;
-  event.preventDefault();quitting=true;pet?.dispose();terminal?.dispose();
+  event.preventDefault();quitting=true;pet?.dispose();terminal?.dispose();workRunner.disconnect();
   void (sessions?.closeAll()||Promise.resolve()).finally(()=>app.quit());
 });
 app.on('before-quit', () => terminal?.dispose());

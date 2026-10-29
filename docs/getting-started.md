@@ -70,6 +70,26 @@ Work 保存当前任务、SESSION 与共享笔记；L3 长期知识交给 Stele�
 
 ## 数据与回退
 
+### Work 后台任务与进化实验
+
+在右侧「工作 → 后台任务」填写目标、验收标准、模型与预算，点击「开始执行」。同一 Work 开始后台任务前需要结束普通会话连接。首次启动会安装并启用 WSL 用户服务 `lucyna-work-runner.service`；不改变全局 OMP 配置。WSL 需要 Python 3.10+、systemd 用户服务、bubblewrap，以及已配置的 OMP 和 Work helper。
+
+支持当前 Work 的 UTF-8 文件读写、搜索、L0/L1/L2 局部记录，以及已有 skill 与 Stele L3 的只读使用。技能通过 `list_work_skills` / `read_work_skill` 按需读取，公共知识通过明确的读取白名单访问；不会加载任意 MCP 写入工具或修改公共 skill。Git 成员可查看 status、diff 摘要和 log。
+
+`run_work_command` 使用 `/usr/bin/` 程序和参数数组，可在无网络、无用户主目录的隔离环境内构建/测试，当前 Work 可写；SESSION、成员登记、已有日志与冻结文件只读。固定验收使用相同隔离机制，但整个 Work 只读；临时输出写 `/tmp`。私有配置被遮蔽，符号/硬链接及未挂载的运行时不受支持。Git 写入、任意联网和设备操作继续使用普通会话。未配置自动检查的普通任务由用户验收。
+
+「新建进化实验」使用 AntOmniEvo：选择 1–10 个已有的 Work 局部文件、1–5 轮上限，分别指定训练与留出命令及不重叠的冻结文件。评分器最后一行输出 `{"score":0.75}` 或 `{"passed":3,"total":4}`。全部评分依赖预先提供的检查，程序需实际读取待优化的脚本/流程文件；不会仅凭修改笔记就自动产生能力分数。
+
+首次实验下载固定提交的 AntOmniEvo 并安装于 `~/.local/share/lucyna/ant-omnievo/` 的独立 venv。候选从 Work 快照产生，模型仅能修改选定文件，不能读取列入留出配置的文件；训练运行也遮蔽这些文件。检查输出和候选 diff 可在「放大查看任务与实验」中比较。留出得分达到 100% 且严格优于基线，才出现可采纳候选；点击采纳前会核对 Work 漂移。已采纳文件可回退，外部修改导致哈希不符时拒绝覆盖。评分器由用户负责可信性，当前沙箱不证明任意恶意候选无法对评分器投机。
+
+关闭 Lucyna 后后台任务继续；重新打开同一 Work 可查看状态和回答问题。原生 goal 完成后仍要经过检查。进程/服务中断后保留改动与 journal，进入待核查状态；检查 Work 后点击「恢复执行」。取消任务保留已有改动，不自动回滚代码或结束整个 Work。Token 预算不保证正在进行的请求硬截断。
+
+运行数据位于 WSL 的 `~/.local/state/lucyna/work-runner/`，独立版本位于 `~/.local/share/lucyna/work-runner/`。后台 journal 在该运行目录中，从后台任务入口管理，不混入普通会话历史。若需要停用，在对应 WSL 用户下运行 `systemctl --user disable --now lucyna-work-runner.service`；这会停止受管执行，数据库、journal 和 Work 文件保留。更换服务版本前应先完成或取消已有任务。
+
+用户服务启用不代表 Windows/WSL 冷启动已经验收；需要按本机 WSL 启动机制单独验证。AntOmniEvo 已接入局部文件实验；RSI-Anything 尚未接入，当前能力不等同于已证明长期自进化效果。实验进程中断后保留基线和候选，需显式恢复；未完成候选不会直接写入 Work，缺失最终用量的调用按预留上限计入预算。
+
+### 客户端数据
+
 内部 package 名仍为 `omp-cindy`，以保持旧安装的数据目录兼容。Electron `userData` 存放客户端设置、历史副本及窗口状态；准确位置以设置页为准。原生 WSL profile 和 session 属于 OMP。导入历史使用副本，不覆盖来源。
 
 更新前备份 `runtime.local.json` 和设置页中的数据目录。关闭程序前先确认运行任务；升级不会自动迁移或删除原有 OMP 环境。保留旧 checkout 可回退代码，`npm run start:legacy` 可启动保留的早期界面用于排障。
