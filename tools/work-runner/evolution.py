@@ -61,6 +61,7 @@ def specification(value, root):
 
 async def run_worker(runner, key):
     run=runner.store.get(key)
+    agent=runner.require_auxiliary()
     folder=runner.directory/'runs'/key/'evolution'
     folder.mkdir(parents=True,exist_ok=True)
     request_file=folder/'request.json'
@@ -73,16 +74,18 @@ async def run_worker(runner, key):
         if snapshot(str(initial))!=hashes or snapshot(run['root'])!=hashes:
             raise ValueError('快照期间 Work 发生变化，请重新创建实验')
         atomic_json(request_file,{'root':run['root'],'objective':run['objective'],'acceptance':run['acceptance'],
-            'spec':run['evolutionSpec'],'hashes':hashes,'model':run['model'],'tokenBudget':run['tokenBudget'],
-            'omp':runner.config['omp'],'agentDir':runner.config['agentDir'],'helper':runner.config['helper']})
+            'spec':run['evolutionSpec'],'hashes':hashes,'model':run['model'],'tokenBudget':run['tokenBudget']})
     run.update(state='running',phase='baseline')
-    runner.save(run,'evolution_started','AntOmniEvo 已启动，使用隔离候选副本')
+    runner.save(run,'evolution_started','AntOmniEvo 已启动，调用本地 agent 迭代 Work 副本')
     from runner import child_setup, identity
     process=await asyncio.create_subprocess_exec(worker_python(),str(Path(__file__).with_name('evo_worker.py')),str(folder),
-        stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.DEVNULL,env=await runner.environment(),start_new_session=True,preexec_fn=child_setup,limit=4*1024*1024)
+        stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.DEVNULL,start_new_session=True,preexec_fn=child_setup,limit=4*1024*1024)
     runner.workers[key]=process
     run['process']=identity(process.pid);runner.store.save(run)
     try:
+        process.stdin.write((json.dumps(agent)+'\n').encode())
+        await process.stdin.drain()
+        process.stdin.close()
         while line:=await process.stdout.readline():
             event=json.loads(line)
             if event.get('type')!='evolution':

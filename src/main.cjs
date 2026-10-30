@@ -44,7 +44,7 @@ const auxiliaryAgent=new AuxiliaryAgent(auxiliarySettings);
 const sessionTitles=new SessionTitles(auxiliaryAgent,auxiliarySettings);
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const historyTrash = new HistoryTrash(app.getPath('userData'));
-const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get()});
+const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get(),auxiliary:()=>auxiliarySettings.resolve()});
 const onlyMain = event => { if (!window || event.sender !== window.webContents) throw new Error('Unauthorized IPC sender'); };
 async function readBounded(filePath, limit, label) {
   const handle = await fs.open(filePath, 'r');

@@ -71,6 +71,7 @@ class Runner:
         self.tasks = {}
         self.processes = {}
         self.workers = {}
+        self.auxiliary = None  # Credentials are ephemeral and never part of a run or client record.
         self.answers = {}
         self.admission = asyncio.Lock()
         for run in self.store.list():
@@ -88,7 +89,7 @@ class Runner:
     async def dispatch(self, request):
         operation = request.get('op')
         if operation == 'status':
-            return {'installed': True, 'version': 3, 'scope': 'work-tools', 'automaticEvolution': True, 'workRoot': self.config['workRoot'], 'tools':[t['name'] for t in TOOLS+EXTRA_TOOLS]}
+            return {'installed': True, 'version': 4, 'scope': 'work-tools', 'automaticEvolution': True, 'evolutionAgent': 'auxiliary', 'workRoot': self.config['workRoot'], 'tools':[t['name'] for t in TOOLS+EXTRA_TOOLS]}
         if operation == 'list':
             return self.store.list(request.get('root'))
         if operation == 'get':
@@ -98,6 +99,9 @@ class Runner:
                 raise ValueError('无效事件游标')
             return {'run': run, **self.store.events(run['id'], after)}
         async with self.admission:
+            if operation == 'auxiliary-configure':
+                self.configure_auxiliary(request.get('auxiliary'))
+                return {'ready': bool(self.auxiliary)}
             if operation == 'automatic-sync':
                 return await self.automatic.sync(request)
             if operation == 'automatic-status':
@@ -116,6 +120,8 @@ class Runner:
             if operation in ('pause', 'cancel'):
                 return await self.stop(run, operation == 'cancel')
             if operation == 'resume':
+                if run.get('mode') == 'evolution':
+                    self.require_auxiliary()
                 if run['state'] not in ('paused', 'interrupted') or run['id'] in self.tasks:
                     raise ValueError('任务当前不可恢复')
                 if still_alive(run.get('process')):
@@ -155,6 +161,16 @@ class Runner:
                 return run
             raise ValueError('不支持的后台任务操作')
 
+    def configure_auxiliary(self, value):
+        from local_agent import configuration
+        self.auxiliary = None
+        self.auxiliary = configuration(value)
+
+    def require_auxiliary(self):
+        if not self.auxiliary:
+            raise ValueError('请打开 Lucyna 并配置辅助模型，本地 agent 就绪后才能迭代 Work；不会回退到 OMP')
+        return self.auxiliary
+
     async def create(self, request, automatic=None):
         key = text(request.get('requestKey'), '请求标识', 100)
         root = text(request.get('root'), 'Work 根', 4096)
@@ -182,6 +198,7 @@ class Runner:
             raise ValueError('无效任务模式')
         evolution_spec=None
         if mode=='evolution':
+            self.require_auxiliary()
             from evo_runtime import python as evolution_python
             evolution_python()
             evolution_spec=evolution_specification(request.get('evolution'),root)
@@ -279,7 +296,7 @@ class Runner:
         try:
             run = self.store.get(key)
             run.update(state='starting', attempts=run['attempts']+1, generation=run['generation']+1, attemptStartedAt=started)
-            self.save(run, 'starting', '启动受管 OMP')
+            self.save(run, 'starting', '启动 AntOmniEvo 与本地 agent' if run.get('mode')=='evolution' else '启动受管 OMP')
             remaining = max(1, run['wallSeconds']-run['elapsedSeconds'])
             await asyncio.wait_for(run_worker(self,key) if run.get('mode')=='evolution' else self.run_attempt(key, resume), remaining)
         except asyncio.CancelledError:

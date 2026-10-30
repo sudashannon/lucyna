@@ -2,7 +2,7 @@ import {useState} from 'react';
 
 export type FileDelta={path:string;beforeSha:string;afterSha:string;diff:string;added:number;removed:number;truncated?:boolean};
 type Candidate={id:string;generation:number;state:string;training:number|null;validation:number|null;trainingOutput?:string;validationOutput?:string;error?:string;lastTool?:string;changes:FileDelta[]};
-export type Evolution={framework:string;phase:string;iteration?:number;iterations?:number;baseline?:number;bestScore?:number;bestCandidate?:string;eligible?:boolean;promotion?:string;candidates:Candidate[];changes?:FileDelta[];history?:number[];usageEstimated?:boolean};
+export type Evolution={agent?:string;framework:string;phase:string;iteration?:number;iterations?:number;baseline?:number;bestScore?:number;bestCandidate?:string;eligible?:boolean;promotion?:string;candidates:Candidate[];changes?:FileDelta[];history?:number[];usageEstimated?:boolean};
 const pct=(n:number|null|undefined)=>n==null?'未评估':`${Math.round(n*100)}%`;
 const candidateStates:Record<string,string>={evaluating:'评估中',proposing:'生成中',proposed:'待评估',pending:'已评估',evolving:'继续优化',unavailable:'未入选',failed:'未完成'};
 
@@ -16,7 +16,7 @@ export function FileChanges({changes}:{changes:FileDelta[]}){
 }
 
 export function RunStages({state,phase,evolution}:{state:string;phase?:string;evolution:boolean}){
-  const labels=evolution?['准备快照','评估基线','生成候选','独立检查','查看与采纳']:['准备','执行任务','检查结果','完成'];
+  const labels=evolution?['准备快照','评估基线','迭代 Work','独立检查','查看与采纳']:['准备','执行任务','检查结果','完成'];
   const stage=evolution?({baseline:1,proposing:2,evaluating:3,review:4,applied:4,rolled_back:4}[phase||'']??0):({queued:0,starting:0,running:1,waiting_user:1,paused:1,interrupted:1,verifying:2,waiting_review:2,completed:3}[state]??0);
   const halted=['paused','interrupted','cancelled','failed','waiting_user','waiting_review'].includes(state);
   return <ol className="wr-stages" aria-label="执行阶段">{labels.map((label,index)=><li key={label} className={index===stage?`current ${halted?'halted':''}`:index<stage?'done':''} aria-current={index===stage?'step':undefined}><i>{index<stage?'✓':index+1}</i><span>{label}</span></li>)}</ol>;

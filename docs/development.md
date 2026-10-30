@@ -10,13 +10,15 @@
 
 `automatic.py` 在同一个服务中持久保存 Work 评测配置、文件版本、触发与客户端活动；独立于 renderer 的计时器检测空闲和文件变化。主进程上报连接/忙碌状态，失联的活动连接不被当作空闲。自动实验使用现有隔离 worker，只生成候选，采纳仍由用户明确触发；普通会话可继续使用。预算不随自动恢复重置，用户暂停不自动恢复。默认空闲 60 秒、冷却 30 分钟、滚动 24 小时每 Work 2 次、自动实验全局串行。新增离线回归 `python3 test/work_automatic_test.py -v` 覆盖去重、重启、活动租约、配额、漂移和恢复。自动调度不能替代用户提供可信的训练/留出检查。
 
-`tools/work-runner/` 核心是 Python 3.10 标准库服务，`src/work-runner.cjs` 是可断开的 WSL stdio 连接，`WorkRuns.tsx` / `WorkRunVisuals.tsx` 提供 Work 内入口、阶段时间线、候选分数和差异。服务 SQLite 采用 WAL/FULL，派发前保存意图；systemd 持有进程，socket 0600。模型调用沿用 WSL 认证环境，不把环境或模型认证字段存入运行数据库。
+`tools/work-runner/` 核心是 Python 3.10 标准库服务，`src/work-runner.cjs` 是可断开的 WSL stdio 连接，`WorkRuns.tsx` / `WorkRunVisuals.tsx` 提供 Work 内入口、阶段时间线、候选分数和差异。服务 SQLite 采用 WAL/FULL，派发前保存意图；systemd 持有进程，socket 0600。普通后台任务的模型调用沿用 WSL OMP 认证环境。进化实验调用本地辅助 agent；两者均不把模型认证字段存入运行数据库。
 
 OMP 18.13.3 的 `--no-tools` 不排除后加载的 MCP 或自动学习工具。任务 overlay 关闭 autolearn 和 memory backend；服务自带 `policy.mjs` 显式加载并完成握手，每轮启用登记的 Work 工具，执行前阻止其他工具和模型自行替换 goal 预算。恢复 goal 时必须重新启用已登记工具，不能只过滤当时的活动集合。
 
-`capabilities.py` 提供受控搜索、公共 skill 读取、Stele 读取白名单、隔离命令和成员 Git 查看。不是启用原生通用 bash 后靠提示约束；公共 home 不挂载给命令，固定验收文件与 Work 身份文件只读。`evolution.py` 管理快照、worker、采纳日志与回退，`evo_worker.py` 在独立 venv 中实际调用 AntOmniEvo `Optimizer`、`ParetoFrontierEvolutionAlgorithm` 和 `LocalCandidateStore`；`OmpProposer` 用原生 RPC/goal 和目标文件白名单生成变更，`WorkSystem` / `WorkEvaluator` 运行冻结检查并映射归一化分数。并发候选数为 1，训练反馈送入 proposer，留出结果只用于评估/选择和用户展示。留出集参与多轮选择，不等于完全未触及的最终泛化测试集。
+`capabilities.py` 提供受控搜索、公共 skill 读取、Stele 读取白名单、隔离命令和成员 Git 查看。不是启用原生通用 bash 后靠提示约束；公共 home 不挂载给命令，固定验收文件与 Work 身份文件只读。`evolution.py` 管理快照、worker、采纳日志与回退，`evo_worker.py` 在独立 venv 中实际调用 AntOmniEvo `Optimizer`、`ParetoFrontierEvolutionAlgorithm` 和 `LocalCandidateStore`；`LocalAgentProposer` 通过私有 stdio 调用现有 `AuxiliaryAgent`（AI SDK `ToolLoopAgent`），用目标文件白名单迭代 Work，不创建 OMP session，`WorkSystem` / `WorkEvaluator` 运行冻结检查并映射归一化分数。并发候选数为 1，训练反馈送入 proposer，留出结果只用于评估/选择和用户展示。留出集参与多轮选择，不等于完全未触及的最终泛化测试集。
 
-离线回归：`node --require ./test/setup.cjs --test test/work-runner.test.cjs`；WSL 中运行 `python3 test/work_runner_test.py -v` 和 `python3 test/work_evolution_test.py -v`。Python 测试需要 bwrap，使用临时文件和假 RPC，不访问真实 Work、不调用模型。真实模型、Ant 优化器、Electron 采纳/回退及服务 SIGKILL 验收使用独立临时 Work、服务单元和客户端 profile，不进入默认测试。
+离线回归：`node --require ./test/setup.cjs --test test/work-runner.test.cjs`；WSL 中运行 `python3 test/work_runner_test.py -v` 和 `python3 test/work_evolution_test.py -v`。Python 测试需要 bwrap，使用临时文件和假 RPC，不访问真实 Work、不调用付费模型。`work_local_agent_test.py` 另用真实 AntOmniEvo 和本地 HTTP 模拟模型验证完整本地 agent 工具循环，缺少可选 Ant 环境时跳过该项。真实模型、Ant 优化器、Electron 采纳/回退及服务 SIGKILL 验收使用独立临时 Work、服务单元和客户端 profile，不进入默认测试。
+
+本地 agent 的模型接口与密钥复用「辅助模型」配置，与自动命名开关独立。Work 每步（模型调用及工具执行）使用独立的 120 秒超时，整个实验另受总时长限制；会话标题保留辅助模型设置中的短请求超时。主进程解密后经私有管道同步给服务，凭据仅保留在内存；正常关闭客户端后可以继续运行，服务重启后等待客户端重新同步。实验可覆盖同一接口中的模型名称。WSL 需 Node.js 22+（支持现有 NVM 安装）；agent 直接复用客户端的 SDK 模块，限 12 步、每步最多 16384 输出 Token（计入原实验总预算），逐步核算总预算，未知用量或中断按预留上限记账。确认写入且训练检查通过后立即交回 AntOmniEvo，不再请求模型生成总结；独立留出检查仍由框架执行。只提供 Work 文件列举、读取、受限写入和训练检查，留出文件不可读取，公共 L3/skill 不进入工具集。暂停/取消会结束整个 worker 进程组。
 
 不宣称普通原生会话热迁移、外部副作用自动重放、多仓 Git 写入或长期进化收益。维护协议时检查 v2 分块、问题代次、同 Work 准入、冻结输入、候选快照漂移、采纳中断与故障后的旧进程身份。源快照最多 100 MiB/10000 文件，忽略 node_modules、.agent-tmp、__pycache__ 和私有路径；实验依赖应放在可复制输入中。候选库保留用于审计，不自动清理。
 

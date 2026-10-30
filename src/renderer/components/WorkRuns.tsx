@@ -99,7 +99,8 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
       <div className="wr-section-title"><strong>{configureAuto?'自动进化 · 一次配置，持续复用':mode==='evolution'?'进化实验 · AntOmniEvo':'后台任务 · OMP'}</strong></div>
       <fieldset disabled={!!busy}><label>目标<textarea required maxLength={16000} value={objective} onChange={e=>setObjective(e.target.value)} placeholder="当前 Work 需要完成什么"/></label>
       <label>验收标准<textarea required maxLength={8000} value={acceptance} onChange={e=>setAcceptance(e.target.value)} placeholder="满足哪些条件才算完成"/></label>
-      <label>模型<input value={model} onChange={e=>setModel(e.target.value)} placeholder="留空使用 WSL OMP 默认模型"/></label>
+      <label>模型（可选覆盖）<input value={model} onChange={e=>setModel(e.target.value)} placeholder={mode==='evolution'?'留空使用设置中的辅助模型':'留空使用 WSL OMP 默认模型'}/></label>
+      {mode==='evolution'&&<p className="wd-caption">AntOmniEvo 调用本地 agent 读取、修改和检查 Work 副本。模型接口复用设置中的「辅助模型」，每轮结果经比较后由你确认采纳。</p>}
       <div className="wr-budget"><label>Token 预算<input type="number" min="1000" max="200000" step="1000" required value={tokens} onChange={e=>setTokens(e.target.value)}/></label><label>时间上限（分钟）<input type="number" min="1" max="720" required value={minutes} onChange={e=>setMinutes(e.target.value)}/></label></div>
       {mode==='evolution'&&<><p className="wd-caption">仅优化选定文件。训练与留出检查分别冻结；评分器最后一行须输出 JSON：score（0–1），或 passed / total。留出检查通过且优于基线，才提供采纳入口。</p><label>优化对象（每行一个现有文件）<textarea required value={targets} onChange={e=>setTargets(e.target.value)} placeholder={'scripts/workflow.py\nnotes/verification.md'}/></label><label>最多生成轮数<input type="number" min="1" max="5" required value={iterations} onChange={e=>setIterations(e.target.value)}/></label></>}
       <details open={mode==='evolution'||undefined}><summary>{mode==='evolution'?'训练检查（必填）':'自动验收（可选）'}</summary><p className="wd-caption">检查在无网络的隔离环境中运行，Work 源文件只读，临时文件可写入 /tmp。普通任务未设置检查时，结束后等待你验收。</p>
@@ -114,7 +115,7 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
     {loaded&&!runs.length&&!showForm&&<p className="empty-line">此 Work 尚无后台任务。</p>}
     {!!runs.length&&<label className="wr-picker">任务<select value={selected} onChange={e=>choose(e.target.value)}>{runs.map(run=><option key={run.id} value={run.id}>{states[run.state]||run.state} · {run.objective.slice(0,45)}</option>)}</select></label>}
     {current&&<article className="wr-run">
-      <div className={`wr-heading wr-state-${current.state}`} role="status" aria-live="polite"><strong>{current.mode==='evolution'&&current.state==='waiting_review'?'候选待采纳':states[current.state]||current.state}</strong><span>WSL · {current.effectiveModel?.name||current.effectiveModel?.id||current.model||'默认模型'}</span></div>
+      <div className={`wr-heading wr-state-${current.state}`} role="status" aria-live="polite"><strong>{current.mode==='evolution'&&current.state==='waiting_review'?'候选待采纳':states[current.state]||current.state}</strong><span>{current.evolution?.agent==='auxiliary'?'本地 agent':current.mode==='evolution'&&!current.effectiveModel?'等待 agent':'WSL OMP'} · {current.effectiveModel?.name||current.effectiveModel?.id||current.model||'默认模型'}</span></div>
       <RunStages state={current.state} phase={current.phase} evolution={current.mode==='evolution'}/>
       {current.automatic&&<p className="wr-auto-origin">自动触发 · Work 有新变化且已空闲 · 候选等待你确认采纳</p>}
       <h3>{current.objective}</h3><p className="wd-caption">{current.acceptance}</p>

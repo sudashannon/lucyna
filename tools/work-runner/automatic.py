@@ -11,6 +11,7 @@ from storage import TERMINAL
 
 PROFILE_FIELDS = ('objective', 'acceptance', 'model', 'tokenBudget', 'wallSeconds', 'evolution')
 LABELS = {
+    'waiting_agent': '等待本地 agent 就绪',
     'needs_profile': '等待评测配置', 'disabled': '自动进化已关闭', 'waiting_idle': '等待 Work 空闲',
     'unknown_client': '等待客户端确认状态', 'stabilizing': '等待文件稳定', 'unchanged': '等待新的 Work 变化',
     'cooldown': '冷却中', 'daily_limit': '今日自动实验次数已达上限', 'running': '自动实验进行中',
@@ -60,6 +61,8 @@ class Automatic:
             raise ValueError('自动进化只能使用登记的 Work')
 
     async def sync(self, request):
+        if 'auxiliary' in request:
+            self.runner.configure_auxiliary(request['auxiliary'])
         client = request.get('clientId')
         roots = request.get('works')
         if not isinstance(client, str) or not 1 <= len(client) <= 100 or not isinstance(roots, list) or len(roots) > 500:
@@ -150,6 +153,8 @@ class Automatic:
         if active:
             value['lastRunId'] = active['id']
             if active.get('automatic') and active['state'] == 'interrupted' and active.get('reason') in ('service_restarted', 'service_stopping', 'execution_error'):
+                if not self.runner.auxiliary:
+                    self.status(value, 'waiting_agent', '请打开 Lucyna 同步辅助模型配置；不会创建额外的 OMP 会话。'); return
                 activity = self.activity(root)
                 if activity:
                     self.status(value, activity, '等待普通会话空闲后恢复隔离实验。', idleSince=now); return
@@ -196,6 +201,8 @@ class Automatic:
             self.status(value, 'stabilizing' if now < value.get('idleSince', now)+self.idle_seconds else 'cooldown', '已保存触发意图，满足空闲与冷却条件后开始。', nextAt=due); return
         if any(self.store.get(key).get('automatic') for key in self.runner.tasks):
             self.status(value, 'waiting_task', '另一个 Work 的自动实验正在运行，随后继续。'); return
+        if not self.runner.auxiliary:
+            self.status(value, 'waiting_agent', '请在 Lucyna 设置中配置辅助模型；自动运行和比较，采纳由你确认。'); return
         specification(value['profile']['evolution'], root)
         from evo_runtime import python, install
         try:

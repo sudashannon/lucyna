@@ -11,8 +11,9 @@ const script=toWslPath(path.resolve(__dirname,'../tools/work-runner/cli.py'));
 const state=runtime.home+'/.local/state/lucyna/work-runner';
 
 class WorkRunner {
-  constructor({execute=spawn,listWorks,connections=()=>[],settings=async()=>({}),config=runtime,scriptPath=script,stateDirectory=state}={}){
+  constructor({execute=spawn,listWorks,connections=()=>[],settings=async()=>({}),auxiliary=async()=>null,config=runtime,scriptPath=script,stateDirectory=state}={}){
     this.execute=execute;this.listWorks=listWorks;this.connections=connections;this.settings=settings;this.config=config;
+    this.auxiliary=auxiliary;
     this.child=null;this.pending=new Map();this.admissions=new Set();this.installing=null;this.script=scriptPath;this.state=stateDirectory;
     this.automaticReady=false;this.automaticError='';this.activity=new Map();this.clientId='lucyna-desktop';this.automaticWorks=[];
   }
@@ -78,13 +79,19 @@ class WorkRunner {
     else if(event.type==='session_state'&&typeof event.isSettled==='boolean')this.activity.set(id,!event.isSettled);
     else if(event.type==='process_exit')this.activity.delete(id);
   }
+  async agentConfiguration(){
+    const config=await this.auxiliary();
+    return config?.baseURL&&config?.model?{script:toWslPath(path.resolve(__dirname,'evolution-agent-worker.cjs')),config}:null;
+  }
   async syncAutomatic(release=false){
     if(this.automaticSync)return this.automaticSync;
     this.automaticSync=(async()=>{
       if(!this.automaticReady){await this.ensure();this.automaticReady=true;}
       const works=await this.listWorks(),connections=release?[]:this.connections();
       this.automaticWorks=works.filter(w=>w.kind!=='invalid').map(w=>{const related=connections.filter(c=>c.root===w.root);return {root:w.root,connected:!!related.length,busy:related.some(c=>!c.ready||c.questions?.length||(this.activity.get(c.id)??c.busy))||this.admissions.has(w.root)};});
-      await this.request({op:'automatic-sync',clientId:this.clientId,works:this.automaticWorks});this.automaticError='';
+      // The service retains credentials only in memory; client records never contain them.
+      const auxiliary=await this.agentConfiguration().catch(()=>null);
+      await this.request({op:'automatic-sync',clientId:this.clientId,works:this.automaticWorks,auxiliary});this.automaticError='';
     })().catch(error=>{this.automaticReady=false;this.automaticError=String(error);throw error;});
     try{return await this.automaticSync;}finally{this.automaticSync=null;}
   }
@@ -115,12 +122,15 @@ class WorkRunner {
       return (await this.inspect(data.root)).filter(r=>r.root===data.root);
     }
     if(op==='create'||op==='resume'){
-      const root=op==='create'?data.root:(await this.inspect()).find(r=>r.id===data.runId)?.root;
+      const existing=op==='resume'?(await this.inspect()).find(r=>r.id===data.runId):null;
+      const root=op==='create'?data.root:existing?.root;
       if(!root)throw Error('后台任务不存在');
       return this.admit(root,async()=>{
         if(this.connections().some(c=>c.root===root))throw Error('此 Work 仍有普通会话连接，请先结束连接再启动后台任务');
         if(op==='create'&&data.mode==='evolution')await this.oneShot('install-evolution');
-        await this.ensure();return this.request({...data,op});
+        await this.ensure();
+        if(data.mode==='evolution'||existing?.mode==='evolution')await this.request({op:'auxiliary-configure',auxiliary:await this.agentConfiguration()});
+        return this.request({...data,op});
       });
     }
     if(op==='adopt'||op==='rollback'){

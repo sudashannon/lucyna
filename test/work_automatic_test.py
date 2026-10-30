@@ -25,6 +25,7 @@ class Scheduling(unittest.IsolatedAsyncioTestCase):
         self.directory = self.base/'state'; self.directory.mkdir()
         self.config = {'workRoot':str(self.root.parent), 'helper':str(helper), 'omp':'unused', 'agentDir':str(self.base)}
         self.runner = Runner(self.directory, self.config)
+        self.runner.auxiliary = {'config': {'model': 'test-local'}}
         self.now = time.time(); self.launched = []
         self.runner.launch = lambda key, resume=False:self.launched.append((key, resume))
         self.auto = self.runner.automatic = Automatic(self.runner, clock=lambda:self.now, idle_seconds=10, cooldown=100, daily_limit=2)

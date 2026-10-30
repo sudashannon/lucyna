@@ -48,6 +48,7 @@ design/*
 # Only deterministic tests and explicitly documented offline render checks ship.
 test/*
 !test/*.test.cjs
+!test/work_local_agent_test.py
 !test/setup.cjs
 !test/desktop-log.cjs
 !test/runtime-config.test.cjs
