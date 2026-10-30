@@ -80,6 +80,7 @@ class SessionManager {
   async request(id,type,data) {
     if(type==='prompt')validatePrompt(data);
     const record=this.get(id);
+    const titleRevision=type==='get_messages'?this.titles?.revision(record):undefined;
     if(['prompt','set_session_name','abort','abort_and_restore_queue'].includes(type))this.titles?.cancel(record);
     const prompt=type==='prompt',wasBusy=record.busy;
     if(prompt&&!wasBusy)this.emit(record,{type:'client_prompt',titleHint:resultExcerpt(data.message,120)||(data.images?.length?'图片任务':'')});
@@ -95,6 +96,7 @@ class SessionManager {
     }
     if(type==='get_state')this.emit(record,{type:'session_state',sessionName:result?.sessionName||'',isSettled:result?.isSettled});
     if(type==='get_messages'){
+      this.titles?.restore(record,result?.messages,this,titleRevision);
       const first=result?.messages?.find(m=>m.role==='user');
       const titleHint=resultExcerpt(first?.content,120)||(first?.content?.some?.(b=>b?.type==='image')?'图片任务':'');
       if(titleHint)this.emit(record,{type:'session_metadata',titleHint});

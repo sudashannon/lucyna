@@ -93,7 +93,7 @@ app.whenReady().then(async () => {
   handle('settings:get', async () => ({settings:await settingsStore.get(),storage:app.getPath('userData'),workspace:{distro:runtime.distro,user:runtime.user,root:runtime.workRoot}}));
   handle('settings:check', checkSettings);
   handle('auxiliary:get',()=>auxiliarySettings.get());
-  handle('auxiliary:save',async input=>{const settings=await auxiliarySettings.save(input);for(const record of sessions.records.values())sessionTitles.cancel(record);return settings;});
+  handle('auxiliary:save',async input=>{const settings=await auxiliarySettings.save(input);for(const record of sessions.records.values())sessionTitles.refresh(record,sessions);return settings;});
   handle('auxiliary:check',input=>auxiliaryAgent.check(input));
   handle('settings:save', async input => {
     const next=validateSettings(input);

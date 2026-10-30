@@ -37,7 +37,7 @@ class Conversation {
   get title(){return this.sessionName||textContent(this.view.messages.find(m=>m.role==='user')?.content).slice(0,240).replace(/\s+/g,' ').slice(0,60)||(this.sessionFile?'已恢复的会话':'新会话');}
   get busy(){return !!this.view.run?.active;}
   changed=()=>this.owner.changed();
-  request=(type:string,data?:OmpEvent)=>{const revision=this.titleRevision;return this.owner.api.request(type,data,this.id).then(result=>type==='get_state'&&revision!==this.titleRevision?{...result,sessionName:this.sessionName}:result);};
+  request=(type:string,data?:OmpEvent)=>{const revision=this.titleRevision;return this.owner.api.request(type,data,this.id).then(result=>type==='get_state'?{...result,...(revision!==this.titleRevision?{sessionName:this.sessionName}:{}),clientTitleRevision:this.titleRevision}:result);};
   setError=(message:string)=>{this.error=message;this.changed();};
   log=(text:string,level:WorkEvent['level']='info',detail?:string)=>{this.events=[{id:uid(),time:new Date().toLocaleTimeString('zh-CN',{hour12:false}),text,level,detail,root:this.work.root},...this.events].slice(0,200);this.changed();};
   report=(e:unknown)=>{const message=errorText(e);this.error=message.split('\n')[0];if(!this.owner.isReading(this.id))this.unread=true;this.log('操作失败','error',message);};
@@ -50,7 +50,7 @@ class Conversation {
     if(this.view.run?.active&&!next.run?.active&&next.run?.outcome&&!this.owner.isReading(this.id))this.unread=true;
     this.view=next;if(streaming)this.owner.streamChanged();else this.changed();
     if(['agent_start','session_settled','prompt_result'].includes(event.type))this.owner.persist();};
-  syncState=(state:OmpEvent)=>{this.sessionName=state.sessionName||'';this.sessionFile=state.sessionFile||this.sessionFile;this.model=label(state);this.owner.persist();this.changed();};
+  syncState=(state:OmpEvent)=>{if(state.clientTitleRevision===undefined||state.clientTitleRevision===this.titleRevision)this.sessionName=state.sessionName||'';this.sessionFile=state.sessionFile||this.sessionFile;this.model=label(state);this.owner.persist();this.changed();};
   ready=async(reattaching=false)=>{
     if(this.loadingHistory){if(reattaching)this.retryHistory=true;return;}
     this.loadingHistory=true;

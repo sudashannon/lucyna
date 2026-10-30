@@ -11,6 +11,12 @@ test('native title updates reach their own tab and survive an older in-flight st
  assert.equal(a.title,'合适的任务名称');assert.notEqual(b.title,a.title);assert.equal(JSON.parse(localStorage.getItem('omp.openSessions.v1')).sessions.find(s=>s.id===a.id).title,a.title);f.store.dispose();
 });
 
+test('a resolved startup state cannot clear a title received while other startup requests finish',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;await s.start();
+ const state=await s.request('get_state');f.emit({type:'session_info_update',clientSessionId:s.id,title:'历史会话补全名称'});s.syncState(state);
+ assert.equal(s.title,'历史会话补全名称');assert.equal(JSON.parse(localStorage.getItem('omp.openSessions.v1')).sessions.find(entry=>entry.id===s.id).title,s.title);f.store.dispose();
+});
+
 test('completed unread waits for native settlement and reading the conversation, not its monitor',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;await s.send('background work');
  f.store.setConversationVisible(false);

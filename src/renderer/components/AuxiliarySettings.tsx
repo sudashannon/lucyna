@@ -18,7 +18,7 @@ export function AuxiliarySettings({value,onChange,disabled,onChecking}:{value:Au
     <label className="settings-field">模型名称<Input aria-label="辅助模型名称" placeholder="填写服务提供的完整模型 ID" value={value.model} disabled={disabled} onChange={model=>update({model})}/><small>建议使用响应快、擅长概括的轻量模型。</small></label>
     <label className="settings-field">请求超时<select aria-label="辅助模型请求超时" value={value.timeoutSeconds} disabled={disabled} onChange={e=>update({timeoutSeconds:Number(e.target.value)})}>{[10,20,30,60,120].map(seconds=><option key={seconds} value={seconds}>{seconds} 秒</option>)}</select></label>
     <label className="pet-option"><input type="checkbox" aria-label="自动生成会话名称" checked={value.autoTitle} disabled={disabled} onChange={e=>update({autoTitle:e.target.checked})}/>自动生成会话名称</label>
-    <p className="settings-caption">首轮有效回复后，发送有限长度的任务描述和回复摘要生成名称；已有名称和手动改名优先。每次命名通常增加一次 API 调用。</p>
+    <p className="settings-caption">打开或恢复未命名的历史会话时自动补名；新会话在首轮有效回复后命名。仅发送有限长度的任务描述和回复摘要，已有名称始终保留。每次命名通常增加一次 API 调用。</p>
     <Button variant="secondary" loading={checking} disabled={disabled||!api.checkAuxiliary} onClick={()=>void test()}>测试辅助模型连接</Button>
     {error&&<p role="alert" className="error-text">{error}</p>}
     {result&&<div className="environment-result" role="status"><strong>辅助模型连接成功</strong><small>{result.model} · {result.elapsedMs} 毫秒 · 输入 {result.usage.inputTokens} / 输出 {result.usage.outputTokens} tokens</small></div>}

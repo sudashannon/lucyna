@@ -38,16 +38,17 @@ test('real SDK sends bounded standalone requests for both protocols and redacts 
  assert.equal(normalizeTitle('"合适的标题"'),'合适的标题');assert.equal(normalizeTitle('标题\n解释'),'');assert.ok(Buffer.byteLength(normalizeTitle('标题'.repeat(200)))<=180);
 });
 function fixture(generate){
- const events=[],writes=[];const settings={revision:0,resolve:async()=>({autoTitle:true})};let native,record;
+ const events=[],writes=[],commands=[];const settings={revision:0,resolve:async()=>({autoTitle:true})};let native,record;
  const titles=new SessionTitles({title:generate||(async()=> '自动标题')},settings);
- const manager=new SessionManager({titles,send:e=>events.push(e),create:emit=>native={child:{},ready:true,start:async()=>({}),messages:async()=>({messages:[]}),request:async(type,data)=>{
+ const manager=new SessionManager({titles,send:e=>events.push(e),create:emit=>native={child:{},ready:true,start:async()=>({}),history:[],messages:async()=>({messages:native.history}),request:async(type,data)=>{
+  commands.push(type);
   if(type==='get_state')return {sessionId:'native-id',sessionFile:'C:/research.jsonl',sessionName:native.name||'',isSettled:!record.busy};
   if(type==='set_session_name'){writes.push(data.name);native.name=data.name;return {};}
   return {agentInvoked:true};
  },close:async()=>{native.child=null;emit({type:'process_exit'});},emit}});
  const start=async()=>{await manager.start('test',run=>run({root:'/work/test',settings:{runtime:'wsl'}}));record=manager.get('test');};
  const reply=()=>{native.emit({type:'agent_start'});native.emit({type:'message_end',message:{role:'user',content:'为 Lucyna 添加会话命名'}});native.emit({type:'message_end',message:{role:'assistant',content:[{type:'text',text:'已定位标题入口'}]}});native.emit({type:'session_settled'});native.emit({type:'prompt_result',status:'completed'});};
- const flush=async()=>{await Promise.all([...titles.tasks]);};return {manager,settings,titles,events,writes,start,reply,flush,get native(){return native;}};
+ const flush=async()=>{while(manager.titles.tasks.size)await Promise.all([...manager.titles.tasks]);};return {manager,settings,titles,events,writes,commands,start,reply,flush,get native(){return native;}};
 }
 test('native settlement names once without submitting another OMP prompt; existing names win',async()=>{
  const f=fixture();await f.start();f.reply();await f.flush();assert.deepEqual(f.writes,['自动标题']);assert.ok(f.events.some(e=>e.type==='session_info_update'&&e.title==='自动标题'));
@@ -70,4 +71,54 @@ test('disabled, failed, interrupted and low-signal rounds do not spend auxiliary
 });
 test('failed title generation retries only on a later round and stays bounded',async()=>{
  let count=0;const f=fixture(async()=>{count++;throw Error('safe failure');});await f.start();for(let i=0;i<4;i++){f.reply();await f.flush();}assert.equal(count,2);assert.deepEqual(f.writes,[]);assert.equal(f.events.filter(e=>e.type==='auxiliary_title_error').length,2);await f.manager.closeAll();
+});
+const history=()=>[{role:'user',content:'修复 Lucyna 历史会话命名'},{role:'assistant',content:[{type:'text',text:'已查明 RPC 中的标题生成配置。'}]}];
+test('opening unnamed history generates from bounded visible tasks without an OMP prompt',async()=>{
+ let input;const f=fixture(async(config,task,answer)=>{input={task,answer};return '修复历史会话命名';});await f.start();
+ f.native.history=[{message:{role:'user',content:'修复 Lucyna 历史会话命名'+'首轮描述'.repeat(700)}},{role:'toolResult',content:'private-tool-output'},{role:'user',content:'补充：保留已有 OMP 名称'+'最近描述'.repeat(700)},{role:'assistant',content:[{type:'thinking',thinking:'private-thinking'},{type:'text',text:'已经定位到命名入口。'+'回复说明'.repeat(1000)}]}];
+ await f.manager.request('test','get_messages');await f.flush();
+ assert.match(input.task,/最初任务：修复 Lucyna/);assert.match(input.task,/最近任务：补充/);assert.ok(input.task.length<2100&&input.answer.length<=1500);assert.ok(!JSON.stringify(input).includes('private-'));
+ assert.deepEqual(f.writes,['修复历史会话命名']);assert.ok(!f.commands.includes('prompt'));
+ await f.manager.request('test','get_messages');await f.flush();assert.equal(f.writes.length,1);await f.manager.closeAll();
+});
+test('historical tasks can be named without an assistant reply; existing names and disabled settings win',async()=>{
+ for(const variant of ['task-only','named','disabled','empty','low-signal','skill']){
+  let count=0;const f=fixture(async()=>{count++;return '历史任务';});await f.start();f.native.history=history();
+  if(variant==='task-only')f.native.history=history().slice(0,1);
+  if(variant==='named')f.native.name='OMP 已生成名称';
+  if(variant==='disabled')f.settings.resolve=async()=>({autoTitle:false});
+  if(variant==='empty')f.native.history=[];
+  if(variant==='low-signal')f.native.history=[{role:'user',content:'继续'},{role:'assistant',content:'好的'}];
+  if(variant==='skill')f.native.history=[{role:'custom',customType:'skill-prompt',attribution:'user',display:true,details:{name:'review',args:'审查历史会话恢复逻辑'}}];
+  await f.manager.request('test','get_messages');await f.flush();assert.equal(count,['task-only','skill'].includes(variant)?1:0,variant);assert.ok(!f.commands.includes('prompt'));await f.manager.closeAll();
+ }
+});
+test('busy history waits for settlement and repeated reads do not retry a failed title',async()=>{
+ let count=0;const f=fixture(async()=>{count++;throw Error('safe failure');});await f.start();f.native.emit({type:'agent_start'});f.native.history=history();
+ await f.manager.request('test','get_messages');await f.flush();assert.equal(count,0);
+ f.native.emit({type:'session_settled'});await f.flush();assert.equal(count,1);
+ for(let i=0;i<3;i++){await f.manager.request('test','get_messages');await f.flush();}assert.equal(count,1);
+ f.settings.revision++;f.titles.refresh(f.manager.get('test'),f.manager);await f.flush();assert.equal(count,2);await f.manager.closeAll();
+});
+test('configuration save checks already loaded history and replaces a pending obsolete request',async()=>{
+ let enabled=false,count=0,release,began;const started=new Promise(r=>began=r),f=fixture(async()=>{count++;if(count===1){began();return new Promise(r=>release=r);}return '新配置生成的标题';});
+ await f.start();f.settings.resolve=async()=>({autoTitle:enabled});f.native.history=history();await f.manager.request('test','get_messages');await f.flush();assert.equal(count,0);
+ enabled=true;f.settings.revision++;f.titles.refresh(f.manager.get('test'),f.manager);await started;
+ f.settings.revision++;f.titles.refresh(f.manager.get('test'),f.manager);release('过期标题');await f.flush();assert.equal(count,2);assert.deepEqual(f.writes,['新配置生成的标题']);await f.manager.closeAll();
+});
+test('history captured before a new prompt or connection change cannot seed automatic naming',async()=>{
+ for(const action of ['prompt','reopen']){
+  const f=fixture(()=>assert.fail('stale history must not generate'));await f.start();let release;f.native.messages=()=>new Promise(r=>release=r);const pending=f.manager.request('test','get_messages');
+  if(action==='prompt')await f.manager.request('test','prompt',{message:'另外一个任务'});
+  else{await f.manager.close('test');await f.start();}
+  release({messages:history()});await pending;await f.flush();assert.deepEqual(f.writes,[],action);await f.manager.closeAll();
+ }
+});
+test('restoring many histories bounds auxiliary concurrency and removes cancelled waiters',async()=>{
+ const settings={revision:0,resolve:async()=>({autoTitle:true})},gates=[];let active=0,max=0,calls=0;
+ const titles=new SessionTitles({title:async()=>{calls++;active++;max=Math.max(max,active);await new Promise(r=>gates.push(r));active--;return '恢复后的标题';}},settings),fixtures=[];
+ for(let i=0;i<5;i++){const f=fixture();f.manager.titles=titles;fixtures.push(f);await f.start();f.native.history=history();await f.manager.request('test','get_messages');}
+ await new Promise(r=>setImmediate(r));assert.equal(calls,2);await fixtures[2].manager.close('test');
+ while(titles.tasks.size){for(const release of gates.splice(0))release();await new Promise(r=>setImmediate(r));}
+ assert.equal(max,2);assert.equal(calls,4);assert.deepEqual(fixtures[2].writes,[]);assert.equal(titles.active,0);assert.equal(titles.waiters.length,0);for(const f of fixtures)await f.manager.closeAll();
 });
