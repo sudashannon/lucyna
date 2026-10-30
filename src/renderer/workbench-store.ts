@@ -17,6 +17,7 @@ class Conversation {
   connection: 'idle'|'starting'|'ready'|'closing' = 'idle';
   view: SessionView = emptyView();
   sessionName=''; sessionFile=''; agentDir=''; runtime=''; error=''; unread=false;summary='';
+  titleRevision=0;
   events:WorkEvent[]=[]; questions:OmpEvent[]=[]; nativeCommands:SlashCommand[]=[];
   commandsStatus:'idle'|'loading'|'ready'|'error'='idle'; commandsError='';
   starting:Promise<void>|null=null; commandTask:Promise<void>|null=null;
@@ -34,7 +35,7 @@ class Conversation {
   get title(){return this.sessionName||textContent(this.view.messages.find(m=>m.role==='user')?.content).slice(0,240).replace(/\s+/g,' ').slice(0,60)||(this.sessionFile?'已恢复的会话':'新会话');}
   get busy(){return !!this.view.run?.active;}
   changed=()=>this.owner.changed();
-  request=(type:string,data?:OmpEvent)=>this.owner.api.request(type,data,this.id);
+  request=(type:string,data?:OmpEvent)=>{const revision=this.titleRevision;return this.owner.api.request(type,data,this.id).then(result=>type==='get_state'&&revision!==this.titleRevision?{...result,sessionName:this.sessionName}:result);};
   setError=(message:string)=>{this.error=message;this.changed();};
   log=(text:string,level:WorkEvent['level']='info',detail?:string)=>{this.events=[{id:uid(),time:new Date().toLocaleTimeString('zh-CN',{hour12:false}),text,level,detail,root:this.work.root},...this.events].slice(0,200);this.changed();};
   report=(e:unknown)=>{const message=errorText(e);this.error=message.split('\n')[0];if(!this.owner.isReading(this.id))this.unread=true;this.log('操作失败','error',message);};
@@ -82,6 +83,8 @@ class Conversation {
   };
   event=(event:OmpEvent)=>{
     if(event.runtime)this.runtime=event.runtime;
+    if(event.type==='session_info_update'){this.titleRevision++;this.sessionName=typeof event.title==='string'?event.title:'';this.owner.persist();this.changed();void this.owner.refreshHistory(this.work.root);return;}
+    if(event.type==='auxiliary_title_error'){this.log('自动命名暂未完成','warning',event.message);return;}
     if(event.type==='ready'){void this.ready();return;}
     if(event.type==='available_commands_update'){
       try{this.nativeCommands=normalizeCommands(event.commands);this.commandsStatus='ready';this.commandsError='';this.changed();}catch(e){this.commandsStatus='error';this.commandsError=String(e);this.changed();}return;

@@ -62,6 +62,8 @@ test/*
 !test/renderer-behavior.cjs
 !test/pet-animation-desktop.cjs
 !test/feedback-desktop.cjs
+!test/auxiliary-desktop.cjs
+!test/auxiliary-native.cjs
 !test/brand-typography-desktop.cjs
 !test/session-monitor-desktop.cjs
 !test/knowledge-sidebar-desktop.cjs

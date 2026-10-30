@@ -4,6 +4,13 @@ const {Workbench}=require('../src/renderer/workbench-store.ts');
 const {isCompletedUnread}=require('../src/renderer/session-monitor.ts');
 const tick=()=>new Promise(r=>setImmediate(r));
 
+test('native title updates reach their own tab and survive an older in-flight state reply',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;await a.start();await f.store.selectWork(f.works[1]);const b=f.store.active;
+ let release;const original=f.api.request;f.api.request=async(type,data,id)=>type==='get_state'&&id===a.id?new Promise(r=>release=r):original(type,data,id);
+ const stale=a.request('get_state');f.emit({type:'session_info_update',clientSessionId:a.id,title:'合适的任务名称'});release({sessionName:'',sessionFile:a.sessionFile});a.syncState(await stale);
+ assert.equal(a.title,'合适的任务名称');assert.notEqual(b.title,a.title);assert.equal(JSON.parse(localStorage.getItem('omp.openSessions.v1')).sessions.find(s=>s.id===a.id).title,a.title);f.store.dispose();
+});
+
 test('completed unread waits for native settlement and reading the conversation, not its monitor',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;await s.send('background work');
  f.store.setConversationVisible(false);

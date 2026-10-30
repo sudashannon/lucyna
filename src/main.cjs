@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { spawn } = require('node:child_process');
@@ -27,6 +27,9 @@ const {SettingsStore, checkSettings, validateSettings, historyLocations, session
 const knowledge = require('./knowledge-service.cjs').createKnowledgeService();
 const workDetails = require('./work-details.cjs').createWorkDetails({listWorks});
 const {WorkRunner}=require('./work-runner.cjs');
+const {AuxiliarySettings}=require('./auxiliary-settings.cjs');
+const {AuxiliaryAgent}=require('./auxiliary-agent.cjs');
+const {SessionTitles}=require('./session-titles.cjs');
 
 let window, sessions, pet, feedback, selectedHistory, listedHistory = new Map(), terminal, runtimeMutation = false;
 let windowsPreparation = Promise.resolve();
@@ -36,6 +39,9 @@ configureAppIdentity(app);
 if (!require('./single-instance.cjs').claimInstance(app, () => window)) return;
 installTaskbarIdentity(app);
 const settingsStore = new SettingsStore(app.getPath('userData'));
+const auxiliarySettings=new AuxiliarySettings(app.getPath('userData'),safeStorage);
+const auxiliaryAgent=new AuxiliaryAgent(auxiliarySettings);
+const sessionTitles=new SessionTitles(auxiliaryAgent,auxiliarySettings);
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const historyTrash = new HistoryTrash(app.getPath('userData'));
 const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get()});
@@ -62,7 +68,7 @@ app.whenReady().then(async () => {
   if(windowChrome.enabled())windowChrome.installWindowChrome(window);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file://')) event.preventDefault(); });
-  sessions = new SessionManager({create: send => new OmpSession(send), onState:async record=>{
+  sessions = new SessionManager({titles:sessionTitles,create: send => new OmpSession(send), onState:async record=>{
     if(record.forkSource){
       record.forkTask ||= completeImportedFork(record.importRoot,record.agentDir,record.forkSource,record.sessionFile,record.root);
       try{await record.forkTask;record.forkSource=undefined;}finally{record.forkTask=undefined;}
@@ -87,6 +93,9 @@ app.whenReady().then(async () => {
   handle('feedback:stop-preview',()=>feedback.stopPreview());
   handle('settings:get', async () => ({settings:await settingsStore.get(),storage:app.getPath('userData'),workspace:{distro:runtime.distro,user:runtime.user,root:runtime.workRoot}}));
   handle('settings:check', checkSettings);
+  handle('auxiliary:get',()=>auxiliarySettings.get());
+  handle('auxiliary:save',async input=>{const settings=await auxiliarySettings.save(input);for(const record of sessions.records.values())sessionTitles.cancel(record);return settings;});
+  handle('auxiliary:check',input=>auxiliaryAgent.check(input));
   handle('settings:save', async input => {
     const next=validateSettings(input);
     if(runtimeMutation) throw new Error('设置正在保存，请稍候');

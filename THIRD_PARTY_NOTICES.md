@@ -12,6 +12,10 @@ The original [LICENSE](src/renderer/vendor/cindy/LICENSE), [NOTICE](src/renderer
 
 Electron, React, Radix UI, Tailwind CSS, Lucide, Streamdown, KaTeX, Mermaid, xterm.js and other npm dependencies retain their respective licenses. Versions are pinned in `package-lock.json`; consult each package's license when redistributing a bundled application.
 
+## Vercel AI SDK
+
+Lucyna's independent auxiliary agent uses [AI SDK](https://github.com/vercel/ai) and its OpenAI / compatible provider adapters, copyright Vercel, Inc., under Apache License 2.0. Licenses are retained in the installed npm packages. Requests use the user-configured provider endpoint rather than the SDK's default gateway.
+
 ## Cytoscape.js
 
 Knowledge graph rendering uses [Cytoscape.js](https://github.com/cytoscape/cytoscape.js), copyright The Cytoscape Consortium, under the MIT license. Its license is retained in the installed package and must accompany distributions. Lucyna supplies its own interface, styling, data adapter and graph interactions.

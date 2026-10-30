@@ -7,6 +7,9 @@ export interface ClientSettings {version:1; runtime:'windows'|'wsl'; windowsExec
 export interface FeedbackSettings {version:1;mode:'silent'|'focus'|'companion';style:'soft'|'pixel';volume:number;completed:boolean;attention:boolean;error:boolean;reducedMotion:boolean}
 export interface FeedbackInfo {settings:FeedbackSettings;warning:string}
 export interface SettingsInfo {settings:ClientSettings; storage:string; workspace:{distro:string;user:string;root:string}}
+export interface AuxiliarySettings {version:1;protocol:'chat-completions'|'responses';baseURL:string;model:string;autoTitle:boolean;timeoutSeconds:number;hasApiKey:boolean}
+export type AuxiliaryInput=AuxiliarySettings&{apiKey?:string;clearApiKey?:boolean};
+export interface AuxiliaryCheck {elapsedMs:number;model:string;usage:{inputTokens:number;outputTokens:number}}
 export interface EnvironmentCheck {runtime:string; version:string; configFiles:string[]; elapsedMs:number; note:string}
 export interface HistoryDeletionPlan {token:string;files:{path:string;kind:'journal'|'artifacts'|'backup'|'memo'}[];warnings:string[]}
 export interface History { sessions: HistoryEntry[]; managed: HistoryEntry[]; warnings?: string[]; trash?: {key:string;source:string;entry:HistoryEntry;deletedAt:string;version?:number;files?:HistoryDeletionPlan['files'];state?:string}[] }
@@ -42,6 +45,9 @@ export interface Desktop {
   knowledgeSaveFile(name:string,bytes:Uint8Array):Promise<boolean>;
   onKnowledge(fn:(data:{requestId:string;event:{type:string;content?:string;references?:import('./knowledge-types').KnowledgeEvidence[]}})=>void):()=>void;
   getSettings(): Promise<SettingsInfo>; checkSettings(settings:ClientSettings): Promise<EnvironmentCheck>; saveSettings(settings:ClientSettings): Promise<ClientSettings>;
+  getAuxiliary?():Promise<AuxiliarySettings>;
+  saveAuxiliary?(input:AuxiliaryInput):Promise<AuxiliarySettings>;
+  checkAuxiliary?(input:AuxiliaryInput):Promise<AuxiliaryCheck>;
   copyText(text: string): Promise<void>;
   listWorks(): Promise<Work[]>; readWork(root: string): Promise<string>;
   context(query: string): Promise<OmpEvent>; start(options: OmpEvent): Promise<unknown>;

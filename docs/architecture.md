@@ -2,6 +2,10 @@
 
 Lucyna 提供 UI 和进程路由；OMP 保留模型、工具、技能和会话循环。Work 与 Stele 负责不同层次的上下文。
 
+客户端辅助任务由独立的 Vercel AI SDK `ToolLoopAgent` 执行。`auxiliary-settings.cjs` 管理协议、地址、模型、超时和加密密钥；只有主进程读取密钥。`auxiliary-agent.cjs` 显式连接用户配置的 Chat Completions 或 Responses 服务，单步、无工具、无自动网络重试；Responses 请求关闭服务端存储。它不创建 OMP 会话，也不向主对话追加命名提示。原生任务执行仍由 OMP 管理。
+
+`session-titles.cjs` 在有效任务回复结束后为无标题会话生成名称。写回前后绑定同一客户端连接、原生日志和会话 ID，并检查配置版本、运行状态和当前名称；新 prompt、改名、关闭或配置变化使迟到结果失效。通过原生 `set_session_name` 保存标题，按 RPC 语义标记为 `source:user`，成功后保留；界面与桌宠通过 `session_info_update` 同步。失败保留消息摘要，同一连接最多尝试两次，重试等待后续有效轮次。恢复历史本身不会触发生成。
+
 ```mermaid
 flowchart LR
   UI[React 工作台 / 知识库] <-->|受限 IPC| Main[Electron 主进程]

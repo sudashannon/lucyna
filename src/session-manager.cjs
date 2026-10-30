@@ -12,7 +12,7 @@ function clientId(value = 'legacy') {
 // One native harness per conversation. This layer only owns routing and lifetime;
 // prompt admission, queues, tools and cancellation remain native OMP operations.
 class SessionManager {
-  constructor({create, send,onState=async()=>{},writeAttachments=writeTextAttachments,restoreAttachments=restoreTextAttachments}) {this.create=create; this.send=send; this.onState=onState;this.writeAttachments=writeAttachments;this.restoreAttachments=restoreAttachments;this.records=new Map(); this.files=new Map(); this.starting=new Set();this.journalMutations=new Map();}
+  constructor({create, send,onState=async()=>{},writeAttachments=writeTextAttachments,restoreAttachments=restoreTextAttachments,titles}) {this.create=create; this.send=send; this.onState=onState;this.writeAttachments=writeAttachments;this.restoreAttachments=restoreAttachments;this.titles=titles;this.records=new Map(); this.files=new Map(); this.starting=new Set();this.journalMutations=new Map();}
   reserveJournal(file,id) {
     const key=sessionKey(file);
     if(this.journalMutations.has(key))throw Error('该会话正在移入回收站或恢复，请稍候');
@@ -50,6 +50,7 @@ class SessionManager {
         if(event.method==='cancel')record.questions.delete(event.targetId);
       }
       if(event.type==='process_exit') {for(const [key,owner] of this.files)if(owner===id)this.files.delete(key);record.questions.clear();}
+      this.titles?.observe(record,event,this);
       this.send({...event,clientSessionId:id,workRoot:record.root,runtime:record.settings?.runtime});
     });
     this.records.set(id,record);
@@ -72,6 +73,7 @@ class SessionManager {
   async request(id,type,data) {
     if(type==='prompt')validatePrompt(data);
     const record=this.get(id);
+    if(['prompt','set_session_name','abort','abort_and_restore_queue'].includes(type))this.titles?.cancel(record);
     const prompt=type==='prompt',wasBusy=record.busy;
     if(prompt&&!wasBusy)this.emit(record,{type:'client_prompt',titleHint:resultExcerpt(data.message,120)||(data.images?.length?'图片任务':'')});
     if(['abort','abort_and_restore_queue'].includes(type))this.emit(record,{type:'client_stopping'});
@@ -102,7 +104,7 @@ class SessionManager {
     return saved;
   }
   respond(id,data){const record=this.get(id);if(!record.questions.has(data.id))throw new Error('该问题不属于当前会话或已结束');record.session.sendFrame(data);record.questions.delete(data.id);this.emit(record,{type:'question_resolved',id:data.id});}
-  close(id){const record=this.records.get(clientId(id));if(record)this.emit(record,{type:'client_closing'});return record?record.session.close():Promise.resolve();}
+  close(id){const record=this.records.get(clientId(id));if(record){this.titles?.cancel(record);this.emit(record,{type:'client_closing'});}return record?record.session.close():Promise.resolve();}
   list(){return [...this.records.values()].filter(r=>r.session.child).map(r=>({id:r.id,root:r.root,agentDir:r.agentDir,sessionFile:r.sessionFile,runtime:r.settings.runtime,ready:r.session.ready,busy:r.busy,questions:[...r.questions.values()]}));}
   async closeAll(){await Promise.allSettled([...this.records.values()].map(r=>r.session.close()));}
 }

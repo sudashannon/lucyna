@@ -44,11 +44,11 @@ class PetState{
   if(!e.clientSessionId)return false;
   // Stream payloads remain ignored; only a bounded final visible answer is kept.
   const accepted=['session_connecting','session_state','session_metadata','ready','client_prompt','client_prompt_failed','client_command_complete','client_closing','client_stopping','question_resolved','agent_start','agent_end','message_start','message_end','message_update','tool_execution_start','tool_execution_end','auto_retry_start','auto_retry_end','auto_compaction_start','auto_compaction_end','prompt_result','session_settled','process_exit','process_error','extension_ui_request'];
-  if(!accepted.includes(e.type))return false;
+  if(!accepted.includes(e.type)&&e.type!=='session_info_update')return false;
   const s=this.record(e.clientSessionId,e.workRoot);let changed=true;
   if(!s.promptTitle&&e.titleHint)s.promptTitle=readableTitle(e.titleHint);
   const phase=name=>{if((s.run?.phase===name||s.run?.phase==='stopping')&&s.run.active){changed=false;return;}if(!s.run?.active){s.runId++;s.run={active:true,phase:name,startedAt:now};s.answer='';s.toolIds=new Set();s.failedTools=new Set();}else s.run={...s.run,phase:name};};
-  if(e.type==='session_state'){const title=readableTitle(e.sessionName);if(title)s.title=title;}
+  if(e.type==='session_state'||e.type==='session_info_update'){const title=readableTitle(e.type==='session_info_update'?e.title:e.sessionName);if(title)s.title=title;}
   else if(e.type==='session_metadata'){/* Bounded title hint from restored native history. */}
   else if(e.type==='message_start'){if(e.message?.role==='user'&&!s.promptTitle)s.promptTitle=readableTitle(resultExcerpt(e.message.content,120));else changed=false;}
   else if(e.type==='message_end'){
