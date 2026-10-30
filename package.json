@@ -34,6 +34,7 @@
     "test:attachments": "electron test/text-attachments-desktop.cjs",
     "test:attachments:native": "node test/text-attachments-native.cjs",
     "test:sessions": "electron test/session-monitor-desktop.cjs",
+    "test:sessions:restore": "node test/session-restore-desktop.cjs",
     "test:knowledge:sidebar": "electron test/knowledge-sidebar-desktop.cjs",
     "test:pet:layout": "electron test/pet-layout-desktop.cjs",
     "screenshots": "electron test/screenshot-gallery.cjs",

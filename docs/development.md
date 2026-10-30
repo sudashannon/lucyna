@@ -44,6 +44,7 @@ docs/                公共文档与演示截图
 | `npm run test:attachments` | 文本附件粘贴/预览/移除、持久草稿、跨会话保存失败、默认文件引用、显式全文及窄屏验证 |
 | `npm run test:attachments:native -- --work=/绝对/work/路径` | 可选真实 Windows/WSL OMP 模型读取 `local://`，原会话恢复和 Windows 短路径缓存恢复；仅创建隔离验收会话 |
 | `npm run test:single-instance` | 重复启动唤起已有窗口，不另开 profile 数据库或丢失输入 |
+| `npm run test:sessions:restore` | 两个独立 Electron 进程共用隔离 profile，验证退出重开后多 work / session 原路径恢复、手动断开、已完成未读及正文/图片/长文本草稿；使用合成 RPC，不调用模型 |
 | `npm run test:experience` | 空会话、删除文件范围预览与取消、会话和 Work 备忘的真实移动/恢复、慢连接、长历史时间轴、并行监控、停止后的草稿归属与窄窗口回归 |
 | `npm run test:usability` | 独立 profile 与合成服务：文档加载/空白/失败/竞态、证据检索来源与版本、连接冲突预检、宽表单固定操作区、工作区筛选、设置导航与窄屏布局 |
 | `npm run test:work:ui` | 工作详情、搜索、来源跳转、阅读位置、大 diff、窄窗口/深色与读取失败保留旧数据的离线 UI 回归 |
@@ -85,6 +86,8 @@ Windows 任务栏单独设置窗口的 AppUserModelID、Lucyna 图标和重新�
 `electron tools/create-shortcut.cjs <绝对路径.lnk> <已有数据目录>` 可创建绑定现有 profile 的 Windows 快捷方式。启动参数使用 `--user-data-dir`，任务栏重开时也保留该物理路径，避免从 Codex 与资源管理器启动时因 AppData 虚拟化出现不同配置和草稿。`LUCYNA_USERDATA` / `OMP_CINDY_USERDATA` 环境变量仍优先；相对路径不接受。工具在独立临时 profile 中运行，不连接用户会话。
 
 同一物理 profile 只允许一个客户端进程。重复点击快捷方式会显示已有窗口，包括因桌宠而隐藏的主窗口，不再并发打开 Chromium 草稿数据库。草稿读取失败时禁止写入，避免旧草稿被空值覆盖；每 5 秒及重新聚焦时重试，也可手动重试。恢复后合并期间新输入的内容，保留其他会话草稿，提示随实际恢复自动消失。故障期间的当前输入只在窗口内保留，关闭前应复制。
+
+打开的会话记录保存连接恢复意图、未读标记和已结束轮次的耗时/结果状态。完整退出结束普通 OMP 进程；重开优先恢复上次选中会话，再以最多两条并发启动接回其余原始 journal，不发送 prompt 或重放中断工具。手动“结束连接”清除恢复意图，回收站内会话不重连；单条失败进入待处理，其余继续。工作区暂不可用时保留会话与草稿，刷新工作区后重试。仅重载渲染器时接回现存进程，不创建第二个 writer。旧版缺少连接意图的已打开历史标签会在升级后恢复一次，此后按明确的连接/断开状态保存。
 
 `npm run test:experience -- --preview` 在回归通过后保留独立的演示窗口，使用临时 profile 和合成协议事件，不启动 OMP。窗口持续显示“演示数据”横幅；知识库使用明确标记的示例文档，不连接真实 Stele。截图输出到忽略目录 `.runtime/experience/`。此窗口用于检查菜单、收起侧栏、时间轴、会话监控和知识库交互，不能作为真实模型或服务成功的证据。日常使用请通过 `npm start` 打开正式客户端。
 

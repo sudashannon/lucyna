@@ -4,20 +4,6 @@ const {Workbench}=require('../src/renderer/workbench-store.ts');
 const {isCompletedUnread}=require('../src/renderer/session-monitor.ts');
 const tick=()=>new Promise(r=>setImmediate(r));
 
-test('startup deadline includes stalled IPC and cleanup; late ready cannot revive an expired attempt',async t=>{
- const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;
- const start=f.api.start,close=f.api.close;let release;
- f.api.start=()=>new Promise(resolve=>release=resolve);f.api.close=()=>new Promise(()=>{});
- t.mock.timers.enable({apis:['setTimeout']});
- const pending=s.start(),rejected=assert.rejects(pending,/启动超时.*校验历史/);
- f.emit({type:'connection_progress',phase:'正在校验历史会话',clientSessionId:s.id});assert.equal(s.connectionPhase,'正在校验历史会话');
- t.mock.timers.tick(75000);await tick();assert.equal(s.connection,'closing');
- f.emit({type:'ready',clientSessionId:s.id});assert.equal(f.calls.filter(c=>c.type==='get_messages').length,0);
- t.mock.timers.tick(10000);await rejected;assert.equal(s.connection,'idle');assert.equal(s.starting,null);
- f.api.start=start;f.api.close=close;await s.start();assert.equal(s.connection,'ready');
- release({runtime:'windows',agentDir:'late-agent'});await tick();assert.equal(s.runtime,'wsl');assert.notEqual(s.agentDir,'late-agent');f.store.dispose();
-});
-
 test('native title updates reach their own tab and survive an older in-flight state reply',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;await a.start();await f.store.selectWork(f.works[1]);const b=f.store.active;
  let release;const original=f.api.request;f.api.request=async(type,data,id)=>type==='get_state'&&id===a.id?new Promise(r=>release=r):original(type,data,id);
@@ -57,8 +43,9 @@ test('timeline invalidates only at semantic boundaries, not per token or tool ou
  for(let i=0;i<100;i++)f.emit({clientSessionId:s.id,type:'message_update',messageId:'stream',assistantMessageEvent:{type:'text_delta',delta:'x'}});
  assert.equal(s.timelineRevision,before);f.emit({clientSessionId:s.id,type:'message_end',messageId:'stream',message:{role:'assistant',content:[{type:'text',text:'finished'}]}});assert.ok(s.timelineRevision>before);assert.equal(f.store.view().sessions[0].summary,'finished');f.store.dispose();
 });
-function setup(){
+function setup(saved){
  const values=new Map();global.localStorage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};
+ if(saved)values.set('omp.openSessions.v1',JSON.stringify(saved));
  const works=['a','b'].map(name=>({name,root:'/work/'+name,kind:'work'})),calls=[],states=new Map(),messages=new Map();let emit;
  const api={listWorks:async()=>works,listConnections:async()=>[],readWork:async root=>root+' notes',listHistory:async()=>({sessions:[],managed:[]}),getSettings:async()=>({settings:{runtime:'wsl'}}),onEvent(fn){emit=fn;return()=>{};},
  async start(options){calls.push({type:'start',...options});states.set(options.clientSessionId,{sessionId:options.clientSessionId,sessionFile:options.resume||'C:/'+options.clientSessionId+'.jsonl',model:{name:'native'}});setImmediate(()=>emit({type:'ready',clientSessionId:options.clientSessionId,runtime:'wsl'}));return {runtime:'wsl',agentDir:'C:/agent'};},
@@ -66,6 +53,89 @@ function setup(){
  async close(id){calls.push({type:'close',id});emit({clientSessionId:id,type:'process_exit',code:0});},respond:async(data,id)=>{calls.push({type:'answer',id,data});}};
  const store=new Workbench(api);store.connect();return {store,api,works,calls,states,messages,emit:e=>emit(e)};
 }
+
+const savedSession=(id,extra={})=>({id,root:'/work/a',draftKey:'draft-'+id,title:'Task '+id,sessionFile:'C:/'+id+'.jsonl',agentDir:'C:/agent',runtime:'wsl',reconnectOnLaunch:true,...extra});
+
+test('startup deadline includes stalled IPC and cleanup; late ready cannot revive an expired attempt',async t=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;
+ const start=f.api.start,close=f.api.close;let release;
+ f.api.start=()=>new Promise(resolve=>release=resolve);f.api.close=()=>new Promise(()=>{});
+ t.mock.timers.enable({apis:['setTimeout']});
+ const pending=s.start(),rejected=assert.rejects(pending,/启动超时.*校验历史/);
+ f.emit({type:'connection_progress',phase:'正在校验历史会话',clientSessionId:s.id});assert.equal(s.connectionPhase,'正在校验历史会话');
+ t.mock.timers.tick(75000);await tick();assert.equal(s.connection,'closing');
+ f.emit({type:'ready',clientSessionId:s.id});assert.equal(f.calls.filter(c=>c.type==='get_messages').length,0);
+ t.mock.timers.tick(10000);await rejected;assert.equal(s.connection,'idle');assert.equal(s.starting,null);
+ f.api.start=start;f.api.close=close;await s.start();assert.equal(s.connection,'ready');
+ release({runtime:'windows',agentDir:'late-agent'});await tick();assert.equal(s.runtime,'wsl');assert.notEqual(s.agentDir,'late-agent');f.store.dispose();
+});
+async function until(check){for(let i=0;i<100;i++){if(check())return;await tick();}assert.ok(check(),'condition did not settle');}
+
+test('cold restart reconnects all intended journals across works, retaining drafts, selection and completed unread',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;await a.send('A');
+ await f.store.newSession();const b=f.store.active;await b.send('same work B');
+ await f.store.selectWork(f.works[1]);const c=f.store.active;await c.start();
+ const closed=f.store.create(f.works[1]);await closed.start();await closed.close();
+ const blank=f.store.create(f.works[1]);f.store.selectSession(c.id);
+ f.emit({type:'prompt_result',clientSessionId:a.id,status:'completed'});assert.ok(a.unread);
+ const before=JSON.parse(localStorage.getItem('omp.openSessions.v1'));
+ assert.equal(before.sessions.find(s=>s.id===closed.id).reconnectOnLaunch,false);
+ f.store.dispose();f.calls.length=0;const restarted=new Workbench(f.api);restarted.connect();
+ await until(()=>[a,b,c].every(s=>restarted.sessions.get(s.id)?.connection==='ready'));
+ assert.equal(restarted.activeId,c.id);assert.equal(restarted.sessions.size,5);
+ for(const s of [a,b,c,closed,blank]){const restored=restarted.sessions.get(s.id);assert.equal(restored.draftKey,s.draftKey);assert.equal(restored.sessionFile,s.sessionFile);}
+ assert.equal(restarted.sessions.get(closed.id).connection,'idle');assert.equal(restarted.sessions.get(blank.id).connection,'idle');
+ assert.equal(isCompletedUnread(restarted.view().sessions.find(s=>s.id===a.id)),true);
+ assert.equal(restarted.sessions.get(b.id).busy,false,'interrupted work must not be replayed');
+ assert.deepEqual(f.calls.filter(c=>c.type==='start').map(c=>c.resume).sort(),[a,b,c].map(s=>s.sessionFile).sort());
+ assert.equal(f.calls.filter(c=>['prompt','close','abort_and_restore_queue'].includes(c.type)).length,0);
+ restarted.dispose();
+});
+
+test('saved disconnected selected session and recycled journal never reconnect automatically',async()=>{
+ const f=setup({activeId:'closed',sessions:[savedSession('closed',{reconnectOnLaunch:false}),savedSession('deleted',{historyDeleted:true}),savedSession('draft',{sessionFile:'',agentDir:''})]});
+ await tick();await tick();assert.equal(f.store.activeId,'closed');assert.equal(f.calls.filter(c=>c.type==='start').length,0);assert.equal(f.store.sessions.size,3);
+ f.store.selectSession('closed');await until(()=>f.store.active.connection==='ready');assert.equal(f.calls.filter(c=>c.type==='start').length,1);assert.ok(f.store.active.reconnectOnLaunch);f.store.dispose();
+});
+
+test('legacy saved journal tabs reconnect once and persist explicit intent for future launches',async()=>{
+ const legacy=savedSession('legacy');delete legacy.reconnectOnLaunch;
+ const f=setup({activeId:'legacy',sessions:[legacy,savedSession('blank',{sessionFile:'',agentDir:'',reconnectOnLaunch:undefined})]});
+ await until(()=>f.store.active.connection==='ready');assert.equal(f.calls.filter(c=>c.type==='start').length,1);
+ await f.store.active.close();assert.equal(JSON.parse(localStorage.getItem('omp.openSessions.v1')).sessions.find(s=>s.id==='legacy').reconnectOnLaunch,false);f.store.dispose();
+});
+
+test('restart queues at most two starts, prioritizes selection and isolates a failed peer',async()=>{
+ const f=setup({activeId:'c',sessions:['a','b','c','d','e'].map(id=>savedSession(id))}),release=new Map();let inFlight=0,max=0;
+ const start=f.api.start;f.api.start=async options=>{inFlight++;max=Math.max(max,inFlight);release.set(options.clientSessionId,{options});await new Promise((resolve,reject)=>Object.assign(release.get(options.clientSessionId),{resolve,reject}));inFlight--;return start(options);};
+ await tick();assert.deepEqual([...release.keys()],['c','a']);assert.equal(f.store.sessions.get('b').connectionPhase,'等待恢复连接');
+ f.store.selectSession('e');assert.equal(release.size,2,'selecting a queued tab must not bypass the queue');
+ release.get('c').resolve();await until(()=>release.has('b'));assert.equal(f.store.activeId,'e');
+ inFlight--;release.get('a').reject(Error('missing journal'));await until(()=>release.has('d'));
+ assert.match(f.store.sessions.get('a').error,/missing journal/);assert.equal(f.store.sessions.get('a').connection,'idle');
+ release.get('b').resolve();await until(()=>release.has('e'));release.get('d').resolve();release.get('e').resolve();
+ await until(()=>f.store.restoreWorkers===0);assert.equal(max,2);assert.equal(f.store.activeId,'e');
+ assert.deepEqual(f.calls.filter(c=>c.type==='close').map(c=>c.id),['a']);
+ assert.equal(f.calls.filter(c=>c.type==='prompt').length,0);f.store.dispose();
+});
+
+test('temporary unavailable works preserve all saved tabs until a successful inventory refresh',async()=>{
+ const saved={activeId:'a',sessions:[savedSession('a'),savedSession('b',{root:'/work/b'})]};const f=setup(saved);
+ f.api.listWorks=async()=>[]; // The initial call has already begun; clear its shared inventory instead.
+ f.works.splice(0);await tick();assert.equal(f.store.sessions.size,2);assert.equal(f.calls.filter(c=>c.type==='start').length,0);
+ assert.equal(JSON.parse(localStorage.getItem('omp.openSessions.v1')).sessions.length,2);assert.ok(f.store.sessions.get('b').error);
+ f.api.listWorks=async()=>['a','b'].map(name=>({name,root:'/work/'+name,kind:'work'}));await f.store.loadWorks();
+ await until(()=>[...f.store.sessions.values()].every(s=>s.connection==='ready'));assert.equal(f.store.sessions.get('b').error,'');f.store.dispose();
+});
+
+test('renderer reload reattaches live connections without spawning duplicates or clearing unread completion',async()=>{
+ const finished={active:false,phase:'completed',outcome:'completed',startedAt:1,endedAt:10,tools:2};
+ const f=setup({activeId:'a',sessions:[savedSession('a'),savedSession('b',{unread:true,lastRun:finished})]});
+ f.api.listConnections=async()=>['a','b'].map(id=>({id,root:'/work/a',sessionFile:'C:/'+id+'.jsonl',agentDir:'C:/agent',runtime:'wsl',ready:true,busy:id==='a'}));
+ f.states.set('a',{sessionFile:'C:/a.jsonl',isStreaming:true,isSettled:false});f.states.set('b',{sessionFile:'C:/b.jsonl',isSettled:true});
+ await until(()=>[...f.store.sessions.values()].length===2&&[...f.store.sessions.values()].every(s=>s.connection==='ready'));
+ assert.equal(f.calls.filter(c=>c.type==='start'||c.type==='close').length,0);assert.ok(f.store.sessions.get('a').busy);assert.ok(isCompletedUnread(f.store.view().sessions.find(s=>s.id==='b')));f.store.dispose();
+});
 
 test('text attachments save before prompt, keep ownership across work switches, and restore queue as native local references',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;let release;

@@ -66,6 +66,7 @@ test/*
 !test/auxiliary-native.cjs
 !test/brand-typography-desktop.cjs
 !test/session-monitor-desktop.cjs
+!test/session-restore-desktop.cjs
 !test/knowledge-sidebar-desktop.cjs
 !test/text-attachments-desktop.cjs
 !test/text-attachments-native.cjs

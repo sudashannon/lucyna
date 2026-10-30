@@ -12,7 +12,7 @@ export function SessionMonitor({active,sessions,onOpen,onStop,onClose}:{active:b
  useEffect(()=>{if(!active)return;setNow(Date.now());const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[active]);
  const counts=Object.fromEntries(monitorFilters.map(([value])=>[value,sessions.filter(s=>matchesMonitorFilter(s,value)).length])) as Record<MonitorFilter,number>;
  const descriptions:Record<MonitorFilter,string>={
-  connected:'已连接表示 OMP 连接仍在，不一定正在执行任务。手动结束的会话保留在“全部打开”。',
+  connected:'已连接表示 OMP 连接仍在，不一定正在执行任务。启动时恢复上次连接，手动结束的会话保留在“全部打开”。',
   running:'正在执行任务的会话；切换页面不会停止任务。',
   completedUnread:'已完成且尚未查看的结果，按完成时间排序。打开会话后标为已读。',
   attention:'需要你回复，或连接、执行发生错误的会话。打开后查看具体原因。',

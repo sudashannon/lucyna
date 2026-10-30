@@ -1,5 +1,5 @@
 import type {Desktop, Work, History, HistoryEntry, OmpEvent, WorkEvent} from './types';
-import {emptyView, nativeQueue, projectEvent, restoreMessages, textContent, type SessionView, type Queued} from './session-view';
+import {emptyView, nativeQueue, projectEvent, restoreMessages, textContent, type SessionView, type Queued, type Run} from './session-view';
 import {normalizeCommands, type SlashCommand} from './command-completion';
 import {errorText} from './errors';
 import {resultExcerpt} from '../result-excerpt.cjs';
@@ -8,6 +8,7 @@ import {composeTextPrompt,validateTextAttachments,type DraftTextAttachment} from
 import {validateInput,type PromptImage} from './composer-input';
 const uid = () => crypto.randomUUID();
 const label = (s: OmpEvent) => typeof s.model === 'string' ? s.model : s.model?.name || s.model?.id || 'OMP 默认模型';
+const savedRun=(run:any):Run|null=>run&&!run.active&&['completed','aborted','error'].includes(run.outcome)&&[run.startedAt,run.endedAt,run.tools].every(Number.isFinite)?{active:false,phase:run.outcome,outcome:run.outcome,startedAt:run.startedAt,endedAt:run.endedAt,updatedAt:run.endedAt,tools:run.tools}:null;
 type WorkData = {history: History|null; historyError:string; document:string; documentError:string; documentLoading:boolean; documentUpdated:string; historyRevision:number; documentRevision:number};
 const blankWork = (): WorkData => ({history:null,historyError:'',document:'',documentError:'',documentLoading:false,documentUpdated:'',historyRevision:0,documentRevision:0});
 
@@ -30,6 +31,7 @@ class Conversation {
   timelineRevision=0;
   loadingHistory=false; retryHistory=false;
   historyDeleted=false;
+  reconnectOnLaunch=false;
   entry?:HistoryEntry;
   constructor(public owner:Workbench,public work:Work,public id:string=uid(),public draftKey=work.root) {}
   get title(){return this.sessionName||textContent(this.view.messages.find(m=>m.role==='user')?.content).slice(0,240).replace(/\s+/g,' ').slice(0,60)||(this.sessionFile?'已恢复的会话':'新会话');}
@@ -46,7 +48,8 @@ class Conversation {
     // Only native settlement makes a completed result unread. A prompt can
     // return while background tools are still running.
     if(this.view.run?.active&&!next.run?.active&&next.run?.outcome&&!this.owner.isReading(this.id))this.unread=true;
-    this.view=next;if(streaming)this.owner.streamChanged();else this.changed();};
+    this.view=next;if(streaming)this.owner.streamChanged();else this.changed();
+    if(['agent_start','session_settled','prompt_result'].includes(event.type))this.owner.persist();};
   syncState=(state:OmpEvent)=>{this.sessionName=state.sessionName||'';this.sessionFile=state.sessionFile||this.sessionFile;this.model=label(state);this.owner.persist();this.changed();};
   ready=async(reattaching=false)=>{
     if(this.loadingHistory){if(reattaching)this.retryHistory=true;return;}
@@ -125,6 +128,7 @@ class Conversation {
     if(this.connection==='ready')return Promise.resolve();
     if(this.connection==='closing')return Promise.reject(new Error('正在结束当前会话，请稍候'));
     if(this.work.kind==='invalid')return Promise.reject(new Error('请先选择有效工作区'));
+    this.reconnectOnLaunch=true;this.owner.persist();
     this.connection='starting';this.connectionPhase='正在准备会话';this.connectionStarted=Date.now();this.generation++;this.error='';this.commandsStatus='loading';this.changed();
     this.starting=(async()=>{
       let timer:ReturnType<typeof setTimeout>|undefined,cancelled=false;
@@ -169,11 +173,12 @@ class Conversation {
   close=():Promise<boolean>=>{
     if(this.closing)return this.closing;
     if(this.busy||this.starting||this.sending||this.importing){this.setError('请先停止当前任务，再结束会话连接');return Promise.resolve(false);}
+    const wanted=this.reconnectOnLaunch;this.reconnectOnLaunch=false;this.owner.persist();
     if(this.connection==='idle')return Promise.resolve(true);
     this.connection='closing';this.changed();
     this.closing=(async()=>{
       try{await this.owner.api.close(this.id);this.connection='idle';this.rememberEntry();this.changed();void this.owner.refreshHistory(this.work.root);return true;}
-      catch(e){this.connection='ready';this.report(e);return false;}
+      catch(e){this.connection='ready';this.reconnectOnLaunch=wanted;this.owner.persist();this.report(e);return false;}
       finally{this.closing=null;}
     })();return this.closing;
   };
@@ -192,10 +197,12 @@ export class Workbench {
   works:Work[]=[];loading=true;activeId='';sessions=new Map<string,Conversation>();data=new Map<string,WorkData>();
   conversationVisible=true;
   isReading=(id:string)=>this.conversationVisible&&this.activeId===id;
-  setConversationVisible=(visible:boolean)=>{this.conversationVisible=visible;if(visible&&this.active.unread){this.active.unread=false;this.changed();}};
+  setConversationVisible=(visible:boolean)=>{this.conversationVisible=visible;if(visible&&this.active.unread){this.active.unread=false;this.persist();this.changed();}};
   lastByWork=new Map<string,string>();listeners=new Set<()=>void>();revision=0;off?:()=>void;disposed=false;
   fallback=new Conversation(this,{name:'',root:'',kind:'invalid'},'unselected','');
   offNavigate?:()=>void;pendingSelection='';
+  initializing=true;
+  restoreQueue:Conversation[]=[];restoring=new Set<string>();restoreWorkers=0;
   constructor(public api:Desktop){}
   subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>{this.listeners.delete(listener);};};
   snapshot=()=>this.revision;
@@ -204,20 +211,53 @@ export class Workbench {
   streamChanged=()=>{if(this.notifyTimer===undefined)this.notifyTimer=setTimeout(()=>this.changed(),32);};
   get active(){return this.sessions.get(this.activeId)||this.fallback;}
   workData=(root:string)=>{if(!this.data.has(root))this.data.set(root,blankWork());return this.data.get(root)!;};
-  persist=()=>{try{localStorage.setItem('omp.openSessions.v1',JSON.stringify({activeId:this.activeId,sessions:[...this.sessions.values()].map(s=>({id:s.id,root:s.work.root,draftKey:s.draftKey,title:s.title,sessionFile:s.sessionFile,agentDir:s.agentDir,runtime:s.runtime,source:s.entry?.path,historyDeleted:s.historyDeleted}))}));}catch{this.active.error='会话列表暂时无法保存，请保留草稿';}};
+  persist=()=>{if(this.initializing)return;try{localStorage.setItem('omp.openSessions.v1',JSON.stringify({activeId:this.activeId,sessions:[...this.sessions.values()].map(s=>({id:s.id,root:s.work.root,draftKey:s.draftKey,title:s.title,sessionFile:s.sessionFile,agentDir:s.agentDir,runtime:s.runtime,source:s.entry?.path,historyDeleted:s.historyDeleted,reconnectOnLaunch:s.reconnectOnLaunch,unread:s.unread,lastRun:savedRun(s.view.run)}))}));}catch{this.active.error='会话列表暂时无法保存，请保留草稿';}};
   connect=()=>{this.disposed=false;this.off=this.api.onEvent(event=>{if(event.type==='history_deleted'||event.type==='history_restored'){this.historyRemoved(event.source,event.type==='history_deleted');return;}const target=this.sessions.get(event.clientSessionId)||(!event.clientSessionId?this.active:undefined);target?.event(event);});this.offNavigate=this.api.onPetNavigate?.(({id})=>{if(this.sessions.has(id))this.selectSession(id);else this.pendingSelection=id;});void this.initialize();};
   historyRemoved=(source:string,deleted:boolean)=>{for(const s of this.sessions.values())if(fileKey(s.sessionFile)===fileKey(source)){s.historyDeleted=deleted;if(deleted)s.error='该会话已移入回收站，草稿已保留。恢复后可继续会话。';else if(s.error.includes('该会话已移入回收站'))s.error='';}this.persist();this.changed();};
-  dispose=()=>{this.disposed=true;this.off?.();this.offNavigate?.();clearTimeout(this.notifyTimer);this.notifyTimer=undefined;};
+  dispose=()=>{this.disposed=true;this.restoreQueue=[];this.off?.();this.offNavigate?.();clearTimeout(this.notifyTimer);this.notifyTimer=undefined;};
   initialize=async()=>{
-    await this.loadWorks();if(this.disposed)return;
     let saved:any;try{saved=JSON.parse(localStorage.getItem('omp.openSessions.v1')||'null');}catch{}
+    await this.loadWorks();if(this.disposed)return;
     const live=await this.api.listConnections?.().catch(()=>[])||[];
-    for(const item of Array.isArray(saved?.sessions)?saved.sessions:[]){const work=this.works.find(w=>w.root===item.root);if(!work||typeof item.id!=='string')continue;const s=new Conversation(this,work,item.id,item.draftKey||item.id);s.sessionName=item.title||'';s.sessionFile=item.sessionFile||'';s.agentDir=item.agentDir||'';s.runtime=item.runtime||'';s.historyDeleted=item.historyDeleted===true;if(s.historyDeleted)s.error='该会话已移入回收站，草稿已保留。恢复后可继续会话。';if(s.sessionFile&&s.agentDir)s.entry={sessionFile:s.sessionFile,agentDir:s.agentDir,runtime:s.runtime as 'wsl'|'windows',path:item.source};this.sessions.set(s.id,s);this.lastByWork.set(work.root,s.id);}
-    for(const item of live){const work=this.works.find(w=>w.root===item.root);if(!work)continue;const s=this.sessions.get(item.id)||new Conversation(this,work,item.id,item.id);s.agentDir=item.agentDir;s.runtime=item.runtime;s.sessionFile=item.sessionFile;s.connection='starting';s.questions=item.questions||[];this.sessions.set(s.id,s);this.lastByWork.set(work.root,s.id);if(item.busy)s.dispatch({type:'agent_start'});if(item.ready)void s.ready(true);}
-    if(this.sessions.has(saved?.activeId))this.selectSession(saved.activeId);
-    else{const work=this.works.find(w=>w.root===localStorage.getItem('omp.work'));if(work)this.selectWork(work);}
+    if(this.disposed)return;
+    for(const item of Array.isArray(saved?.sessions)?saved.sessions:[]){
+      if(typeof item?.id!=='string'||typeof item.root!=='string'||!item.root||this.sessions.has(item.id))continue;
+      // A temporarily unavailable WSL work root must not erase its saved tabs.
+      const work=this.works.find(w=>w.root===item.root)||{root:item.root,name:item.root.split('/').filter(Boolean).at(-1)||item.root,kind:'invalid',error:'工作区暂不可用，请刷新工作区列表；会话和草稿已保留。'};
+      const s=new Conversation(this,work,item.id,item.draftKey||item.id);s.sessionName=item.title||'';s.sessionFile=item.sessionFile||'';s.agentDir=item.agentDir||'';s.runtime=item.runtime||'';s.historyDeleted=item.historyDeleted===true;
+      s.unread=item.unread===true;s.view={...s.view,run:savedRun(item.lastRun)};
+      if(work.kind==='invalid')s.error=work.error||'工作区暂不可用，请刷新工作区列表；会话和草稿已保留。';
+      if(s.historyDeleted)s.error='该会话已移入回收站，草稿已保留。恢复后可继续会话。';
+      if(s.sessionFile&&s.agentDir)s.entry={sessionFile:s.sessionFile,agentDir:s.agentDir,runtime:s.runtime as 'wsl'|'windows',path:item.source};
+      // Older clients saved open journals without recording connection intent.
+      s.reconnectOnLaunch=typeof item.reconnectOnLaunch==='boolean'?item.reconnectOnLaunch:!!s.entry;
+      this.sessions.set(s.id,s);this.lastByWork.set(work.root,s.id);
+    }
+    for(const item of live){const work=this.works.find(w=>w.root===item.root)||this.sessions.get(item.id)?.work;if(!work)continue;const s=this.sessions.get(item.id)||new Conversation(this,work,item.id,item.id);s.agentDir=item.agentDir;s.runtime=item.runtime;s.sessionFile=item.sessionFile;s.connection='starting';s.reconnectOnLaunch=true;s.questions=item.questions||[];this.sessions.set(s.id,s);this.lastByWork.set(work.root,s.id);if(item.busy)s.dispatch({type:'agent_start'});if(item.ready)void s.ready(true);}
+    this.initializing=false;
+    if(!this.activeId&&this.sessions.has(saved?.activeId))this.selectSession(saved.activeId,false);
+    else if(!this.activeId){const work=this.works.find(w=>w.root===localStorage.getItem('omp.work'));if(work)this.selectWork(work);}
     if(this.pendingSelection){this.selectSession(this.pendingSelection);this.pendingSelection='';}
-    this.changed();
+    this.restoreConnections();this.persist();this.changed();
+  };
+  restoreConnections=()=>{
+    if(this.initializing||this.disposed)return;
+    const candidates=[...this.sessions.values()].sort((a,b)=>Number(b.id===this.activeId)-Number(a.id===this.activeId));
+    for(const s of candidates){
+      if(!s.reconnectOnLaunch||!s.entry?.sessionFile||s.historyDeleted||s.work.kind==='invalid'||s.connection!=='idle'||this.restoring.has(s.id))continue;
+      s.connection='starting';s.connectionPhase='等待恢复连接';s.connectionStarted=Date.now();this.restoring.add(s.id);this.restoreQueue.push(s);
+    }
+    this.drainRestores();
+  };
+  drainRestores=()=>{
+    while(!this.disposed&&this.restoreWorkers<2&&this.restoreQueue.length){
+      const s=this.restoreQueue.shift()!;
+      if(this.sessions.get(s.id)!==s||!s.reconnectOnLaunch||s.historyDeleted||s.work.kind==='invalid'){this.restoring.delete(s.id);if(s.connection==='starting'&&!s.starting)s.connection='idle';continue;}
+      this.restoreWorkers++;
+      // This resumes the original journal. It never submits a prompt or replays
+      // interrupted tool calls, and a failed peer cannot block the next one.
+      void s.start().catch(s.report).finally(()=>{this.restoreWorkers--;this.restoring.delete(s.id);this.drainRestores();this.changed();});
+    }
   };
   loadWorks=async()=>{this.loading=true;this.changed();try{
     this.works=await this.api.listWorks();
@@ -229,8 +269,9 @@ export class Workbench {
         if(session===this.active){void this.refreshHistory(next.root);void this.refreshDocument(next.root);}
       }
     }
+    if(!this.initializing)this.restoreConnections();
   }catch(e){this.active.report(e);}finally{this.loading=false;this.changed();}};
-  selectSession=(id:string)=>{const s=this.sessions.get(id);if(!s)return;this.activeId=id;if(this.conversationVisible)s.unread=false;this.lastByWork.set(s.work.root,id);this.persist();this.changed();if(s.work.kind==='invalid'){s.setError(s.work.error||'工作区校验失败');return;}void this.refreshHistory(s.work.root);if(!this.workData(s.work.root).document)void this.refreshDocument(s.work.root);if(s.entry?.sessionFile&&!s.view.messages.length&&s.connection==='idle')void s.start().catch(s.report);};
+  selectSession=(id:string,connect=true)=>{const s=this.sessions.get(id);if(!s)return;this.activeId=id;if(this.conversationVisible)s.unread=false;this.lastByWork.set(s.work.root,id);this.persist();this.changed();if(s.work.kind==='invalid'){s.setError(s.work.error||'工作区校验失败');return;}void this.refreshHistory(s.work.root);if(!this.workData(s.work.root).document)void this.refreshDocument(s.work.root);if(connect&&s.entry?.sessionFile&&!s.view.messages.length&&s.connection==='idle')void s.start().catch(s.report);};
   selectWork=async(work:Work)=>{const previous=this.lastByWork.get(work.root);if(previous&&this.sessions.has(previous)){this.selectSession(previous);return;}this.create(work,work.root);};
   create=(work:Work,draftKey?:string,select=true)=>{const s=new Conversation(this,work,uid(),draftKey||uid());this.sessions.set(s.id,s);if(select)this.selectSession(s.id);return s;};
   newSession=async()=>{if(!this.active.work.root)return false;this.create(this.active.work);return true;};
