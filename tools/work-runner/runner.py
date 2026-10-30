@@ -79,6 +79,8 @@ class Runner:
                 run.pop('attemptStartedAt', None)
                 run.update(state='interrupted', reason='service_restarted', question=None)
                 self.store.save(run, {'type': 'interrupted', 'message': '服务已重启；请核查 Work 后恢复，未自动重放工具'})
+        from automatic import Automatic
+        self.automatic = Automatic(self)
 
     def save(self, run, kind, message='', **extra):
         self.store.save(run, dict(type=kind, message=message, **extra))
@@ -86,7 +88,7 @@ class Runner:
     async def dispatch(self, request):
         operation = request.get('op')
         if operation == 'status':
-            return {'installed': True, 'version': 2, 'scope': 'work-tools', 'workRoot': self.config['workRoot'], 'tools':[t['name'] for t in TOOLS+EXTRA_TOOLS]}
+            return {'installed': True, 'version': 3, 'scope': 'work-tools', 'automaticEvolution': True, 'workRoot': self.config['workRoot'], 'tools':[t['name'] for t in TOOLS+EXTRA_TOOLS]}
         if operation == 'list':
             return self.store.list(request.get('root'))
         if operation == 'get':
@@ -96,6 +98,13 @@ class Runner:
                 raise ValueError('无效事件游标')
             return {'run': run, **self.store.events(run['id'], after)}
         async with self.admission:
+            if operation == 'automatic-sync':
+                return await self.automatic.sync(request)
+            if operation == 'automatic-status':
+                self.automatic.check_root(request.get('root'))
+                return self.automatic.view(request['root'])
+            if operation == 'automatic-configure':
+                return self.automatic.configure(request)
             if operation == 'create':
                 return await self.create(request)
             run = self.store.get(request.get('runId'))
@@ -146,7 +155,7 @@ class Runner:
                 return run
             raise ValueError('不支持的后台任务操作')
 
-    async def create(self, request):
+    async def create(self, request, automatic=None):
         key = text(request.get('requestKey'), '请求标识', 100)
         root = text(request.get('root'), 'Work 根', 4096)
         objective = text(request.get('objective'), '任务目标')
@@ -183,7 +192,7 @@ class Runner:
             'tokenBudget': token_budget, 'usedTokens': None, 'baseTokens': 0, 'wallSeconds': wall,
             'elapsedSeconds': 0, 'attempts': 0, 'generation': 0, 'goal': None,
             'question': None, 'sessionFile': None, 'sessionId': None, 'verification': None,
-            'createdAt': time.time(), 'scope': 'work-tools', 'result': '', 'mode':mode,'evolutionSpec':evolution_spec,'evolution':None,'changes':[],
+            'createdAt': time.time(), 'scope': 'work-tools', 'result': '', 'mode':mode,'evolutionSpec':evolution_spec,'evolution':None,'changes':[], 'automatic':automatic,
             'request': {'root': root, 'objective': objective, 'acceptance': acceptance,
                 'verification': request.get('verification'), 'model': model, 'tokenBudget': token_budget, 'wallSeconds': wall,
                 'mode':mode,'evolution':request.get('evolution')}}
@@ -191,6 +200,10 @@ class Runner:
             self.store.save(run, {'type': 'queued', 'message': '执行意图已持久化', 'time': time.time()}, new=True)
         except sqlite3.IntegrityError:
             raise ValueError('该 Work 已有未结束的后台任务，请先查看、恢复或取消') from None
+        if mode == 'evolution' and not automatic:
+            self.automatic.remember(run)
+        if automatic:
+            self.save(run, 'auto_triggered', 'Work 有新变化且空闲，自动开始候选比较；采纳由用户确认')
         self.launch(run['id'])
         return run
 
@@ -514,6 +527,7 @@ async def serve(directory, config):
             await writer.wait_closed()
     server = await asyncio.start_unix_server(client, path=str(socket_path), limit=512*1024)
     socket_path.chmod(0o600)
+    automatic_task = asyncio.create_task(runner.automatic.loop())
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -522,6 +536,8 @@ async def serve(directory, config):
         async with server:
             await stop.wait()
     finally:
+        automatic_task.cancel()
+        await asyncio.gather(automatic_task, return_exceptions=True)
         for task in runner.tasks.values():
             task.cancel()
         await asyncio.gather(*list(runner.tasks.values()), return_exceptions=True)

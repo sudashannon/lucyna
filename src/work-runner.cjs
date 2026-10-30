@@ -5,7 +5,7 @@ const {randomUUID}=require('node:crypto');
 const runtime=require('./runtime-config.cjs');
 const {toWslPath}=require('./client-settings.cjs');
 const TERMINAL=new Set(['completed','cancelled','failed']);
-const OPERATIONS=new Set(['status','list','get','create','pause','cancel','resume','answer','accept','adopt','rollback']);
+const OPERATIONS=new Set(['status','list','get','create','pause','cancel','resume','answer','accept','adopt','rollback','automatic-status','automatic-configure']);
 const script=toWslPath(path.resolve(__dirname,'../tools/work-runner/cli.py'));
 const state=runtime.home+'/.local/state/lucyna/work-runner';
 
@@ -13,6 +13,7 @@ class WorkRunner {
   constructor({execute=spawn,listWorks,connections=()=>[],settings=async()=>({}),config=runtime,scriptPath=script,stateDirectory=state}={}){
     this.execute=execute;this.listWorks=listWorks;this.connections=connections;this.settings=settings;this.config=config;
     this.child=null;this.pending=new Map();this.admissions=new Set();this.installing=null;this.script=scriptPath;this.state=stateDirectory;
+    this.automaticReady=false;this.automaticError='';this.activity=new Map();this.clientId='lucyna-desktop';this.automaticWorks=[];
   }
   command(mode){return [ ...this.config.wslPrefix,'--exec','python3',this.script,mode,'--state',this.state ];}
   oneShot(mode,input){return new Promise((resolve,reject)=>{
@@ -60,16 +61,47 @@ class WorkRunner {
     this.admissions.add(root);try{return await callback();}finally{this.admissions.delete(root);}
   }
   async interactive(root,callback){return this.admit(root,async()=>{
-    if((await this.inspect()).some(r=>r.root===root&&(!TERMINAL.has(r.state)||r.process)))throw Error('该 Work 有未结束的后台任务，请在「后台任务」中操作或先取消');
+    if((await this.inspect()).some(r=>r.root===root&&!(r.automatic&&r.mode==='evolution')&&(!TERMINAL.has(r.state)||r.process)))throw Error('该 Work 有未结束的后台任务，请在「后台任务」中操作或先取消');
     return callback();
   });}
+  observe(event){
+    const id=event.clientSessionId;if(!id)return;
+    if(['client_prompt','agent_start','session_connecting','client_stopping','client_closing'].includes(event.type))this.activity.set(id,true);
+    else if(['session_settled','client_prompt_failed','client_command_complete'].includes(event.type))this.activity.set(id,false);
+    else if(event.type==='session_state'&&typeof event.isSettled==='boolean')this.activity.set(id,!event.isSettled);
+    else if(event.type==='process_exit')this.activity.delete(id);
+  }
+  async syncAutomatic(release=false){
+    if(this.automaticSync)return this.automaticSync;
+    this.automaticSync=(async()=>{
+      if(!this.automaticReady){await this.ensure();this.automaticReady=true;}
+      const works=await this.listWorks(),connections=release?[]:this.connections();
+      this.automaticWorks=works.filter(w=>w.kind!=='invalid').map(w=>{const related=connections.filter(c=>c.root===w.root);return {root:w.root,connected:!!related.length,busy:related.some(c=>!c.ready||c.questions?.length||(this.activity.get(c.id)??c.busy))||this.admissions.has(w.root)};});
+      await this.request({op:'automatic-sync',clientId:this.clientId,works:this.automaticWorks});this.automaticError='';
+    })().catch(error=>{this.automaticReady=false;this.automaticError=String(error);throw error;});
+    try{return await this.automaticSync;}finally{this.automaticSync=null;}
+  }
+  startAutomatic(){
+    if(this.automaticTimer)return;
+    void this.syncAutomatic().catch(()=>{});
+    this.automaticTimer=setInterval(()=>{void this.syncAutomatic().catch(()=>{});},10000);this.automaticTimer.unref?.();
+  }
+  async stopAutomatic(){
+    clearInterval(this.automaticTimer);this.automaticTimer=null;
+    await this.automaticSync?.catch(()=>{});
+    if(this.automaticReady)await this.syncAutomatic(this.connections().length===0).catch(()=>{});
+    this.disconnect();
+  }
   async call(op,data={}){
     if(!OPERATIONS.has(op)||!data||typeof data!=='object'||Array.isArray(data)||JSON.stringify(data).length>128000)throw Error('无效后台任务请求');
     // No arbitrary RPC passthrough, executable, environment or state-directory fields.
-    const allowed={status:[],list:['root'],get:['runId','after'],create:['root','requestKey','objective','acceptance','verification','model','tokenBudget','wallSeconds','mode','evolution'],pause:['runId'],cancel:['runId'],resume:['runId'],answer:['runId','answerKey','answer'],accept:['runId'],adopt:['runId'],rollback:['runId']}[op];
+    const allowed={status:[],list:['root'],get:['runId','after'],create:['root','requestKey','objective','acceptance','verification','model','tokenBudget','wallSeconds','mode','evolution'],pause:['runId'],cancel:['runId'],resume:['runId'],answer:['runId','answerKey','answer'],accept:['runId'],adopt:['runId'],rollback:['runId'],'automatic-status':['root'],'automatic-configure':['root','enabled','profile']}[op];
     if(Object.keys(data).some(k=>!allowed.includes(k)))throw Error('不支持的后台任务参数');
-    if(op==='list'||op==='create'){
+    if(op==='list'||op==='create'||op.startsWith('automatic-')){
       if(typeof data.root!=='string'||!(await this.listWorks()).some(w=>w.root===data.root&&w.kind!=='invalid'))throw Error('请选择有效 Work');
+    }
+    if(op.startsWith('automatic-')){
+      await this.syncAutomatic();return this.request({...data,op});
     }
     if(op==='list'){
       // Browsing does not install/start a service. Durable state remains visible offline.

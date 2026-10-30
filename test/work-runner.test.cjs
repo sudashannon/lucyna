@@ -30,3 +30,20 @@ test('offline inspection neither installs nor starts service, completed work per
  assert.deepEqual((await runner.call('list',{root:'/works/a'})).map(r=>r.id),['one']);
  assert.equal(await runner.interactive('/works/a',async()=>true),true);
 });
+
+test('automatic experiments do not block foreground work; renderer cannot forge automatic triggers',async()=>{
+ const runner=make();runner.inspect=async()=>[{root:'/works/a',state:'running',mode:'evolution',automatic:{trigger:'work_changed_idle'}}];
+ assert.equal(await runner.interactive('/works/a',async()=>42),42);
+ await assert.rejects(runner.call('automatic-sync',{clientId:'fake',works:[]}),/无效/);
+ await assert.rejects(runner.call('create',{root:'/works/a',automatic:true}),/参数/);
+ await assert.rejects(runner.call('automatic-configure',{root:'/else',enabled:true}),/有效/);
+});
+
+test('automatic heartbeat reports prompt admission immediately and releases only after foreground shutdown',async()=>{
+ const connections=[{root:'/works/a',id:'native',ready:true,busy:false,questions:[]}],runner=make(connections),requests=[];
+ runner.ensure=async()=>{};runner.request=async data=>{requests.push(data);return {};};runner.disconnect=()=>{};
+ runner.observe({type:'client_prompt',clientSessionId:'native'});await runner.syncAutomatic();
+ assert.equal(requests.at(-1).works[0].busy,true);
+ runner.observe({type:'session_settled',clientSessionId:'native'});await runner.syncAutomatic();assert.equal(requests.at(-1).works[0].busy,false);
+ connections.length=0;await runner.stopAutomatic();assert.equal(requests.at(-1).works[0].connected,false);
+});

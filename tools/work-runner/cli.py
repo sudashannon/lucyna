@@ -31,10 +31,10 @@ def inspect(directory, root=None):
         return []
     with sqlite3.connect(database.as_uri()+'?mode=ro', uri=True) as connection:
         if root is None:
-            return [dict(id=key, root=work, state=status, process=json.loads(data).get('process')) for key,work,status,data in connection.execute(
+            return [dict(id=key, root=work, state=status, process=json.loads(data).get('process'), automatic=json.loads(data).get('automatic'), mode=json.loads(data).get('mode')) for key,work,status,data in connection.execute(
                 "SELECT id,root,state,data FROM runs WHERE state NOT IN ('completed','cancelled','failed')")]
         runs = [json.loads(row[0]) for row in connection.execute('SELECT data FROM runs WHERE root=? ORDER BY rowid DESC LIMIT 30', (root,))]
-        fields = ('id','root','objective','acceptance','state','reason','createdAt','updatedAt','tokenBudget','usedTokens','elapsedSeconds','wallSeconds','attemptStartedAt','sessionId','effectiveModel','model','result','question','verification','process','mode','phase','evolution')
+        fields = ('id','root','objective','acceptance','state','reason','createdAt','updatedAt','tokenBudget','usedTokens','elapsedSeconds','wallSeconds','attemptStartedAt','sessionId','effectiveModel','model','result','question','verification','process','mode','phase','evolution','automatic')
         output=[]
         for run in runs:
             item={key:run.get(key) for key in fields}

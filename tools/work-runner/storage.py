@@ -20,6 +20,8 @@ class Store:
           CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT,
             run_id TEXT NOT NULL, data TEXT NOT NULL);
           CREATE INDEX IF NOT EXISTS run_events ON events(run_id,seq);
+          CREATE TABLE IF NOT EXISTS automation (root TEXT PRIMARY KEY, data TEXT NOT NULL);
+          CREATE TABLE IF NOT EXISTS automation_clients (id TEXT PRIMARY KEY, data TEXT NOT NULL);
         ''')
 
     def get(self, key):
@@ -51,3 +53,18 @@ class Store:
         rows = self.db.execute('SELECT seq,data FROM events WHERE run_id=? AND seq>? ORDER BY seq LIMIT 100', (key, after)).fetchall()
         first = self.db.execute('SELECT MIN(seq) FROM events WHERE run_id=?', (key,)).fetchone()[0]
         return {'events': [dict(json.loads(data), seq=seq) for seq, data in rows], 'firstSeq': first}
+
+    def automation(self, root=None):
+        rows = self.db.execute('SELECT data FROM automation'+(' WHERE root=?' if root else ''), (root,) if root else ())
+        return [json.loads(row[0]) for row in rows]
+
+    def save_automation(self, value):
+        with self.db:
+            self.db.execute('INSERT OR REPLACE INTO automation VALUES (?,?)', (value['root'], json.dumps(value)))
+
+    def clients(self):
+        return [json.loads(row[0]) for row in self.db.execute('SELECT data FROM automation_clients')]
+
+    def save_client(self, value):
+        with self.db:
+            self.db.execute('INSERT OR REPLACE INTO automation_clients VALUES (?,?)', (value['id'], json.dumps(value)))

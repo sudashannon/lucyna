@@ -55,6 +55,7 @@ test/*
 !test/work_details_test.py
 !test/work_runner_test.py
 !test/work_evolution_test.py
+!test/work_automatic_test.py
 !test/work-details-ui.cjs
 !test/fixtures/
 !test/fixtures/**

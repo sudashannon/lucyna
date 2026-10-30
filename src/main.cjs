@@ -68,7 +68,8 @@ app.whenReady().then(async () => {
       try{await record.forkTask;record.forkSource=undefined;}finally{record.forkTask=undefined;}
     }
     await nativeWslHistory.remember(record);
-  }, send: e => { pet?.ingest(e); if (window && !window.isDestroyed()) window.webContents.send('omp:event', e); }});
+  }, send: e => { workRunner.observe(e);pet?.ingest(e); if (window && !window.isDestroyed()) window.webContents.send('omp:event', e); }});
+  workRunner.startAutomatic();
   pet=new PetController({directory:app.getPath('userData'),getMain:()=>window,getSessions:()=>sessions,onQuit:()=>app.quit(),onState:snapshot=>feedback?.observe(snapshot)});
   await pet.init().catch(error=>{console.error('Desktop companion:',error.message);});
   feedback=new FeedbackController({directory:app.getPath('userData'),getMain:()=>window,onChange:settings=>{pet.feedbackReducedMotion=settings.reducedMotion;pet.schedule();}});
@@ -326,7 +327,7 @@ app.on('window-all-closed', () => app.quit());
 let quitting=false;
 app.on('before-quit', event => {
   if(quitting)return;
-  event.preventDefault();quitting=true;feedback?.dispose();pet?.dispose();terminal?.dispose();workRunner.disconnect();
-  void (sessions?.closeAll()||Promise.resolve()).finally(()=>app.quit());
+  event.preventDefault();quitting=true;feedback?.dispose();pet?.dispose();terminal?.dispose();
+  void (sessions?.closeAll()||Promise.resolve()).finally(async()=>{await workRunner.stopAutomatic();app.quit();});
 });
 app.on('before-quit', () => terminal?.dispose());

@@ -2,6 +2,8 @@
 
 ## Work Runner
 
+`automatic.py` 在同一个服务中持久保存 Work 评测配置、文件版本、触发与客户端活动；独立于 renderer 的计时器检测空闲和文件变化。主进程上报连接/忙碌状态，失联的活动连接不被当作空闲。自动实验使用现有隔离 worker，只生成候选，采纳仍由用户明确触发；普通会话可继续使用。预算不随自动恢复重置，用户暂停不自动恢复。默认空闲 60 秒、冷却 30 分钟、滚动 24 小时每 Work 2 次、自动实验全局串行。新增离线回归 `python3 test/work_automatic_test.py -v` 覆盖去重、重启、活动租约、配额、漂移和恢复。自动调度不能替代用户提供可信的训练/留出检查。
+
 `tools/work-runner/` 核心是 Python 3.10 标准库服务，`src/work-runner.cjs` 是可断开的 WSL stdio 连接，`WorkRuns.tsx` / `WorkRunVisuals.tsx` 提供 Work 内入口、阶段时间线、候选分数和差异。服务 SQLite 采用 WAL/FULL，派发前保存意图；systemd 持有进程，socket 0600。模型调用沿用 WSL 认证环境，不把环境或模型认证字段存入运行数据库。
 
 OMP 18.13.3 的 `--no-tools` 不排除后加载的 MCP 或自动学习工具。任务 overlay 关闭 autolearn 和 memory backend；服务自带 `policy.mjs` 显式加载并完成握手，每轮启用登记的 Work 工具，执行前阻止其他工具和模型自行替换 goal 预算。恢复 goal 时必须重新启用已登记工具，不能只过滤当时的活动集合。
