@@ -12,6 +12,32 @@ test('attachment preparation derives native paths from its owner; invalid or dis
 });
 function fixture(){const events=[],native=[];const manager=new SessionManager({send:e=>events.push(e),create:send=>{const session={child:null,ready:true,async start(o){this.options=o;this.child={pid:native.length};return {pid:this.child.pid};},async request(type){this.last=type;return type==='get_state'?{sessionFile:this.options.resume||`C:/sessions/${this.child.pid}.jsonl`}:{ok:true};},messages:async()=>({messages:[]}),sendFrame(data){this.frame=data;},async close(){this.child=null;send({type:'process_exit',code:0});},emit:send};native.push(session);return session;}});const start=(id,resume)=>manager.start(id,run=>run({root:'/work/'+id,agentDir:'C:/agent',settings:{runtime:'wsl'},resume}));return{manager,native,events,start};}
 
+test('startup timeout releases Work admission and refuses late native launch while peers keep running',async t=>{
+ const {WorkRunner}=require('../src/work-runner.cjs');const {manager,native,start,events}=fixture();await start('peer');
+ const runner=new WorkRunner({listWorks:async()=>[]});let release;
+ runner.inspect=()=>new Promise(resolve=>release=resolve);
+ t.mock.timers.enable({apis:['setTimeout']});
+ const pending=manager.start('stuck',(launch,signal,progress)=>{
+  progress('正在检查后台任务');
+  return runner.interactive('/work/stuck',()=>launch({root:'/work/stuck',settings:{runtime:'wsl'}}),signal);
+ },{root:'/work/stuck'});
+ const rejected=assert.rejects(pending,/启动超时.*检查后台任务/);t.mock.timers.tick(60000);await rejected;
+ assert.equal(runner.admissions.size,0);assert.equal(manager.starting.size,0);assert.equal(manager.list()[0].id,'peer');
+ release([]);await new Promise(resolve=>setImmediate(resolve));assert.equal(native[1].child,null,'expired inspect must never launch OMP');
+ runner.inspect=async()=>[];
+ await manager.start('stuck',(launch,signal)=>runner.interactive('/work/stuck',()=>launch({root:'/work/stuck',settings:{runtime:'wsl'}}),signal));
+ assert.equal(manager.list().length,2);assert.ok(events.some(e=>e.type==='connection_progress'&&e.workRoot==='/work/stuck'));
+ await manager.closeAll();
+});
+
+test('closing during asynchronous preparation prevents a late launch and permits immediate retry',async()=>{
+ const {manager,native,start}=fixture();let release;
+ const pending=manager.start('a',async launch=>{await new Promise(resolve=>release=resolve);return launch({root:'/work/a',settings:{runtime:'wsl'}});});
+ const rejected=assert.rejects(pending,/已取消/);await manager.close('a');await rejected;
+ await start('a');release();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(native[0].child,null);assert.equal(manager.get('a').session,native[1]);assert.equal(manager.list().length,1);await manager.closeAll();
+});
+
 test('recycling reserves a journal against concurrent resume and refuses connected sessions without stopping peers',async()=>{
  const {manager,start}=fixture(),file='C:/sessions/deleted.jsonl';await start('peer');const release=manager.reserveJournal(file,'native-id');
  await assert.rejects(start('selected',file),/回收站/);assert.equal(manager.list().length,1);

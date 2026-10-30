@@ -1,4 +1,4 @@
-const { spawn, execFile } = require('node:child_process');
+const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const readline = require('node:readline');
 const http = require('node:http');
@@ -6,16 +6,11 @@ const path = require('node:path');
 const {wslArgs, wslSessionPath, toWslPath} = require('./client-settings.cjs');
 const {FrameDecoder, readMessages} = require('./native-rpc.cjs');
 const runtime=require('./runtime-config.cjs');
+const {boundedExec:execFileAsync}=require('./bounded-exec.cjs');
 
 const WORK_ROOT = runtime.workRoot;
 const WORK_HELPER = runtime.skillDirectory+'/worktree-session/scripts/worktree-work.py';
 const defaultOmp = path.join(process.env.LOCALAPPDATA || '', 'Tern', 'omp', 'bin', 'omp.exe');
-
-function execFileAsync(file, args, options = {}) {
-  return new Promise((resolve, reject) => execFile(file, args, { encoding: 'utf8', timeout: 45000, maxBuffer: 8 * 1024 * 1024, ...options }, (error, stdout, stderr) => {
-    if (error) reject(new Error((stderr || error.message).trim())); else resolve(stdout);
-  }));
-}
 
 let workCache, workCacheTime = 0, workInFlight;
 async function listWorks({refresh = false} = {}) {
@@ -50,9 +45,11 @@ function steleCall(name, args) {
 
 class OmpSession {
   constructor(send, executable = defaultOmp) { this.send = send; this.executable = executable; this.pending = new Map(); this.child = null; this.ready = false; }
-  async start({ root, executionRoot, resume, fork, model, agentDir, env: extraEnv, settings, sessionDir }) {
+  async start({ root, executionRoot, resume, fork, model, agentDir, env: extraEnv, settings, sessionDir, signal }) {
+    signal?.throwIfAborted();
     if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
     const works = await listWorks();
+    signal?.throwIfAborted();
     if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
     if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('工作根不存在、无效或不在已发现的 work 列表中');
     if (executionRoot && executionRoot !== root && !executionRoot.startsWith(root + '/')) throw new Error('会话工作目录不属于所选 work');

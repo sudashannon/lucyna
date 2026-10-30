@@ -19,6 +19,7 @@ flowchart LR
 ```
 
 - `src/session-manager.cjs` 管理每个 session 的原生进程所有权；界面切换不等于终止任务。
+- 会话启动从后台任务检查开始统一限时 60 秒；渲染器另对连接和历史恢复限时 75 秒。关闭或超时会取消准备并释放 Work 启动锁，延迟返回的旧请求不得启动 OMP；工作区扫描即使遇到 WSL 管道不关闭，也在 45 秒后返回错误。
 - `src/history.cjs` 处理历史来源、cwd 归属和导入副本，避免跨 work 错续或双写。
 - `src/wsl-session-history.cjs` 校验配置的原生目录、真实文件路径及 journal 的 cwd，允许已有 WSL 历史原地续聊。Windows 仅登记 `wsl-session-links` 路径索引；显式复制或跨运行时迁移才调用 OMP 原生 pack/unpack。前端按实际 journal 路径识别连接，副本的来源路径不作为写入者身份。
 - 新导入副本首次启动使用原生 `--fork` 获取独立 ID，防止与原件争用 OMP 按 ID 管理的写入锁；成功后原子更新导入元数据，后续使用 `--resume`。旧副本不自动重写。原地续聊的启动状态必须返回所选文件，否则显示错误并结束该次连接，保留草稿。

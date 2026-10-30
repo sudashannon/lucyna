@@ -3,6 +3,7 @@ const {spawn}=require('node:child_process');
 const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const runtime=require('./runtime-config.cjs');
+const {waitForStartup}=require('./startup-control.cjs');
 const {toWslPath}=require('./client-settings.cjs');
 const TERMINAL=new Set(['completed','cancelled','failed']);
 const OPERATIONS=new Set(['status','list','get','create','pause','cancel','resume','answer','accept','adopt','rollback','automatic-status','automatic-configure']);
@@ -16,10 +17,13 @@ class WorkRunner {
     this.automaticReady=false;this.automaticError='';this.activity=new Map();this.clientId='lucyna-desktop';this.automaticWorks=[];
   }
   command(mode){return [ ...this.config.wslPrefix,'--exec','python3',this.script,mode,'--state',this.state ];}
-  oneShot(mode,input){return new Promise((resolve,reject)=>{
+  oneShot(mode,input,{signal}={}){return new Promise((resolve,reject)=>{
+    if(signal?.aborted){reject(signal.reason);return;}
     const child=this.execute('wsl.exe',this.command(mode),{windowsHide:true,stdio:['pipe','pipe','pipe']});
     let output='',settled=false;const timer=setTimeout(()=>{child.kill();finish(Error('后台服务请求超时，请刷新状态后重试'));},mode==='install-evolution'?600000:90000);
-    const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve(value);};
+    const abort=()=>{finish(signal.reason);child.kill();child.stdin.destroy();child.stdout.destroy();child.stderr.destroy();};
+    const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);error?reject(error):resolve(value);};
+    signal?.addEventListener('abort',abort,{once:true});
     child.once('error',finish);child.stdin.on('error',finish);child.stderr.resume();
     child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{output+=chunk;if(output.length>4*1024*1024){child.kill();finish(Error('后台状态超过限制'));}});
     child.once('close',code=>{try{const result=JSON.parse(output);if(code||result?.success===false)throw Error(result?.error||'后台服务操作失败');finish(null,result);}catch(error){finish(error);}});
@@ -55,15 +59,18 @@ class WorkRunner {
     const timer=setTimeout(()=>{this.pending.delete(id);reject(Error('后台操作超时；请刷新确认结果，创建请求可安全重试'));},90000);
     this.pending.set(id,{resolve,reject,timer,child:this.child});this.child.stdin.write(JSON.stringify({...data,id})+'\n');
   });}
-  async inspect(root){return this.oneShot('inspect',root?{root}:undefined);}
-  async admit(root,callback){
+  async inspect(root,options){return this.oneShot('inspect',root?{root}:undefined,options);}
+  async admit(root,callback,signal){
+    signal?.throwIfAborted();
     if(this.admissions.has(root))throw Error('该 Work 的启动操作正在进行，请稍候');
-    this.admissions.add(root);try{return await callback();}finally{this.admissions.delete(root);}
+    this.admissions.add(root);try{return await waitForStartup(callback(),signal);}finally{this.admissions.delete(root);}
   }
-  async interactive(root,callback){return this.admit(root,async()=>{
-    if((await this.inspect()).some(r=>r.root===root&&!(r.automatic&&r.mode==='evolution')&&(!TERMINAL.has(r.state)||r.process)))throw Error('该 Work 有未结束的后台任务，请在「后台任务」中操作或先取消');
+  async interactive(root,callback,signal){return this.admit(root,async()=>{
+    const runs=await waitForStartup(this.inspect(undefined,{signal}),signal);
+    signal?.throwIfAborted();
+    if(runs.some(r=>r.root===root&&!(r.automatic&&r.mode==='evolution')&&(!TERMINAL.has(r.state)||r.process)))throw Error('该 Work 有未结束的后台任务，请在「后台任务」中操作或先取消');
     return callback();
-  });}
+  },signal);}
   observe(event){
     const id=event.clientSessionId;if(!id)return;
     if(['client_prompt','agent_start','session_connecting','client_stopping','client_closing'].includes(event.type))this.activity.set(id,true);

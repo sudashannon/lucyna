@@ -122,7 +122,10 @@ app.whenReady().then(async () => {
   });
   handle('omp:start', async options => {
     if (!options || typeof options.root !== 'string') throw new Error('请选择工作根');
-    return workRunner.interactive(options.root,()=>sessions.start(options.clientSessionId, async startNative => {
+    return sessions.start(options.clientSessionId, (startNative,signal,progress)=>{
+    progress('正在检查后台任务');
+    return workRunner.interactive(options.root,async()=>{
+    progress('正在校验工作区');
     const defaults=await settingsStore.get();
     const settings={...defaults,runtime:options.resume&&['wsl','windows'].includes(options.runtime)?options.runtime:defaults.runtime};
     const locations=historyLocations(app.getPath('userData'),settings.runtime);
@@ -136,6 +139,7 @@ app.whenReady().then(async () => {
       return await startNative(safe);
     }
     if (options.resume || options.agentDir) {
+      progress('正在校验历史会话');
       if (typeof options.resume !== 'string' || typeof options.agentDir !== 'string') throw new Error('请从当前工作区历史列表打开会话，或显式导入副本');
       if(settings.runtime==='wsl'&&options.agentDir.startsWith('/')){
         const restored=await nativeWslHistory.resolve(options.agentDir,options.resume,options.root,settings.wslAgentDir);
@@ -160,6 +164,8 @@ app.whenReady().then(async () => {
     windowsPreparation=new Promise(resolve=>{releasePreparation=resolve;});
     await previous;
     try {
+    signal.throwIfAborted();
+    progress('正在准备 Windows 配置');
     if(runtime.installWorkIntegration){
       await installWorkSteleMcp(safe.agentDir);
       await installWorkSkillDirectory(safe.agentDir);
@@ -171,7 +177,8 @@ app.whenReady().then(async () => {
     try { return await startNative(safe); }
     finally { auth.release(); safe.env = undefined; }
     } finally {releasePreparation();}
-    }));
+    },signal);
+    },{root:options.root});
   });
   handle('omp:prepare-text', (id,files) => sessions.prepareTextAttachments(id,files));
   handle('omp:request', (type, data, id) => { if (!['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command'); return sessions.request(id,type,data); });

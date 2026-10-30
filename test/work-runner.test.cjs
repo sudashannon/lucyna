@@ -31,6 +31,14 @@ test('offline inspection neither installs nor starts service, completed work per
  assert.equal(await runner.interactive('/works/a',async()=>true),true);
 });
 
+test('cancelled foreground inspection terminates its launcher without waiting for close',async()=>{
+ const {EventEmitter}=require('node:events'),{PassThrough}=require('node:stream');let child,killed=false;
+ const runner=new WorkRunner({execute:()=>{child=new EventEmitter();child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{killed=true;};return child;}});
+ const controller=new AbortController(),pending=runner.interactive('/works/a',()=>{throw Error('must not launch');},controller.signal);
+ const rejected=assert.rejects(pending,/cancel test/);controller.abort(Error('cancel test'));await rejected;
+ assert.ok(killed);assert.ok(child.stdout.destroyed);assert.equal(runner.admissions.size,0);
+});
+
 test('automatic experiments do not block foreground work; renderer cannot forge automatic triggers',async()=>{
  const runner=make();runner.inspect=async()=>[{root:'/works/a',state:'running',mode:'evolution',automatic:{trigger:'work_changed_idle'}}];
  assert.equal(await runner.interactive('/works/a',async()=>42),42);

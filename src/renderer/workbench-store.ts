@@ -85,7 +85,8 @@ class Conversation {
     if(event.runtime)this.runtime=event.runtime;
     if(event.type==='session_info_update'){this.titleRevision++;this.sessionName=typeof event.title==='string'?event.title:'';this.owner.persist();this.changed();void this.owner.refreshHistory(this.work.root);return;}
     if(event.type==='auxiliary_title_error'){this.log('自动命名暂未完成','warning',event.message);return;}
-    if(event.type==='ready'){void this.ready();return;}
+    if(event.type==='ready'){if(this.connection==='starting')void this.ready();return;}
+    if(event.type==='connection_progress'){if(this.connection==='starting'){this.connectionPhase=event.phase||this.connectionPhase;this.changed();}return;}
     if(event.type==='available_commands_update'){
       try{this.nativeCommands=normalizeCommands(event.commands);this.commandsStatus='ready';this.commandsError='';this.changed();}catch(e){this.commandsStatus='error';this.commandsError=String(e);this.changed();}return;
     }
@@ -124,15 +125,22 @@ class Conversation {
     if(this.connection==='ready')return Promise.resolve();
     if(this.connection==='closing')return Promise.reject(new Error('正在结束当前会话，请稍候'));
     if(this.work.kind==='invalid')return Promise.reject(new Error('请先选择有效工作区'));
-    this.connection='starting';this.connectionPhase='正在启动 OMP';this.connectionStarted ||= Date.now();this.generation++;this.error='';this.commandsStatus='loading';this.changed();
+    this.connection='starting';this.connectionPhase='正在准备会话';this.connectionStarted=Date.now();this.generation++;this.error='';this.commandsStatus='loading';this.changed();
     this.starting=(async()=>{
-      let timer:ReturnType<typeof setTimeout>|undefined;
-      const waiting=new Promise<void>((resolve,reject)=>{this.waiting={resolve,reject};timer=setTimeout(()=>reject(new Error('OMP 启动超时，请查看事件')),75000);});waiting.catch(()=>{});
+      let timer:ReturnType<typeof setTimeout>|undefined,cancelled=false;
+      const waiting=new Promise<void>((resolve,reject)=>{this.waiting={resolve,reject};timer=setTimeout(()=>reject(new Error(`会话启动超时：${this.connectionPhase}，请重试`)),75000);});
       try {
-        const result=await this.owner.api.start({root:this.work.root,clientSessionId:this.id,resume:this.entry?.sessionFile,agentDir:this.entry?.agentDir,runtime:this.entry?.runtime}) as OmpEvent;
-        this.runtime=result.runtime||this.runtime;this.agentDir=result.agentDir||this.agentDir;await waiting;
+        await Promise.all([this.owner.api.start({root:this.work.root,clientSessionId:this.id,resume:this.entry?.sessionFile,agentDir:this.entry?.agentDir,runtime:this.entry?.runtime}).then(value=>{
+          if(cancelled)return;const result=value as OmpEvent;this.runtime=result.runtime||this.runtime;this.agentDir=result.agentDir||this.agentDir;
+        }),waiting]);
         this.rememberEntry();this.owner.persist();
-      } catch(e){this.waiting=null;await this.owner.api.close(this.id).catch(()=>{});this.connection='idle';this.changed();throw e;}
+      } catch(e){
+        cancelled=true;this.waiting=null;this.generation++;this.connection='closing';this.changed();
+        let closeTimer:ReturnType<typeof setTimeout>|undefined;
+        try{await Promise.race([this.owner.api.close(this.id).catch(()=>{}),new Promise<void>(resolve=>{closeTimer=setTimeout(resolve,10000);})]);}
+        finally{clearTimeout(closeTimer);}
+        this.connection='idle';this.changed();throw e;
+      }
       finally{clearTimeout(timer);this.starting=null;}
     })();return this.starting;
   };

@@ -4,6 +4,20 @@ const {Workbench}=require('../src/renderer/workbench-store.ts');
 const {isCompletedUnread}=require('../src/renderer/session-monitor.ts');
 const tick=()=>new Promise(r=>setImmediate(r));
 
+test('startup deadline includes stalled IPC and cleanup; late ready cannot revive an expired attempt',async t=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;
+ const start=f.api.start,close=f.api.close;let release;
+ f.api.start=()=>new Promise(resolve=>release=resolve);f.api.close=()=>new Promise(()=>{});
+ t.mock.timers.enable({apis:['setTimeout']});
+ const pending=s.start(),rejected=assert.rejects(pending,/启动超时.*校验历史/);
+ f.emit({type:'connection_progress',phase:'正在校验历史会话',clientSessionId:s.id});assert.equal(s.connectionPhase,'正在校验历史会话');
+ t.mock.timers.tick(75000);await tick();assert.equal(s.connection,'closing');
+ f.emit({type:'ready',clientSessionId:s.id});assert.equal(f.calls.filter(c=>c.type==='get_messages').length,0);
+ t.mock.timers.tick(10000);await rejected;assert.equal(s.connection,'idle');assert.equal(s.starting,null);
+ f.api.start=start;f.api.close=close;await s.start();assert.equal(s.connection,'ready');
+ release({runtime:'windows',agentDir:'late-agent'});await tick();assert.equal(s.runtime,'wsl');assert.notEqual(s.agentDir,'late-agent');f.store.dispose();
+});
+
 test('native title updates reach their own tab and survive an older in-flight state reply',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;await a.start();await f.store.selectWork(f.works[1]);const b=f.store.active;
  let release;const original=f.api.request;f.api.request=async(type,data,id)=>type==='get_state'&&id===a.id?new Promise(r=>release=r):original(type,data,id);

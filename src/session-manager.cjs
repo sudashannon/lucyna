@@ -2,6 +2,7 @@ const path = require('node:path');
 const {windowsSessionPath,wslSessionPath} = require('./client-settings.cjs');
 const {validatePrompt}=require('./prompt-input.cjs');
 const {resultExcerpt}=require('./result-excerpt.cjs');
+const {waitForStartup}=require('./startup-control.cjs');
 const {validateAttachments,writeTextAttachments,restoreTextAttachments}=require('./text-attachments.cjs');
 const sessionKey = value => {const normalized=windowsSessionPath(value);return /^\\\\(?:wsl\.localhost|wsl\$)\\/i.test(normalized)?'wsl:'+wslSessionPath(normalized):path.resolve(normalized).toLowerCase();};
 function clientId(value = 'legacy') {
@@ -12,7 +13,7 @@ function clientId(value = 'legacy') {
 // One native harness per conversation. This layer only owns routing and lifetime;
 // prompt admission, queues, tools and cancellation remain native OMP operations.
 class SessionManager {
-  constructor({create, send,onState=async()=>{},writeAttachments=writeTextAttachments,restoreAttachments=restoreTextAttachments,titles}) {this.create=create; this.send=send; this.onState=onState;this.writeAttachments=writeAttachments;this.restoreAttachments=restoreAttachments;this.titles=titles;this.records=new Map(); this.files=new Map(); this.starting=new Set();this.journalMutations=new Map();}
+  constructor({create, send,onState=async()=>{},writeAttachments=writeTextAttachments,restoreAttachments=restoreTextAttachments,startTimeout=60000,titles}) {this.create=create; this.send=send; this.onState=onState;this.writeAttachments=writeAttachments;this.restoreAttachments=restoreAttachments;this.startTimeout=startTimeout;this.titles=titles;this.records=new Map(); this.files=new Map(); this.starting=new Set();this.journalMutations=new Map();}
   reserveJournal(file,id) {
     const key=sessionKey(file);
     if(this.journalMutations.has(key))throw Error('该会话正在移入回收站或恢复，请稍候');
@@ -36,11 +37,15 @@ class SessionManager {
     if(owner)throw Error('该原生会话 ID 已在另一连接中使用。原件与旧副本可能共享 ID，请先结束其中一个连接，或创建新的独立副本。');
     record.nativeId=id;
   }
-  async start(id, prepare) {
+  async start(id, prepare, {root}={}) {
     id=clientId(id);
     if(this.starting.has(id)||this.records.get(id)?.session.child)throw new Error('该会话已有活动 OMP 进程');
     this.starting.add(id);
-    const record={id, questions:new Map(), sessionFile:'', busy:false};
+    const controller=new AbortController(),signal=controller.signal;
+    const record={id,root,controller, questions:new Map(), sessionFile:'', busy:false};
+    let phase='正在准备会话';
+    const progress=value=>{if(!signal.aborted&&this.records.get(id)===record){phase=value;this.emit(record,{type:'connection_progress',phase});}};
+    const timer=setTimeout(()=>controller.abort(Error(`会话启动超时：${phase}，请重试`)),this.startTimeout);
     record.session=this.create(event=>{
       if(this.records.get(id)!==record)return;
       if(event.type==='agent_start')record.busy=true;
@@ -55,20 +60,22 @@ class SessionManager {
     });
     this.records.set(id,record);
     try {
-      return await prepare(async options=>{
+      return await waitForStartup(prepare(async options=>{
+        signal.throwIfAborted();
         record.root=options.root;record.agentDir=options.agentDir;record.settings={...options.settings};record.nativeHistory=!!options.nativeHistory;
         record.expectedResume=options.fork?undefined:options.resume;
         record.forkSource=options.fork?options.resume:undefined;record.importRoot=options.importRoot;
         if(!options.fork)this.ownIdentity(record,options.resumeId);
         this.ownFile(record,options.resume);
         this.emit(record,{type:'session_connecting'});
-        const result=await record.session.start(options);
+        progress('正在启动 OMP');
+        const result=await record.session.start({...options,signal});
         return {...result,clientSessionId:id,agentDir:record.agentDir};
-      });
+      },signal,progress),signal);
     } catch(error) {
       if(!record.session.child){this.emit(record,{type:'process_error',message:error.message});this.records.delete(id);for(const [key,owner]of this.files)if(owner===id)this.files.delete(key);}
       throw error;
-    } finally {this.starting.delete(id);}
+    } finally {clearTimeout(timer);this.starting.delete(id);}
   }
   async request(id,type,data) {
     if(type==='prompt')validatePrompt(data);
@@ -104,8 +111,8 @@ class SessionManager {
     return saved;
   }
   respond(id,data){const record=this.get(id);if(!record.questions.has(data.id))throw new Error('该问题不属于当前会话或已结束');record.session.sendFrame(data);record.questions.delete(data.id);this.emit(record,{type:'question_resolved',id:data.id});}
-  close(id){const record=this.records.get(clientId(id));if(record){this.titles?.cancel(record);this.emit(record,{type:'client_closing'});}return record?record.session.close():Promise.resolve();}
+  close(id){const record=this.records.get(clientId(id));if(record){this.titles?.cancel(record);record.controller.abort(Error('会话启动已取消'));this.emit(record,{type:'client_closing'});}return record?record.session.close():Promise.resolve();}
   list(){return [...this.records.values()].filter(r=>r.session.child).map(r=>({id:r.id,root:r.root,agentDir:r.agentDir,sessionFile:r.sessionFile,runtime:r.settings.runtime,ready:r.session.ready,busy:r.busy,questions:[...r.questions.values()]}));}
-  async closeAll(){await Promise.allSettled([...this.records.values()].map(r=>r.session.close()));}
+  async closeAll(){await Promise.allSettled([...this.records.values()].map(r=>this.close(r.id)));}
 }
 module.exports={SessionManager,clientId,sessionKey};
