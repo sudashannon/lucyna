@@ -1,0 +1,42 @@
+[
+  {
+    "id": "modular",
+    "width": 1441,
+    "height": 902,
+    "overflow": false,
+    "broken": 0,
+    "title": "Lucyna · 蓝调工作室"
+  },
+  {
+    "id": "editorial",
+    "width": 1441,
+    "height": 902,
+    "overflow": false,
+    "broken": 0,
+    "title": "Lucyna · 整理知识库阅读体验"
+  },
+  {
+    "id": "folio",
+    "width": 1441,
+    "height": 902,
+    "overflow": false,
+    "broken": 0,
+    "title": "Lucyna · 纸页研读室"
+  },
+  {
+    "id": "pixel",
+    "width": 1441,
+    "height": 902,
+    "overflow": false,
+    "broken": 0,
+    "title": "Lucyna — 像素工作室"
+  },
+  {
+    "id": "canon",
+    "width": 1441,
+    "height": 902,
+    "overflow": false,
+    "broken": 0,
+    "title": "Lucyna · 专业工作台"
+  }
+]

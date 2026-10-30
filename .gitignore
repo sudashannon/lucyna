@@ -91,3 +91,6 @@ test/*
 # Superseded local harness and unused intermediate artwork.
 test/renderer-behavior.cjs
 src/pet/assets/companions-atlas-v2.png
+
+# Impeccable rendered review captures are local verification artifacts.
+**/.impeccable/review/
