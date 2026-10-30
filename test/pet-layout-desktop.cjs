@@ -91,7 +91,7 @@ app.whenReady().then(async()=>{
   assert.ok(await bubble('(()=>{const title=document.querySelector(".notice strong");return title.getBoundingClientRect().height<=parseFloat(getComputedStyle(title).lineHeight)*2+1})()'));
   pet.theme='dark';pet.publish();await until(async()=>await bubble('document.body.dataset.theme==="dark"'),'dark notification');
   pet.bubble.webContents.invalidate();await pause(300);fs.writeFileSync(path.join(out,'readable-notice-dark-long.png'),(await pet.bubble.webContents.capturePage()).toPNG());
-  const navigated=[];pet.getMain=()=>({isDestroyed:()=>false,isMinimized:()=>false,show(){},focus(){},webContents:{send:(type,payload)=>{if(type==='pet:navigate')navigated.push(payload.id);}}});
+  const navigated=[];pet.getMain=()=>({isDestroyed:()=>false,isMinimized:()=>false,show(){},focus(){},webContents:{isDestroyed:()=>false,isCrashed:()=>false,send:(type,payload)=>{if(type==='pet:navigate')navigated.push(payload.id);}}});
   await bubble('document.querySelector(".notice .primary").click()');
   await until(()=>navigated.length===1,'open named session');assert.deepEqual(navigated,['background-task']);
   checks.push('Private notifications retain work/title; long names fit, dropdowns disambiguate tasks and open targets the correct background session.');

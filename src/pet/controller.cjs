@@ -1,5 +1,6 @@
 const {BrowserWindow,ipcMain,screen,Tray,Menu,nativeImage,powerMonitor}=require('electron');
 const path=require('node:path');
+const fs=require('node:fs/promises');
 const {PetState,Preferences}=require('./state.cjs');
 const {windowShape}=require('./shape.cjs');
 const atlases=require('./animation-data.js');
@@ -8,7 +9,7 @@ const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const bubbleSize={width:350,height:300};
 function place(area,size,position){return {x:Math.round(clamp(area.x+area.width-size.width-(position?.right??24),area.x,area.x+area.width-size.width)),y:Math.round(clamp(area.y+area.height-size.height-(position?.bottom??24),area.y,area.y+area.height-size.height)),...size};}
 class PetController{
- constructor({directory,getMain,getSessions,onQuit,onState=()=>{}}){this.getMain=getMain;this.getSessions=getSessions;this.onQuit=onQuit;this.onState=onState;this.preferences=new Preferences(directory);this.model=new PetState();this.hidden=false;this.locked=false;this.manual=false;this.theme='light';this.listeners=[];this.handlers=[];this.disposed=false;this.serial=Promise.resolve();}
+ constructor({directory,getMain,getSessions,onQuit,onState=()=>{}}){this.getMain=getMain;this.getSessions=getSessions;this.onQuit=onQuit;this.onState=onState;this.preferences=new Preferences(directory);this.model=new PetState();this.hidden=false;this.locked=false;this.manual=false;this.theme='light';this.listeners=[];this.handlers=[];this.disposed=false;this.serial=Promise.resolve();this.recoveryAttempts=[];this.diagnostics=[];this.diagnosticFile=path.join(directory,'desktop-pet-window.json');this.diagnosticWrite=Promise.resolve();}
  get settings(){return this.preferences.value;}
  async init(){await this.preferences.load();this.listen(screen,'display-added',()=>this.reposition());this.listen(screen,'display-removed',()=>this.reposition());this.listen(screen,'display-metrics-changed',()=>this.reposition());this.listen(powerMonitor,'lock-screen',()=>this.suspend());this.listen(powerMonitor,'suspend',()=>this.suspend());this.listen(powerMonitor,'unlock-screen',()=>this.resume());this.listen(powerMonitor,'resume',()=>this.resume());
   this.handle('pet:snapshot',()=>this.snapshot());
@@ -18,13 +19,40 @@ class PetController{
   await this.apply();return this;
  }
  listen(target,name,fn){target.on(name,fn);this.listeners.push(()=>target.removeListener(name,fn));}
- handle(name,fn){ipcMain.handle(name,(event,...args)=>{if(this.disposed)return false;if(![this.pet?.webContents,this.bubble?.webContents].includes(event.sender))throw Error('Unauthorized pet IPC sender');return fn(event,...args);});this.handlers.push(name);}
+ handle(name,fn){ipcMain.handle(name,(event,...args)=>{if(this.disposed||this.retiredContents?.has(event.sender))return false;if(![this.pet?.webContents,this.bubble?.webContents].includes(event.sender))throw Error('Unauthorized pet IPC sender');return fn(event,...args);});this.handlers.push(name);}
  snapshot(){return {...this.model.snapshot({...this.settings,reducedMotion:this.feedbackReducedMotion??this.settings.reducedMotion}),sequence:this.model.sequence,theme:this.theme,hidden:this.hidden,locked:this.locked,manual:this.manual,dragging:!!this.nativeDragging,warning:this.preferences.warning||''};}
  ingest(event){if(this.model.ingest(event))this.schedule();}
  context(context){if(!context||!['light','dark'].includes(context.theme))throw Error('无效桌宠上下文');this.theme=context.theme;if(typeof context.id==='string')this.model.setClientTitle(context.id,context.title);this.schedule();}
  save(patch){const next=this.serial.then(async()=>{const value=await this.preferences.save(patch);if(patch.enabled===true)this.hidden=false;await this.apply();return value;});this.serial=next.catch(()=>{});return next;}
+ recordWindowState(reason,detail={}){
+  const win=this.pet&&!this.pet.isDestroyed()?this.pet:null;
+  this.diagnostics.push({at:new Date().toISOString(),reason,...detail,enabled:this.settings.enabled,hidden:this.hidden,locked:this.locked,visible:win?.isVisible()??false,bounds:win?.getBounds()??null,shapeCount:this.shapeCount||0});
+  if(this.diagnostics.length>30)this.diagnostics.shift();const data=JSON.stringify(this.diagnostics,null,2);
+  // Only window lifecycle metadata; never conversation text or credentials.
+  this.diagnosticWrite=this.diagnosticWrite.then(async()=>{await fs.mkdir(path.dirname(this.diagnosticFile),{recursive:true});await fs.writeFile(this.diagnosticFile,data);}).catch(()=>{});
+ }
+ refreshSprite(){const win=this.pet;if(!win||win.isDestroyed()||win.webContents.isDestroyed()||win.webContents.isCrashed())return;win.webContents.send('pet:refresh');win.webContents.invalidate();}
+ recover({resetPosition=false,reveal=false,afterWake=false}={}){
+  const next=this.serial.then(async()=>{
+   if(this.disposed||!this.settings.enabled)return this.settings;
+   // A lock/hide can arrive while recovery is waiting behind a settings save.
+   if(afterWake&&(this.locked||this.hidden))return this.settings;
+   if(resetPosition){const main=this.getMain(),display=main&&!main.isDestroyed()?screen.getDisplayMatching(main.getBounds()):screen.getPrimaryDisplay();await this.preferences.save({position:{displayId:display.id,right:24,bottom:24}});}
+   if(reveal){this.hidden=false;this.recoveryAttempts=[];}
+   this.recordWindowState('recover',{resetPosition,reveal,afterWake});this.destroyWindows();await this.apply();
+   if(this.preferences.warning?.startsWith('桌宠绘制连续异常')){this.preferences.warning='';this.publish();}return this.settings;
+  });this.serial=next.catch(()=>{});return next;
+ }
+ rendererGone(win,kind,details){
+  if(this.disposed||this.destroyingWindows||![this.pet,this.bubble].includes(win))return;
+  this.recordWindowState('renderer-gone',{kind,reasonCode:details.reason,exitCode:details.exitCode});
+  if(!this.settings.enabled||this.automaticRecovery)return;
+  const now=Date.now();this.recoveryAttempts=this.recoveryAttempts.filter(at=>now-at<60000);
+  if(this.recoveryAttempts.length>=2){this.preferences.warning='桌宠绘制连续异常，请使用“重新显示并重置位置”恢复。';this.publish();return;}
+  this.recoveryAttempts.push(now);this.automaticRecovery=this.recover().catch(error=>this.fail(error)).finally(()=>{this.automaticRecovery=null;});
+ }
  schedule(){if(this.disposed||this.timer)return;this.timer=setTimeout(()=>{this.timer=null;this.publish();},250);}
- publish(){if(this.disposed)return;const snapshot=this.snapshot();this.onState({...snapshot,notices:[...this.model.notices.values()].map(({id,sessionId,kind,order,read,snoozed})=>({id,sessionId,kind,order,read,snoozed}))});for(const win of [this.pet,this.bubble,this.getMain()])if(win&&!win.isDestroyed())win.webContents.send('pet:state',snapshot);this.updateBubble(snapshot);this.updateTray();}
+ publish(){if(this.disposed)return;const snapshot=this.snapshot();this.onState({...snapshot,notices:[...this.model.notices.values()].map(({id,sessionId,kind,order,read,snoozed})=>({id,sessionId,kind,order,read,snoozed}))});for(const win of [this.pet,this.bubble,this.getMain()])if(win&&!win.isDestroyed()&&!win.webContents.isDestroyed()&&!win.webContents.isCrashed())win.webContents.send('pet:state',snapshot);this.updateBubble(snapshot);this.updateTray();}
  size(){const scale={small:.75,medium:1,large:1.25}[this.settings.size],base=this.settings.appearance==='cat'?168:224;return {width:Math.round(base*scale),height:Math.round((base+30)*scale)};}
  display(){return screen.getAllDisplays().find(d=>d.id===this.settings.position?.displayId)||screen.getPrimaryDisplay();}
  async createWindow(kind){
@@ -34,8 +62,11 @@ class PetController{
   // Their only animation is explicitly paused when hidden/locked.
   const win=new BrowserWindow({show:false,width:sprite?this.size().width:bubbleSize.width,height:sprite?this.size().height:bubbleSize.height,frame:false,transparent:sprite,backgroundColor:sprite?'#00000000':'#f8f8f5',hasShadow:!sprite,resizable:false,maximizable:false,minimizable:false,fullscreenable:false,skipTaskbar:true,focusable:true,alwaysOnTop:this.settings.alwaysOnTop,icon:applicationIcon,title:sprite?'Lucyna 桌面伙伴':'Lucyna 会话提醒',webPreferences:{preload:path.join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
   win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',event=>event.preventDefault());
+  win.webContents.on('render-process-gone',(_event,details)=>this.rendererGone(win,kind,details));
+  win.webContents.on('unresponsive',()=>this.recordWindowState('renderer-unresponsive',{kind}));
   win.on('close',event=>{if(!this.disposed&&this.settings.enabled){event.preventDefault();if(sprite)this.hide();else{this.manual=false;const n=this.model.snapshot(this.settings).notices.find(n=>n.popup);if(n)this.model.snooze(n.id);win.hide();}}});
   if(sprite){this.pet=win;this.nativeShape=false;win.setMovable(true);win.setIgnoreMouseEvents(true,{forward:true});this.hit=false;
+   win.on('show',()=>{this.refreshSprite();this.recordWindowState('show');});
    win.on('will-move',()=>{const wasMoving=this.nativeDragging;this.nativeDragging=true;clearTimeout(this.moveSave);if(!wasMoving)this.publish();});
    win.on('moved',()=>{if(!this.nativeDragging)return;clearTimeout(this.moveSave);this.moveSave=setTimeout(()=>void this.finishNativeMove().catch(e=>this.fail(e)),200);});
   }else this.bubble=win;
@@ -45,13 +76,13 @@ class PetController{
  async apply(){
   if(this.disposed)return;
   if(!this.settings.enabled){if(this.getMain()&&!this.getMain().isVisible())this.showMain();this.destroyWindows();this.tray?.destroy();this.tray=null;this.publish();return;}
-  if(!this.tray){this.trayKey='';const icon=nativeImage.createFromPath(trayIcon).resize({width:20,height:20});this.tray=new Tray(icon);this.tray.on('click',()=>{this.hidden=false;this.manual=false;this.reposition();this.publish();});this.tray.on('double-click',()=>this.showMain());}
+  if(!this.tray){this.trayKey='';const icon=nativeImage.createFromPath(trayIcon).resize({width:20,height:20});this.tray=new Tray(icon);this.tray.on('click',()=>{this.manual=false;void this.recover({reveal:true}).catch(e=>this.fail(e));});this.tray.on('double-click',()=>this.showMain());}
   try{if(!this.pet||this.pet.isDestroyed())await this.createWindow('sprite');if(!this.bubble||this.bubble.isDestroyed())await this.createWindow('bubble');}
   catch(e){this.hidden=true;this.destroyWindows();this.preferences.warning='桌宠窗口打开失败：'+e.message;this.updateTray();throw e;}
   for(const win of [this.pet,this.bubble])win.setAlwaysOnTop(this.settings.alwaysOnTop,'floating');
-  this.reposition();this.publish();
+  this.reposition();this.publish();this.recordWindowState('applied');
  }
- reposition(){if(!this.pet||this.pet.isDestroyed())return;this.pet.setBounds(place(this.display().workArea,this.size(),this.settings.position));if(!this.hidden&&!this.locked)this.pet.showInactive();this.positionBubble();}
+ reposition(){if(!this.pet||this.pet.isDestroyed())return;this.pet.setBounds(place(this.display().workArea,this.size(),this.settings.position));if(!this.hidden&&!this.locked){this.pet.showInactive();this.refreshSprite();}this.positionBubble();}
  positionBubble(){if(!this.pet||!this.bubble||this.pet.isDestroyed()||this.bubble.isDestroyed())return;const p=this.pet.getBounds(),area=screen.getDisplayMatching(p).workArea;const width=Math.min(bubbleSize.width,area.width),height=Math.min(bubbleSize.height,area.height),x=clamp(p.x+p.width-width,area.x,area.x+area.width-width),above=p.y-height-8,y=above>=area.y?above:clamp(p.y+p.height+8,area.y,area.y+area.height-height);this.bubble.setBounds({x:Math.round(x),y:Math.round(y),width,height});}
  updateBubble(snapshot){clearTimeout(this.expiry);if(!this.bubble||this.bubble.isDestroyed())return;if(!this.settings.enabled||this.hidden||this.locked){this.pet?.hide();this.bubble.hide();return;}
   const popup=snapshot.notices.find(n=>n.popup);if(this.manual||!this.settings.quiet&&popup){this.positionBubble();if(!this.bubble.isVisible())this.bubble.showInactive();}else this.bubble.hide();
@@ -59,13 +90,13 @@ class PetController{
  }
  updateTray(){if(!this.tray)return;const s=this.snapshot();this.tray.setToolTip(`Lucyna · ${s.activeCount} 个运行中 · ${s.pendingCount} 条待处理`);const key=[this.hidden,this.settings.quiet].join(':');if(this.trayKey===key)return;this.trayKey=key;this.tray.setContextMenu(Menu.buildFromTemplate([
   {label:'打开工作台',click:()=>this.showMain()},
-  {label:this.hidden?'显示桌面伙伴':'隐藏桌面伙伴',click:()=>{if(this.hidden){this.hidden=false;this.reposition();this.publish();}else this.hide();}},
+  {label:this.hidden?'显示桌面伙伴':'隐藏桌面伙伴',click:()=>{if(this.hidden)void this.recover({reveal:true}).catch(e=>this.fail(e));else this.hide();}},
   {label:'勿扰',type:'checkbox',checked:this.settings.quiet,click:item=>{void this.save({quiet:item.checked}).catch(e=>this.fail(e));}},
-  {label:'重置桌宠位置',click:()=>{void this.save({position:null}).catch(e=>this.fail(e));}},
+  {label:'重新显示并重置位置',click:()=>{void this.recover({resetPosition:true,reveal:true}).catch(e=>this.fail(e));}},
   {type:'separator'},{label:'退出 Lucyna',click:()=>this.onQuit()}
  ]));}
  fail(error){this.preferences.warning=String(error.message||error);this.showMain();this.publish();}
- hide(){this.hidden=true;this.manual=false;this.setHit(false);this.pet?.hide();this.bubble?.hide();this.publish();}
+ hide(){this.hidden=true;this.manual=false;this.setHit(false);this.pet?.hide();this.bubble?.hide();this.publish();this.recordWindowState('hide');}
  showMain(){const main=this.getMain();if(main&&!main.isDestroyed()){if(main.isMinimized())main.restore();main.show();main.focus();}}
  shouldKeepAlive(){return this.settings.enabled&&this.settings.closeToTray&&!!this.tray;}
  setLayout(layout){
@@ -114,9 +145,30 @@ class PetController{
   if(!this.model.sessions.has(notice.sessionId))throw Error('会话已关闭');
   this.showMain();this.getMain()?.webContents.send('pet:navigate',{id:notice.sessionId});this.model.read(data);this.manual=false;this.publish();
  }
- suspend(){this.locked=true;this.pet?.hide();this.bubble?.hide();clearTimeout(this.expiry);this.publish();}
- resume(){this.locked=false;this.reposition();this.publish();for(const record of this.getSessions()?.list()||[])void this.getSessions().request(record.id,'get_state').catch(()=>{});}
- destroyWindows(){this.nativeDragging=false;clearTimeout(this.moveSave);this.pendingLayout=null;this.nativeShape=false;for(const win of [this.pet,this.bubble])if(win&&!win.isDestroyed())win.destroy();this.pet=null;this.bubble=null;}
+ suspend(){this.locked=true;this.pet?.hide();this.bubble?.hide();clearTimeout(this.expiry);this.publish();this.recordWindowState('suspend');}
+ resume(){
+  if(this.disposed)return Promise.resolve();
+  const waking=this.locked;this.locked=false;
+  // Windows can keep a transparent native surface blank after unlock even
+  // when the renderer has pixels and isVisible() is true. Recreate only the
+  // companion surfaces, as the manual recovery does; keep the model and OMP.
+  // Resume and unlock may both fire for one wake. Share the in-flight job.
+  if(this.wakeRecovery)return this.wakeRecovery;
+  if(waking&&this.settings.enabled&&!this.hidden){
+   const previous=this.pet;
+   this.wakeRecovery=this.recover({afterWake:true}).then(()=>{
+    if(!this.disposed)this.recordWindowState('resume',{recreated:this.pet!==previous});
+   }).catch(error=>{if(!this.disposed)this.fail(error);}).finally(()=>{this.wakeRecovery=null;});
+  }else{this.reposition();this.publish();this.recordWindowState('resume',{recreated:false});}
+  if(waking){const manager=this.getSessions();for(const record of manager?.list()||[])void Promise.resolve().then(()=>manager.request(record.id,'get_state')).catch(()=>{});}
+  return this.wakeRecovery||Promise.resolve();
+ }
+ destroyWindows(){this.destroyingWindows=true;this.nativeDragging=false;clearTimeout(this.moveSave);this.pendingLayout=null;this.nativeShape=false;this.shapeCount=0;
+  // Drop queued messages from retired pet renderers. Other senders still fail
+  // authorization, and old actions cannot act on a replacement window.
+  this.retiredContents||=new WeakSet();for(const win of [this.pet,this.bubble])if(win&&!win.isDestroyed()){this.retiredContents.add(win.webContents);win.destroy();}
+  this.pet=null;this.bubble=null;this.destroyingWindows=false;
+ }
  dispose(){this.disposed=true;clearTimeout(this.timer);clearTimeout(this.expiry);for(const off of this.listeners)off();this.destroyWindows();this.tray?.destroy();this.tray=null;const handlers=this.handlers.splice(0);setTimeout(()=>{for(const name of handlers)ipcMain.removeHandler(name);},100).unref();}
 }
 module.exports={PetController,place};

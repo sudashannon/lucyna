@@ -2,7 +2,7 @@ const api=window.companion,img=document.getElementById('character'),badge=docume
 const Animation=window.CindyPetAnimation,atlases=window.CindyPetAtlas,assets=new Map();
 const motionPreference=matchMedia('(prefers-reduced-motion: reduce)');
 let lastHit=false,mask=null,appearance='duo',layoutFrame=0,layoutRetries=0;
-let snapshot,animationKey='',clip='idle',started=0,timer=0,currentFrame=-1,currentAsset=null,geometry=null,loadRevision=0,paintCount=0;
+let snapshot,animationKey='',clip='idle',started=0,timer=0,currentFrame=-1,currentAsset=null,geometry=null,loadRevision=0,paintCount=0,canvasLost=false;
 const report=e=>{badge.textContent='桌宠暂不可用';console.error(e);};
 const rect=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};
 function hit(value){if(value===lastHit)return;lastHit=value;api.hit(value).catch(report);}
@@ -51,15 +51,15 @@ function tick(force=false){
  canvas.dataset.playing=String(!frozen&&step.delay>0);
  if(!frozen&&step.delay>0)timer=setTimeout(()=>tick(),Math.max(30,step.delay));
 }
-async function updateAnimation(s){
+async function updateAnimation(s,force=false){
  const nextClip=Animation.clipFor(s),notice=s.notices?.filter(n=>n.kind===nextClip).at(-1)?.id||'',key=appearance+':'+nextClip+':'+notice;
  if(key!==animationKey){animationKey=key;clip=nextClip;started=performance.now();currentFrame=-1;}
- if(!s.settings.animated){loadRevision++;clearTimeout(timer);timer=0;currentAsset=null;canvas.hidden=true;img.style.visibility='';canvas.dataset.playing='false';staticGeometry();return;}
+ if(!s.settings.animated||canvasLost){loadRevision++;clearTimeout(timer);timer=0;currentAsset=null;canvas.hidden=true;img.style.visibility='';canvas.dataset.playing='false';staticGeometry();return;}
  const revision=++loadRevision,name=appearance;
  try{
   const asset=await loadAtlas(name);if(revision!==loadRevision||!snapshot.settings.animated)return;
   const changed=currentAsset!==asset||canvas.hidden;
-  currentAsset=asset;canvas.hidden=false;img.style.visibility='hidden';tick(changed);
+  currentAsset=asset;canvas.hidden=false;img.style.visibility='hidden';tick(changed||force);
  }catch(e){if(revision!==loadRevision)return;currentAsset=null;canvas.hidden=true;img.style.visibility='';staticGeometry();console.warn(e.message);}
 }
 function opaque(x,y){
@@ -71,7 +71,15 @@ function opaque(x,y){
 const layoutObserver=new ResizeObserver(()=>{if(canvas.hidden)staticGeometry();else tick(true);});
 layoutObserver.observe(img);layoutObserver.observe(badge);
 window.addEventListener('resize',()=>{layoutRetries=0;if(canvas.hidden)staticGeometry();else tick(true);});
-document.addEventListener('visibilitychange',()=>tick());
+// A restored compositor/canvas may have lost its pixels while the logical frame
+// is unchanged. This also matters with reduced motion, where no timer repaints.
+function refresh(){layoutRetries=0;if(snapshot)void updateAnimation(snapshot,true);}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)tick();else refresh();});
+window.addEventListener('pageshow',refresh);
+window.addEventListener('focus',refresh);
+canvas.addEventListener('contextlost',()=>{canvasLost=true;refresh();});
+canvas.addEventListener('contextrestored',()=>{canvasLost=false;currentFrame=-1;refresh();});
+api.onRefresh?.(refresh);
 motionPreference.addEventListener('change',()=>{if(snapshot)render(snapshot);});
 document.addEventListener('mousemove',e=>{if(!snapshot?.dragging)hit(opaque(e.clientX,e.clientY));});
 document.addEventListener('mouseleave',()=>{if(!snapshot?.dragging)hit(false);});
@@ -81,9 +89,10 @@ badge.addEventListener('click',()=>api.action('inbox').catch(report));
 document.addEventListener('contextmenu',e=>{e.preventDefault();api.action('inbox').catch(report);});
 const labels={idle:'准备好了',connecting:'正在连接 OMP',disconnected:'连接已结束',working:'正在工作',thinking:'正在思考',attention:'等待你处理',completed:'本轮已完成',aborted:'已停止',error:'需要检查',retrying:'正在重试',compacting:'整理上下文',settling:'正在收尾',background:'等待后续任务',stopping:'正在停止'};
 function render(s){
+ const restored=!!snapshot&&(snapshot.hidden&&!s.hidden||snapshot.locked&&!s.locked);
  snapshot=s;appearance=s.settings.appearance;document.body.dataset.theme=s.theme;document.body.dataset.phase=s.phase;document.body.dataset.reduced=String(reduced()||s.hidden||s.locked);
  const src=appearance==='cat'?'assets/cat.png':'assets/companions.png';if(img.getAttribute('src')!==src){mask=null;img.src=src;}
  badge.textContent=s.settings.quiet?(s.pendingCount?`勿扰 · ${s.pendingCount} 条待办`:'勿扰中'):s.pendingCount?`${s.pendingCount} 条待处理`:s.activeCount?`${s.activeCount} 个运行中`:(labels[s.phase]||'准备好了');
- img.title=canvas.title='拖动角色移动 · 点击下方状态查看待办';void updateAnimation(s);
+ img.title=canvas.title='拖动角色移动 · 点击下方状态查看待办';void updateAnimation(s,restored);
 }
 api.subscribe(render);api.snapshot().then(render).catch(report);

@@ -69,6 +69,7 @@ test/*
 !test/text-attachments-native.cjs
 !test/pet-layout-desktop.cjs
 !test/pet-performance.cjs
+!test/pet-recovery-desktop.cjs
 !test/screenshot-gallery.cjs
 !test/screenshot-preload.cjs
 !test/window-chrome-desktop.cjs

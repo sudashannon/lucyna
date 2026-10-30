@@ -14,6 +14,9 @@ app.whenReady().then(async()=>{
  try{
   pet=new PetController({directory:app.getPath('userData'),getMain:()=>null,getSessions:()=>({list:()=>[]}),onQuit:()=>{}});await pet.init();await pet.save({enabled:true,animated:true});
   await until(async()=>!(await state()).canvasHidden&&pet.nativeShape,'atlas visible');
+  // Keep this timing test independent of the host's accessibility preference.
+  // Production still respects the OS preference; reduced motion is tested below.
+  pet.pet.webContents.debugger.attach('1.3');await pet.pet.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
   // Offscreen windows intentionally have no desktop visibility; exercise the
   // page's visibility lifecycle explicitly while keeping the user's desktop free.
   await js('Object.defineProperty(document,"hidden",{configurable:true,get:()=>false});document.dispatchEvent(new Event("visibilitychange"))');
