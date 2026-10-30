@@ -29,6 +29,9 @@ app.whenReady().then(async()=>{
   pet.ingest({clientSessionId:'completed',type:'prompt_result',status:'completed'});
   pet.ingest({clientSessionId:'pending',type:'extension_ui_request',method:'ask',id:'question'});pet.publish();
   const model=pet.model,sessions=JSON.stringify([...model.sessions]),notices=JSON.stringify([...model.notices]);
+  // Flush the controller's queued status publish before deliberately clearing
+  // pixels; otherwise that unrelated publish can legitimately repaint first.
+  await wait(400);
   await js('Object.defineProperty(document,"hidden",{configurable:true,get:()=>false});true');
   await clear();assert.equal(await pixels(),0);await js('document.dispatchEvent(new Event("visibilitychange"))');await until(async()=>await pixels()>1000,'visibility repaint');
   assert.equal(await js('document.getElementById("animation").dataset.playing'),'false');
@@ -76,6 +79,7 @@ app.whenReady().then(async()=>{
   handle('pet:reset-position',()=>{recoveries++;return pet.recover({resetPosition:true,reveal:true});});
   handle('feedback:get',()=>({settings:require('../src/feedback/settings.cjs').defaults(),warning:''}));
   handle('feedback:stop-preview',()=>{});
+  handle('auxiliary:get',()=>({...require('../src/auxiliary-settings.cjs').defaults(),hasApiKey:false}));
   handle('settings:get',()=>({settings:require('../src/client-settings.cjs').defaults(),storage:out,workspace:{distro:'test',user:'fixture',root:'/demo'}}));
   handle('works:list',()=>[]);handle('omp:list',()=>[]);
   for(const name of ['omp:start','omp:request','omp:close'])handle(name,()=>{ompCalls++;throw Error('Unexpected OMP operation');});
@@ -98,6 +102,15 @@ app.whenReady().then(async()=>{
   await ui('Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="取消").click()');
   assert.equal(pet.settings.privacy,true);assert.equal(JSON.stringify([...model.notices]),notices);
   checks.push('Production settings button recovers immediately without Save, preserves unsaved options on screen and leaves OMP untouched. Cancel does not apply those options.');
+  const chooseMotion=mode=>ui(`(()=>{const select=document.querySelector('select[aria-label="桌宠动画"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(select,${JSON.stringify(mode)});select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await ui('document.querySelector("button[aria-label=设置]").click()');await until(()=>ui('!!document.querySelector("select[aria-label=桌宠动画]")'),'animation modes');
+  assert.deepEqual(await ui('Array.from(document.querySelector("select[aria-label=桌宠动画]").options).map(o=>o.value)'),['system','always','off']);
+  await chooseMotion('always');await ui('Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="取消").click()');assert.equal(pet.settings.animationMode,'system');
+  await ui('document.querySelector("button[aria-label=设置]").click()');await until(()=>ui('!!document.querySelector("select[aria-label=桌宠动画]")'),'reopen animation modes');
+  await chooseMotion('always');await ui('Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="保存").click()');
+  await until(()=>pet.settings.animationMode==='always','animation mode saved');assert.equal(pet.settings.reducedMotion,true);assert.equal(pet.settings.animated,true);assert.equal(ompCalls,0);
+  assert.equal(JSON.parse(fs.readFileSync(pet.preferences.file,'utf8')).animationMode,'always');
+  checks.push('Formal animation selector preserves Cancel, persists always-play on Save, and leaves reduced-motion settings and OMP connections untouched.');
   await pet.save({enabled:false});await pet.recover({resetPosition:true,reveal:true});pet.suspend();await pet.resume();assert.equal(pet.pet,null);assert.equal(pet.settings.enabled,false);
   await pet.diagnosticWrite;const trace=JSON.parse(fs.readFileSync(pet.diagnosticFile,'utf8'));assert.ok(trace.some(e=>e.reason==='renderer-gone'));assert.ok(trace.length<=30);
   checks.push('Recovery respects the disabled preference; bounded local diagnostics record window lifecycle only.');

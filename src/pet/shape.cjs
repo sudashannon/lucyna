@@ -22,4 +22,26 @@ function windowShape({bitmap,width,height,image,badge,bounds,source={x:0,y:0,wid
  if(badge.width&&badge.height){const x=Math.max(0,Math.floor(badge.x)),y=Math.max(0,Math.floor(badge.y));rects.push({x,y,width:Math.max(0,Math.min(bounds.width-x,Math.ceil(badge.width))),height:Math.max(0,Math.min(bounds.height-y,Math.ceil(badge.height)))});}
  return rects;
 }
-module.exports={windowShape};
+// One stable native region for every pose. Changing SetWindowRgn every frame
+// needlessly invalidates the transparent Windows surface and its hit region.
+function unionRegions(groups,bounds){
+ const width=Math.ceil(bounds.width),height=Math.ceil(bounds.height);
+ if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0||width*height>1000000)throw Error('Invalid region bounds');
+ const mask=new Uint8Array(width*height);
+ for(const group of groups)for(const r of group){
+  const left=Math.max(0,Math.floor(r.x)),right=Math.min(width,Math.ceil(r.x+r.width)),top=Math.max(0,Math.floor(r.y)),bottom=Math.min(height,Math.ceil(r.y+r.height));
+  for(let y=top;y<bottom;y++)mask.fill(1,y*width+left,y*width+right);
+ }
+ const rects=[];let previous=new Map();
+ for(let y=0;y<height;y++){
+  const row=new Map();let start=-1;
+  for(let x=0;x<=width;x++){
+   const solid=x<width&&mask[y*width+x];
+   if(solid&&start<0)start=x;
+   if(!solid&&start>=0){const key=start+':'+(x-start),old=previous.get(key);if(old){old.height++;row.set(key,old);}else{const r={x:start,y,width:x-start,height:1};rects.push(r);row.set(key,r);}start=-1;}
+  }
+  previous=row;
+ }
+ return rects;
+}
+module.exports={windowShape,unionRegions};

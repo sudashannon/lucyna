@@ -66,4 +66,4 @@ export interface Desktop {
   listFiles(root: string, directory?: string, options?: {query?: string; showHidden?: boolean; offset?: number}): Promise<FileListing>;
 }
 declare global { interface Window { desktop?: Desktop } }
-export interface PetSettings {version:1;enabled:boolean;animated:boolean;alwaysOnTop:boolean;appearance:'duo'|'cat';size:'small'|'medium'|'large';quiet:boolean;privacy:boolean;reducedMotion:boolean;closeToTray:boolean;notifyCompletion:boolean;notifyError:boolean;pinnedSessionId:string;position:{displayId:number;right:number;bottom:number}|null}
+export interface PetSettings {version:1;enabled:boolean;animated:boolean;animationMode?:'system'|'always';alwaysOnTop:boolean;appearance:'duo'|'cat';size:'small'|'medium'|'large';quiet:boolean;privacy:boolean;reducedMotion:boolean;closeToTray:boolean;notifyCompletion:boolean;notifyError:boolean;pinnedSessionId:string;position:{displayId:number;right:number;bottom:number}|null}

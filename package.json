@@ -37,8 +37,9 @@
     "test:sessions:restore": "node test/session-restore-desktop.cjs",
     "test:knowledge:sidebar": "electron test/knowledge-sidebar-desktop.cjs",
     "test:pet:layout": "electron test/pet-layout-desktop.cjs",
-    "screenshots": "electron test/screenshot-gallery.cjs",
     "test:pet:recovery": "electron test/pet-recovery-desktop.cjs",
+    "test:pet:playback": "electron test/pet-playback-desktop.cjs",
+    "screenshots": "electron test/screenshot-gallery.cjs",
     "pet:preview": "electron tools/show-pet-animation.cjs",
     "icons:build": "electron tools/build-app-icons.cjs",
     "start:legacy": "node tools/launch-legacy.cjs"

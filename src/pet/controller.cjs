@@ -2,7 +2,7 @@ const {BrowserWindow,ipcMain,screen,Tray,Menu,nativeImage,powerMonitor}=require(
 const path=require('node:path');
 const fs=require('node:fs/promises');
 const {PetState,Preferences}=require('./state.cjs');
-const {windowShape}=require('./shape.cjs');
+const {windowShape,unionRegions}=require('./shape.cjs');
 const atlases=require('./animation-data.js');
 const {applicationIcon,trayIcon}=require('../app-icon.cjs');
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
@@ -67,8 +67,12 @@ class PetController{
   win.on('close',event=>{if(!this.disposed&&this.settings.enabled){event.preventDefault();if(sprite)this.hide();else{this.manual=false;const n=this.model.snapshot(this.settings).notices.find(n=>n.popup);if(n)this.model.snooze(n.id);win.hide();}}});
   if(sprite){this.pet=win;this.nativeShape=false;win.setMovable(true);win.setIgnoreMouseEvents(true,{forward:true});this.hit=false;
    win.on('show',()=>{this.refreshSprite();this.recordWindowState('show');});
-   win.on('will-move',()=>{const wasMoving=this.nativeDragging;this.nativeDragging=true;clearTimeout(this.moveSave);if(!wasMoving)this.publish();});
-   win.on('moved',()=>{if(!this.nativeDragging)return;clearTimeout(this.moveSave);this.moveSave=setTimeout(()=>void this.finishNativeMove().catch(e=>this.fail(e)),200);});
+   const beginMove=()=>{const wasMoving=this.nativeDragging;this.nativeDragging=true;clearTimeout(this.moveSave);if(!wasMoving)this.publish();};
+   const endMove=()=>{if(!this.nativeDragging)return;clearTimeout(this.moveSave);this.moveSave=setTimeout(()=>void this.finishNativeMove().catch(e=>this.fail(e)),0);};
+   win.on('will-move',beginMove);win.on('moved',endMove);
+   // A cancelled native drag need not emit "moved". Always release the pause
+   // when the Windows move loop exits, including Escape/no position change.
+   if(process.platform==='win32'){win.hookWindowMessage(0x0231,beginMove);win.hookWindowMessage(0x0232,endMove);}
   }else this.bubble=win;
   await win.loadFile(path.join(__dirname,sprite?'sprite.html':'bubble.html'));
   return win;
@@ -115,20 +119,30 @@ class PetController{
   this.assetMasks||=new Map();let asset=this.assetMasks.get(key);
   if(!asset){const image=nativeImage.createFromPath(path.join(__dirname,animated?atlases[layout.appearance].file:'assets/'+(layout.appearance==='cat'?'cat.png':'companions.png')));asset={...image.getSize(),bitmap:image.toBitmap()};this.assetMasks.set(key,asset);}
   const source=animated?atlases[layout.appearance].frames[layout.frame]:undefined;
-  // Each animation frame is cached at the current layout. No alpha scan per token.
-  const regionKey=JSON.stringify([key,layout.frame,layout.image,layout.badge,bounds.width,bounds.height]);
+  // Use the union of all poses, not a new native clipping region per frame.
+  // Quantize the shared anchor so harmless floating-point roundoff from a
+  // different frame width cannot turn steady animation into native mutations.
+  const round=n=>Math.round(n*1000000)/1000000;
+  const anchor=animated?{scale:round(layout.image.width/source.width),centerX:round(layout.image.x+layout.image.width/2),bottom:round(layout.image.y+layout.image.height)}:null;
+  const regionKey=JSON.stringify([key,anchor||layout.image,layout.badge,bounds.width,bounds.height]);
+  if(this.appliedRegionKey===regionKey)return true;
   this.regionCache||=new Map();let rects=this.regionCache.get(regionKey);
-  if(!rects){rects=windowShape({...asset,image:layout.image,badge:layout.badge,bounds,source});if(this.regionCache.size>=64)this.regionCache.clear();this.regionCache.set(regionKey,rects);}
+  if(!rects){
+   rects=animated?unionRegions(atlases[layout.appearance].frames.map(frame=>windowShape({...asset,image:{x:anchor.centerX-frame.width*anchor.scale/2,y:anchor.bottom-frame.height*anchor.scale,width:frame.width*anchor.scale,height:frame.height*anchor.scale},badge:layout.badge,bounds,source:frame})),bounds):windowShape({...asset,image:layout.image,badge:layout.badge,bounds});
+   if(this.regionCache.size>=64)this.regionCache.clear();this.regionCache.set(regionKey,rects);
+  }
   if(!rects.length)throw Error('桌宠命中区域为空');
-  this.pet.setShape(rects);this.shapeCount=rects.length;this.nativeShape=true;this.pet.setIgnoreMouseEvents(false);this.hit=true;return true;
+  this.pet.setShape(rects);this.appliedRegionKey=regionKey;this.shapeCount=rects.length;this.nativeShape=true;this.pet.setIgnoreMouseEvents(false);this.hit=true;return true;
  }
  setHit(hit){if(this.nativeShape||!this.pet||this.pet.isDestroyed()||this.hit===hit)return;this.hit=hit;this.pet.setIgnoreMouseEvents(!hit,{forward:true});}
  async finishNativeMove(){
   if(!this.pet||this.pet.isDestroyed())return;this.nativeDragging=false;
   const b=this.pet.getBounds(),d=screen.getDisplayMatching(b),a=d.workArea;
-  await this.preferences.save({position:{displayId:d.id,right:Math.max(0,a.x+a.width-b.x-b.width),bottom:Math.max(0,a.y+a.height-b.y-b.height)}});
   if(this.pendingLayout){const layout=this.pendingLayout;this.pendingLayout=null;this.setLayout(layout);}
-  this.positionBubble();this.publish();
+  // Resume rendering immediately; a delayed filesystem write must not leave
+  // the renderer stuck with the previous dragging=true snapshot.
+  this.positionBubble();this.publish();this.refreshSprite();
+  await this.preferences.save({position:{displayId:d.id,right:Math.max(0,a.x+a.width-b.x-b.width),bottom:Math.max(0,a.y+a.height-b.y-b.height)}});
  }
 
  async action(action,data){
@@ -163,7 +177,7 @@ class PetController{
   if(waking){const manager=this.getSessions();for(const record of manager?.list()||[])void Promise.resolve().then(()=>manager.request(record.id,'get_state')).catch(()=>{});}
   return this.wakeRecovery||Promise.resolve();
  }
- destroyWindows(){this.destroyingWindows=true;this.nativeDragging=false;clearTimeout(this.moveSave);this.pendingLayout=null;this.nativeShape=false;this.shapeCount=0;
+ destroyWindows(){this.destroyingWindows=true;this.nativeDragging=false;clearTimeout(this.moveSave);this.pendingLayout=null;this.nativeShape=false;this.shapeCount=0;this.appliedRegionKey=null;
   // Drop queued messages from retired pet renderers. Other senders still fail
   // authorization, and old actions cannot act on a replacement window.
   this.retiredContents||=new WeakSet();for(const win of [this.pet,this.bubble])if(win&&!win.isDestroyed()){this.retiredContents.add(win.webContents);win.destroy();}

@@ -53,15 +53,18 @@ docs/                公共文档与演示截图
 | `python -m unittest discover -s test -p work_details_test.py` | Linux 临时 Git 仓库中的工作详情、分离差异、资产索引、路径边界与旧版 Git 兼容测试 |
 | `npm run test:pet:animation` | 动画状态、帧尺寸与设置回归 |
 | `npm run test:pet:layout` | 桌宠布局回归 |
-| `npm run screenshots` | 用生产 renderer 与合成数据重建 `docs/screenshots/` |
 | `npm run test:pet:recovery` | 桌宠画布丢失、隐藏/唤醒、跨屏重置与渲染进程崩溃恢复；隔离 profile，不启动 OMP |
+| `npm run test:pet:playback` | 透明窗口误报遮挡、系统/客户端减少动态、独立始终播放、拖动结束与固定窗口轮廓；附加 `-- --visible` 可显示隔离桌宠 |
+| `npm run screenshots` | 用生产 renderer 与合成数据重建 `docs/screenshots/` |
 | `npm run pet:preview` | 交互查看像素动画素材 |
 | `npm run icons:build` | 从保留的设计稿重新生成应用图标 |
 | `npm run dev` | 浏览器 UI 开发预览，不连接真实 OMP/WSL |
 
-桌面测试需要可运行 Electron 的 Windows 会话。默认测试使用独立临时 profile，不接触运行中的用户客户端；截图脚本不加载生产 preload，也不调用模型或 WSL。
 桌宠不见时，设置 → 桌面伙伴 → “重新显示并重置位置”会立即重建两个桌宠窗口，并移到工作台所在显示器右下角；不重建主窗口、OMP 连接或通知模型。锁屏/休眠后恢复时，同样重建已启用且未被用户隐藏的桌宠窗口，保留位置、会话和待办；同一轮唤醒的重复事件合并，恢复排队期间重新锁屏或隐藏则跳过重建。隐藏后显示和画布上下文恢复会强制重绘当前帧；上下文丢失期间使用静态角色。渲染进程异常最多自动重建两次/分钟，避免崩溃循环。客户端数据目录的 `desktop-pet-window.json` 保留最近 30 条窗口生命周期记录（位置、可见性、隐藏/锁屏状态、退出原因），不记录会话内容。回归测试模拟画布清空、上下文与锁屏/唤醒事件，实际终止隔离渲染进程，并通过正式设置页验证立即恢复与未保存选项保留；不代表所有显卡或远程桌面的合成行为都已覆盖。
 
+桌宠动画支持跟随系统与客户端动态效果、始终播放（仅桌宠）、关闭三档；旧设置保持跟随模式，显式始终播放不修改系统或客户端的减少动态偏好，隐藏和锁屏仍暂停。悬停状态标签可以区分系统/客户端减少动态、拖动暂停、静态动作结束。播放只服从原生隐藏/锁屏状态，不因 Chromium 对透明窗口的遮挡判断停止。Windows 使用全部姿势的合并轮廓，换帧不再反复修改原生窗口；原生拖动退出时立即恢复动画，位置保存独立完成。
+
+桌面测试需要可运行 Electron 的 Windows 会话。默认测试使用独立临时 profile，不接触运行中的用户客户端；截图脚本不加载生产 preload，也不调用模型或 WSL。
 
 工作详情验收使用 `test/desktop-log.cjs` 将日志先写到本次 `.runtime/` 目录的 `desktop.log`，再输出到终端。调用方关闭 stdout/stderr 管道时仅处理 `EPIPE`，测试继续保存结果并正常退出；其他异常保持可见，不使用全局异常吞噬。新增 Electron 验收入口应复用此日志工具。
 

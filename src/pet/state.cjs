@@ -1,7 +1,7 @@
 const {settledOutcome}=require('../run-outcome.cjs');
 const {resultExcerpt}=require('../result-excerpt.cjs');
 const fs=require('node:fs/promises'),path=require('node:path');
-const defaults=()=>({version:1,enabled:false,animated:true,alwaysOnTop:true,appearance:'duo',size:'medium',quiet:false,privacy:true,reducedMotion:false,closeToTray:true,notifyCompletion:true,notifyError:true,pinnedSessionId:'',position:null});
+const defaults=()=>({version:1,enabled:false,animated:true,animationMode:'system',alwaysOnTop:true,appearance:'duo',size:'medium',quiet:false,privacy:true,reducedMotion:false,closeToTray:true,notifyCompletion:true,notifyError:true,pinnedSessionId:'',position:null});
 async function replacePreferences(temp,file){
  // Windows indexers/AV can briefly hold the destination without delete sharing.
  // Retry the atomic rename; never delete the previous preferences as a fallback.
@@ -14,6 +14,7 @@ function validate(patch,current=defaults()){
   if(!Object.prototype.hasOwnProperty.call(next,key))throw Error('未知桌宠设置');
   if(key==='version'){if(value!==1)throw Error('不支持的桌宠设置版本');continue;}
   if(['enabled','animated','alwaysOnTop','quiet','privacy','reducedMotion','closeToTray','notifyCompletion','notifyError'].includes(key)){if(typeof value!=='boolean')throw Error('无效开关');}
+  else if(key==='animationMode'&&!['system','always'].includes(value))throw Error('无效桌宠动画模式');
   else if(key==='appearance'&&!['duo','cat'].includes(value)||key==='size'&&!['small','medium','large'].includes(value))throw Error('无效桌宠外观');
   else if(key==='pinnedSessionId'&&(typeof value!=='string'||value.length>100||value&&!/^[a-zA-Z0-9-]+$/.test(value)))throw Error('无效关注会话');
   else if(key==='position'&&value!==null&&(!value||typeof value!=='object'||!Number.isFinite(value.displayId)||!Number.isFinite(value.right)||!Number.isFinite(value.bottom)||Math.abs(value.right)>100000||Math.abs(value.bottom)>100000))throw Error('无效桌宠位置');

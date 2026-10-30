@@ -23,6 +23,6 @@ export function FeedbackSettings({value,onChange,disabled}:{value:Settings;onCha
   {error&&<p className="error-text" role="alert">{error}</p>}
   <div className="feedback-events">{([['completed','本轮完成'],['attention','等待你回复'],['error','执行中断']] as const).map(([key,label])=><label className="pet-option" key={key}><input type="checkbox" disabled={disabled} checked={value[key]} onChange={e=>onChange({[key]:e.target.checked})}/>{label}</label>)}</div>
   <label className="pet-option"><input type="checkbox" aria-label="减少界面与桌宠动效" disabled={disabled} checked={value.reducedMotion} onChange={e=>onChange({reducedMotion:e.target.checked})}/>减少界面与桌宠动效</label>
-  <p className="settings-caption">同时发生的提示会合并，不连续响铃。主动停止、工具重试不发声；系统减少动态设置始终优先。关闭桌宠仍可使用提示音，桌宠勿扰会同时暂停声音。</p>
+  <p className="settings-caption">同时发生的提示会合并，不连续响铃。主动停止、工具重试不发声。界面动画遵循系统减少动态设置；桌宠在“桌面伙伴”中选择跟随或始终播放。关闭桌宠仍可使用提示音，桌宠勿扰会同时暂停声音。</p>
  </>;
 }

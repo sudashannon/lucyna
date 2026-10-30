@@ -31,7 +31,10 @@ test('every source frame is valid and shares a fixed baseline at all desktop siz
  }
 });
 test('older saved pet settings migrate to animation without losing disabled/reduced motion preferences',()=>{
- const old=defaults();delete old.animated;old.enabled=false;old.reducedMotion=true;
+ const old=defaults();delete old.animated;delete old.animationMode;old.enabled=false;old.reducedMotion=true;
  assert.equal(validate(old).animated,true);assert.equal(validate(old).enabled,false);assert.equal(validate(old).reducedMotion,true);
+ assert.equal(validate(old).animationMode,'system');
+ assert.equal(validate({animationMode:'always'},validate(old)).reducedMotion,true);
+ assert.throws(()=>validate({animationMode:'invalid'}));
  assert.equal(validate({animated:false}).animated,false);assert.throws(()=>validate({animated:'yes'}));
 });

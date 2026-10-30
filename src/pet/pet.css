@@ -9,4 +9,4 @@
 .notice strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.4}
 
 .sprite[data-phase=error] #badge{border-color:#b45045}.sprite[data-phase=completed] #badge{border-color:var(--accent)}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media(prefers-reduced-motion:reduce){body:not([data-animation-mode=always]),body:not([data-animation-mode=always]) *,body:not([data-animation-mode=always]) *::before,body:not([data-animation-mode=always]) *::after{animation:none!important;transition:none!important}}
