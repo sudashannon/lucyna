@@ -2,7 +2,6 @@ const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, safeStorage } = r
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { spawn } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
 const { listWorks, wslUnc, steleCall, OmpSession, defaultOmp } = require('./backend.cjs');
 const { importSession, completeImportedFork, validateImportedSession, listWslSessions, listImportedSessions, validateNativeSession, listNativeSessions } = require('./history.cjs');
 const { prepare: prepareModel } = require('./windows-provider.cjs');
@@ -257,7 +256,14 @@ app.whenReady().then(async () => {
     return await importSession({ source, cwd: wslUnc(root), destinationRoot: locations.historyDir, omp: settings.windowsExecutable, workRoot: root, settings, sourceRuntime });
     } finally {runtimeMutation=false;}
   });
-  handle('external:open', async url => { const parsed = new URL(url); if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('仅支持 HTTP(S)'); await shell.openExternal(parsed.toString()); });
+  const openExternal = async rawUrl => {
+    if (typeof rawUrl !== 'string' || rawUrl.length > 2048) throw new Error('请输入有效网页地址');
+    let url;
+    try { url = new URL(rawUrl.trim()); } catch { throw new Error('请输入完整的 HTTP(S) 地址'); }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('仅支持不含凭据的 HTTP(S) 地址');
+    await shell.openExternal(url.toString());
+  };
+  handle('external:open', openExternal);
   handle('terminal:open', async root => { const works = await listWorks(); if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根'); const p = spawn('wsl.exe', [...runtime.wslPrefix, '--cd', root], { detached: true, stdio: 'ignore', windowsHide: false }); p.unref(); });
   terminal = new TerminalManager({
     listWorks,
@@ -313,27 +319,8 @@ app.whenReady().then(async () => {
     return { kind: 'image', name: path.basename(selectedPath), path: selectedPath, dataUrl: `data:${mime};base64,${data.toString('base64')}` };
   }
   handle('preview:read', readPreview);
-  handle('web:preview', async rawUrl => {
-    if (typeof rawUrl !== 'string' || rawUrl.length > 2048) throw new Error('请输入有效网页地址');
-    let url;
-    try { url = new URL(rawUrl.trim()); } catch { throw new Error('请输入完整的 HTTP(S) 地址'); }
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('网页预览只支持不含凭据的 HTTP(S) 地址');
-    const preview = new BrowserWindow({
-      width: 1100, height: 800, minWidth: 640, minHeight: 480, parent: window,
-      title: `网页预览 · ${url.hostname}`, icon: applicationIcon,
-      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, partition: `omp-web-preview-${randomUUID()}` }
-    });
-    const allowHttp = target => { try { return ['http:', 'https:'].includes(new URL(target).protocol); } catch { return false; } };
-    preview.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-    preview.webContents.on('will-navigate', (event, target) => { if (!allowHttp(target)) event.preventDefault(); });
-    preview.webContents.on('will-redirect', (event, target) => { if (!allowHttp(target)) event.preventDefault(); });
-    preview.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-    preview.webContents.session.setPermissionCheckHandler(() => false);
-    preview.webContents.session.on('will-download', (_event, item) => item.cancel());
-    preview.once('ready-to-show', () => preview.show());
-    try { await preview.loadURL(url.toString()); }
-    catch (error) { if (!preview.isDestroyed()) preview.destroy(); throw new Error(`网页无法打开：${error.message}`); }
-  });
+  // Older renderers use this channel; keep the same system-browser behavior.
+  handle('web:preview', openExternal);
   const rendererFile = process.env.OMP_CINDY_LEGACY_UI === '1'
     ? path.join(__dirname, 'index.html')
     : path.join(__dirname, '..', 'dist', 'renderer', 'index.html');

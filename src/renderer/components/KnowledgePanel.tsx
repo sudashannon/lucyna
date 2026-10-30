@@ -81,7 +81,7 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onQu
   useEffect(()=>{if(navigateTo)openDocument(navigateTo);},[navigateTo]);
   useEffect(()=>{if(refreshKey){void loadCatalog(true);if(docId)setReload(v=>v+1);}},[refreshKey,loadCatalog]);
   const refresh=()=>{void loadCatalog(true);if(view!=='documents')void loadExtra(view);if(docId)setReload(v=>v+1);};
-  const native=()=>{void api.webPreview('http://127.0.0.1:18989').catch(e=>setActionError(errorText(e)));};
+  const native=()=>{void api.openExternal('http://127.0.0.1:18989').catch(e=>setActionError(errorText(e)));};
   const selectedDoc=detail?.component||byId.get(docId);
   const content=view==='candidates'?selectedCandidate?.text||'':detail?.content||'';
   const title=view==='candidates'?selectedCandidate?.title:selectedDoc?.title;

@@ -9,5 +9,5 @@ contextBridge.exposeInMainWorld('desktop',{
  importSession:(source,root)=>call('import',source,root),start:options=>call('start',options),request:(type,data,id)=>call('request',type,data,id),close:id=>call('close',id),
  chooseSession:async()=>null,onTerminal:()=>()=>{},onEvent:fn=>{const listener=(_,event)=>fn(event);ipcRenderer.on('test:event',listener);return()=>ipcRenderer.removeListener('test:event',listener);},
  knowledgeCatalog:()=>call('knowledge','catalog'),knowledgeDocument:id=>call('knowledge','document',{id}),knowledgeCandidates:()=>call('knowledge','candidates'),knowledgeReviews:()=>call('knowledge','reviews'),knowledgeImage:async()=>{throw Error('演示窗口没有外部图片。');},
- petContext:async()=>{},copyText:async()=>{},
+ openExternal:url=>call('external',url),petContext:async()=>{},copyText:async()=>{},
 });
