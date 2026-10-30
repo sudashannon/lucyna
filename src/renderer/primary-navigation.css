@@ -1,0 +1,66 @@
+/* Impeccable polish: primary destinations remain distinct from tool tabs. */
+.primary-switcher {
+  display: flex;
+  container: primary-navigation / inline-size;
+  gap: var(--space-1);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--soft-border);
+}
+.primary-switcher button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 38px;
+  padding: var(--space-2) var(--space-1);
+  border-radius: 8px;
+  font-size: var(--text-13);
+  font-weight: 500;
+  color: var(--muted-readable);
+  white-space: nowrap;
+  transition: background-color var(--motion-fast), color var(--motion-fast);
+}
+.primary-switcher button:hover { background: var(--sidebar-hover); color: var(--text-primary); }
+.primary-switcher button[aria-selected=true] { background: var(--sidebar-selection); color: var(--text-primary); }
+.primary-switcher button:focus-visible { outline-offset: -2px; }
+.primary-count { font-size: var(--text-11); font-variant-numeric: tabular-nums; }
+@container primary-navigation (max-width: 210px) {
+  .primary-switcher button { font-size: var(--text-12); padding-inline: 2px; gap: 2px; }
+}
+.primary-switcher.is-compact {
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 44px;
+  border: 0;
+  padding: 0;
+  margin: var(--space-1) 0 var(--space-2);
+}
+.primary-switcher.is-compact button {
+  position: relative;
+  flex: 0 0 52px;
+  flex-direction: column;
+  width: 44px;
+  height: 52px;
+  min-height: 52px;
+  padding: var(--space-1) 0;
+  gap: var(--space-1);
+}
+.primary-compact-label { font-size: var(--text-11); line-height: 1.25; }
+.primary-switcher.is-compact .primary-count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding-inline: 3px;
+  border-radius: var(--radius-full);
+  background: var(--surface-elevated);
+  border: 1px solid var(--soft-border);
+  color: var(--text-primary-body-strong);
+}

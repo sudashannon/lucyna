@@ -25,7 +25,8 @@
   --sidebar-selection: #e3e3df;
   --sidebar-hover: #e8e8e5;
   --soft-border: #e6e6e2;
-  --muted-readable: #6c6c67;
+  --muted-readable: #60605c;
+  --segmented-option-fg: var(--muted-readable);
   --text-placeholder: #767671;
   --text-danger: #b3261e;
   --focus-ring: #5373ad;

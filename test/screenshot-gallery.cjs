@@ -19,7 +19,7 @@ app.whenReady().then(async()=>{
   await until('document.querySelector("#message-input")');
   await js('document.querySelector("#tab-work").click()');
   await until('document.querySelector("#tool-panel-work .wd-provenance")');
-  await js('window.gallery.ready()');await until('document.querySelector(".composer-footnote").textContent.includes("会话已连接")');await js('window.gallery.conversation()');await until('document.querySelector(".message.assistant")');
+  await click('技能与命令');await until('document.querySelector(".composer-footnote").textContent.includes("会话已连接")');await click('关闭命令补全');await js('window.gallery.conversation()');await until('document.querySelector(".message.assistant")');
   await shot('workbench-light');await click('切换深色外观');await shot('workbench-dark');await click('切换浅色外观');
   await js('document.querySelector("#tab-preview").click()');await until('document.querySelectorAll(".file-list-row:not(:disabled)").length===2');
   await click('预览文件 architecture.md');await until('document.querySelector("#tool-panel-preview [data-streamdown=mermaid-block]")');await js('document.querySelector("#tool-panel-preview [data-streamdown=mermaid-block]").scrollIntoView({block:"center"})');await until('document.querySelector("#tool-panel-preview [data-streamdown=mermaid-block] svg[aria-roledescription]")');await js('document.querySelector("#tool-panel-preview").scrollTop=0');await click('展开阅读文件');await until('document.querySelector(".reading-modal .markdown-engine")');await shot('file-preview');await js('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');await until('!document.querySelector(".reading-modal")');

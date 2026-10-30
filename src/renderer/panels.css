@@ -10,7 +10,7 @@
 .open-session.selected { background: var(--sidebar-selection); }
 .session-select { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 0; padding: 7px 6px; text-align: left; }
 .session-row-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.session-row-label small { display: block; color: var(--muted-readable); font-size: 10px; margin-top: 2px; }
+.session-row-label small { display: block; color: var(--muted-readable); font-size: 11px; margin-top: 3px; line-height: 1.6; }
 .session-dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 6px; background: var(--soft-border); }
 .session-dot.running { background: #5685b8; box-shadow: 0 0 0 3px #5685b81c; }
 .session-dot.needs-input { background: #b88628; }

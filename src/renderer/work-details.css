@@ -11,7 +11,7 @@
 .wd-tabs { display:flex; gap:4px; flex-wrap:wrap; padding:4px; border-radius:10px; background:var(--surface-hover-soft); margin:16px 0 8px; }
 .wd-tabs button { padding:6px 9px; border-radius:7px; color:var(--muted-readable); font-size:12px; display:flex; gap:6px; align-items:center; }
 .wd-tabs button[aria-pressed=true] { background:var(--surface); color:var(--text-primary); box-shadow:0 1px 3px #00000012; }
-.wd-tabs small { font-size:10px; opacity:.75; }
+.wd-tabs small { font-size:11px; color:inherit; }
 .wd-caption { color:var(--muted-readable); font-size:11px; line-height:1.7; margin:8px 0; }
 .wd-provenance { display:flex; flex-direction:column; color:var(--muted-readable); font-size:11px; gap:2px; margin:10px 0; }
 .wd-goal { font-size:14px; line-height:1.75; margin:18px 0 12px; }

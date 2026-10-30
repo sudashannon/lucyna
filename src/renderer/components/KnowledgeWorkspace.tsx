@@ -35,7 +35,7 @@ export const KnowledgeWorkspace=memo(function KnowledgeWorkspace({active,workNam
     {sidebarExpanded&&context}
     <div className="knowledge-sidebar-library" ref={setLibraryTarget} hidden={current!=='documents'||!sidebarExpanded}/>
     {sidebarExpanded&&group!=='documents'&&<p className="knowledge-sidebar-note">{data?`${data.workspaces.length} 个来源 · ${data.documents.length.toLocaleString()} 篇文档`:'正在连接 Stele'}<br/>切换页面会保留当前会话和草稿。</p>}
-  </div>,sidebarTarget)}<section className="knowledge-screen knowledge-workspace" hidden={!active} aria-label="知识库">
+  </div>,sidebarTarget)}<section id="primary-panel-knowledge" role="tabpanel" aria-labelledby="primary-tab-knowledge" className="knowledge-screen knowledge-workspace" hidden={!active} aria-label="知识库">
     <header className="knowledge-workspace-heading"><div><BookOpen size={19}/><h1>知识库</h1><span>{sidebarTarget?groups.find(g=>g.id===group)?.label:'把做过的事，变成下次的起点。'}</span></div>{!sidebarTarget&&<div>{actions}{onBack&&<Button compact variant="secondary" onClick={onBack}>返回工作台</Button>}</div>}</header>
     {!sidebarTarget&&navigation}
     {(!sidebarTarget||!sidebarExpanded)&&context}
