@@ -26,7 +26,7 @@ export interface Desktop {
   workGit(root:string,member:string,action:string,options?:{scope?:string;file?:string}):Promise<GitInspection>;
   openExternal(url:string):Promise<void>;
   mode?:'native'|'demo';
-  windowChrome?:{enabled:boolean;menu:(id:string,position:{x:number;y:number})=>Promise<unknown>;theme:(theme:string,visualTheme?:'classic'|'blue')=>Promise<unknown>;onAction:(fn:(action:string)=>void)=>()=>void};
+  windowChrome?:{enabled:boolean;menu:(id:string,position:{x:number;y:number})=>Promise<unknown>;theme:(theme:string,visualTheme?:import('./appearance').VisualTheme)=>Promise<unknown>;onAction:(fn:(action:string)=>void)=>()=>void};
   getPet?():Promise<{settings:PetSettings;warning:string;sessions:{id:string;title:string}[]}>;
   savePet?(patch:Partial<PetSettings>):Promise<PetSettings>;
   resetPetPosition?():Promise<PetSettings>;

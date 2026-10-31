@@ -109,3 +109,4 @@ src/pet/assets/companions-atlas-v2.png
 !DESIGN.md
 !test/blue-theme-desktop.cjs
 !test/pet-topmost-desktop.cjs
+!test/visual-themes-desktop.cjs

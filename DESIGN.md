@@ -1,6 +1,6 @@
 ---
 name: "Lucyna"
-description: "The Blue workbench for local OMP work, with the original Classic scheme retained."
+description: "Four visual schemes for the same local OMP workbench, each with independent light and dark appearances."
 colors:
   blue-nav: "#112341"
   blue-nav-hover: "#20395e"
@@ -64,6 +64,218 @@ colors:
   classic-dark-ink: "#d4d4d4"
   classic-dark-secondary: "#a3a3a3"
   classic-dark-action: "#ffffff"
+  folio-light-surface: "#f6f2e8"
+  folio-light-surface-hsl: "hsl(43 44% 94%)"
+  folio-light-surface-elevated: "#fffdf7"
+  folio-light-surface-elevated-soft: "#eeeade"
+  folio-light-surface-card-ivory: "#f6f2e8"
+  folio-light-surface-chip: "#e5e8da"
+  folio-light-surface-chip-alt: "#ede9dd"
+  folio-light-surface-hover: "#e2e7d9"
+  folio-light-surface-hover-soft: "#eceee2"
+  folio-light-surface-on-card: "#fffdf7"
+  folio-light-panel-bg: "#efeee2"
+  folio-light-border-default: "#c2c8b6"
+  folio-light-soft-border: "#d8d9c9"
+  folio-light-input-border: "#788370"
+  folio-light-text-primary: "#293c31"
+  folio-light-text-primary-emphasis: "#203c33"
+  folio-light-text-primary-body-strong: "#3f5143"
+  folio-light-text-secondary: "#5c685a"
+  folio-light-text-secondary-mid: "#5c685a"
+  folio-light-muted-readable: "#5c685a"
+  folio-light-text-placeholder: "#65705e"
+  folio-light-accent-cta-bg: "#315b46"
+  folio-light-accent-cta-bg-pure: "#315b46"
+  folio-light-accent-emphasis: "#315b46"
+  folio-light-accent-soft: "#dfe5d6"
+  folio-light-accent-hover: "#244836"
+  folio-light-accent-pure-cta-fg: "#fffdf7"
+  folio-light-segmented-option-fg: "#5c685a"
+  folio-light-focus-ring: "#3d674e"
+  folio-light-primary: "hsl(150 30% 27%)"
+  folio-light-primary-foreground: "hsl(45 100% 98%)"
+  folio-light-ring: "hsl(144 26% 32%)"
+  folio-light-code-bg: "#ececdf"
+  folio-light-md-table-bg: "#eeeee1"
+  folio-light-terminal-bg: "#f1f0e4"
+  folio-light-terminal-fg: "#293c31"
+  folio-light-terminal-selection: "#d1dcc6"
+  folio-light-studio-nav: "#203c33"
+  folio-light-studio-nav-ink: "#f4f1e6"
+  folio-light-studio-nav-muted: "#c7d3c3"
+  folio-light-studio-nav-hover: "#2b493d"
+  folio-light-studio-nav-border: "#526951"
+  folio-light-studio-selection: "#36564a"
+  folio-light-studio-reading: "#fffdf7"
+  folio-light-studio-user: "#e6e9db"
+  folio-light-studio-caption: "#203c33"
+  folio-light-studio-caption-ink: "#f4f1e6"
+  folio-light-overlay-bg: "rgb(24 42 30 / 30%)"
+  folio-light-sidebar-text-primary: "#f4f1e6"
+  folio-light-sidebar-text-body-strong: "#f4f1e6"
+  folio-light-sidebar-muted-readable: "#c7d3c3"
+  folio-light-sidebar-text-secondary: "#c7d3c3"
+  folio-light-sidebar-text-placeholder: "#c7d3c3"
+  folio-dark-surface: "#1c2723"
+  folio-dark-surface-hsl: "hsl(158 16% 13%)"
+  folio-dark-surface-elevated: "#25352c"
+  folio-dark-surface-elevated-soft: "#2d3d32"
+  folio-dark-surface-card-ivory: "#25352c"
+  folio-dark-surface-chip: "#344638"
+  folio-dark-surface-chip-alt: "#2a3b30"
+  folio-dark-surface-hover: "#394d3e"
+  folio-dark-surface-hover-soft: "#304235"
+  folio-dark-surface-on-card: "#25352c"
+  folio-dark-panel-bg: "#233128"
+  folio-dark-border-default: "#52654f"
+  folio-dark-soft-border: "#3e5140"
+  folio-dark-input-border: "#8b9d80"
+  folio-dark-text-primary: "#e9e7dc"
+  folio-dark-text-primary-emphasis: "#f4f1e6"
+  folio-dark-text-primary-body-strong: "#d5decc"
+  folio-dark-text-secondary: "#bac7b0"
+  folio-dark-text-secondary-mid: "#bac7b0"
+  folio-dark-muted-readable: "#bac7b0"
+  folio-dark-text-placeholder: "#afbea5"
+  folio-dark-accent-cta-bg: "#b4d4a8"
+  folio-dark-accent-cta-bg-pure: "#b4d4a8"
+  folio-dark-accent-emphasis: "#c0dbb4"
+  folio-dark-accent-soft: "#344e39"
+  folio-dark-accent-hover: "#c6dfbb"
+  folio-dark-accent-pure-cta-fg: "#1b2d21"
+  folio-dark-segmented-option-fg: "#bac7b0"
+  folio-dark-focus-ring: "#b4d4a8"
+  folio-dark-primary: "hsl(104 34% 75%)"
+  folio-dark-primary-foreground: "hsl(141 25% 14%)"
+  folio-dark-ring: "hsl(104 34% 75%)"
+  folio-dark-code-bg: "#2a3b2e"
+  folio-dark-md-table-bg: "#293b2f"
+  folio-dark-terminal-bg: "#1c2b22"
+  folio-dark-terminal-fg: "#e0e8d9"
+  folio-dark-terminal-selection: "#435b41"
+  folio-dark-studio-nav: "#12241d"
+  folio-dark-studio-nav-ink: "#e4eadf"
+  folio-dark-studio-nav-muted: "#bbcbb5"
+  folio-dark-studio-nav-hover: "#283f2f"
+  folio-dark-studio-nav-border: "#4c6449"
+  folio-dark-studio-selection: "#35523d"
+  folio-dark-studio-reading: "#202d27"
+  folio-dark-studio-user: "#314333"
+  folio-dark-studio-caption: "#12241d"
+  folio-dark-studio-caption-ink: "#e4eadf"
+  folio-dark-overlay-bg: "rgb(24 42 30 / 30%)"
+  folio-dark-sidebar-text-primary: "#e4eadf"
+  folio-dark-sidebar-text-body-strong: "#e4eadf"
+  folio-dark-sidebar-muted-readable: "#bbcbb5"
+  folio-dark-sidebar-text-secondary: "#bbcbb5"
+  folio-dark-sidebar-text-placeholder: "#bbcbb5"
+  pixel-light-surface: "#f1f1f6"
+  pixel-light-surface-hsl: "hsl(240 22% 95%)"
+  pixel-light-surface-elevated: "#fff"
+  pixel-light-surface-elevated-soft: "#eeeefa"
+  pixel-light-surface-card-ivory: "#f5f5fa"
+  pixel-light-surface-chip: "#e6e7f1"
+  pixel-light-surface-chip-alt: "#eeeef7"
+  pixel-light-surface-hover: "#e3e4f3"
+  pixel-light-surface-hover-soft: "#ededf8"
+  pixel-light-surface-on-card: "#fff"
+  pixel-light-panel-bg: "#f3f3f8"
+  pixel-light-border-default: "#c5c6d8"
+  pixel-light-soft-border: "#dddde9"
+  pixel-light-input-border: "#8586a5"
+  pixel-light-text-primary: "#262633"
+  pixel-light-text-primary-emphasis: "#191925"
+  pixel-light-text-primary-body-strong: "#44445b"
+  pixel-light-text-secondary: "#606074"
+  pixel-light-text-secondary-mid: "#606074"
+  pixel-light-muted-readable: "#606074"
+  pixel-light-text-placeholder: "#6a6a80"
+  pixel-light-accent-cta-bg: "#4e58c4"
+  pixel-light-accent-cta-bg-pure: "#4e58c4"
+  pixel-light-accent-emphasis: "#464fb5"
+  pixel-light-accent-soft: "#e1e3fc"
+  pixel-light-accent-hover: "#3d47aa"
+  pixel-light-accent-pure-cta-fg: "#fff"
+  pixel-light-segmented-option-fg: "#606074"
+  pixel-light-focus-ring: "#4e58c4"
+  pixel-light-primary: "hsl(235 50% 54%)"
+  pixel-light-primary-foreground: "hsl(0 0% 100%)"
+  pixel-light-ring: "hsl(235 50% 54%)"
+  pixel-light-code-bg: "#efeff8"
+  pixel-light-md-table-bg: "#f0f0f9"
+  pixel-light-terminal-bg: "#efeff6"
+  pixel-light-terminal-fg: "#333345"
+  pixel-light-terminal-selection: "#d6d8f3"
+  pixel-light-studio-nav: "#202127"
+  pixel-light-studio-nav-ink: "#f0f0f8"
+  pixel-light-studio-nav-muted: "#bcbeca"
+  pixel-light-studio-nav-hover: "#30313e"
+  pixel-light-studio-nav-border: "#575969"
+  pixel-light-studio-selection: "#4e58c4"
+  pixel-light-studio-reading: "#fff"
+  pixel-light-studio-user: "#e7e9fc"
+  pixel-light-studio-caption: "#202127"
+  pixel-light-studio-caption-ink: "#f0f0f8"
+  pixel-light-overlay-bg: "rgb(22 23 35 / 34%)"
+  pixel-light-sidebar-text-primary: "#f0f0f8"
+  pixel-light-sidebar-text-body-strong: "#f0f0f8"
+  pixel-light-sidebar-muted-readable: "#bcbeca"
+  pixel-light-sidebar-text-secondary: "#bcbeca"
+  pixel-light-sidebar-text-placeholder: "#bcbeca"
+  pixel-dark-surface: "#1b1c25"
+  pixel-dark-surface-hsl: "hsl(234 16% 13%)"
+  pixel-dark-surface-elevated: "#292b3b"
+  pixel-dark-surface-elevated-soft: "#323549"
+  pixel-dark-surface-card-ivory: "#292b3b"
+  pixel-dark-surface-chip: "#3a3d52"
+  pixel-dark-surface-chip-alt: "#2e3143"
+  pixel-dark-surface-hover: "#41455e"
+  pixel-dark-surface-hover-soft: "#34384d"
+  pixel-dark-surface-on-card: "#292b3b"
+  pixel-dark-panel-bg: "#242634"
+  pixel-dark-border-default: "#555a78"
+  pixel-dark-soft-border: "#3f435d"
+  pixel-dark-input-border: "#959cc0"
+  pixel-dark-text-primary: "#e9ebf7"
+  pixel-dark-text-primary-emphasis: "#f4f5fe"
+  pixel-dark-text-primary-body-strong: "#d0d4ea"
+  pixel-dark-text-secondary: "#b7bdd8"
+  pixel-dark-text-secondary-mid: "#b7bdd8"
+  pixel-dark-muted-readable: "#b7bdd8"
+  pixel-dark-text-placeholder: "#aeb6d2"
+  pixel-dark-accent-cta-bg: "#b7bfff"
+  pixel-dark-accent-cta-bg-pure: "#b7bfff"
+  pixel-dark-accent-emphasis: "#c4cbff"
+  pixel-dark-accent-soft: "#383f6c"
+  pixel-dark-accent-hover: "#ced3ff"
+  pixel-dark-accent-pure-cta-fg: "#20213b"
+  pixel-dark-segmented-option-fg: "#b7bdd8"
+  pixel-dark-focus-ring: "#b7bfff"
+  pixel-dark-primary: "hsl(233 100% 86%)"
+  pixel-dark-primary-foreground: "hsl(238 30% 18%)"
+  pixel-dark-ring: "hsl(233 100% 86%)"
+  pixel-dark-code-bg: "#2e3248"
+  pixel-dark-md-table-bg: "#2c3045"
+  pixel-dark-terminal-bg: "#1b1e2c"
+  pixel-dark-terminal-fg: "#e0e4f8"
+  pixel-dark-terminal-selection: "#454f7b"
+  pixel-dark-studio-nav: "#15161e"
+  pixel-dark-studio-nav-ink: "#ededf8"
+  pixel-dark-studio-nav-muted: "#b6bbd4"
+  pixel-dark-studio-nav-hover: "#292e43"
+  pixel-dark-studio-nav-border: "#535c7e"
+  pixel-dark-studio-selection: "#424c90"
+  pixel-dark-studio-reading: "#20232f"
+  pixel-dark-studio-user: "#323b61"
+  pixel-dark-studio-caption: "#15161e"
+  pixel-dark-studio-caption-ink: "#ededf8"
+  pixel-dark-overlay-bg: "rgb(22 23 35 / 34%)"
+  pixel-dark-sidebar-text-primary: "#ededf8"
+  pixel-dark-sidebar-text-body-strong: "#ededf8"
+  pixel-dark-sidebar-muted-readable: "#b6bbd4"
+  pixel-dark-sidebar-text-secondary: "#b6bbd4"
+  pixel-dark-sidebar-text-placeholder: "#b6bbd4"
 typography:
   display:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
@@ -124,6 +336,59 @@ typography:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
     fontSize: "10px"
     fontWeight: 400
+  studio-navigation:
+    fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.5
+  folio-brand:
+    fontFamily: "Source Han Serif SC, Noto Serif CJK SC, Songti SC, SimSun, serif"
+    fontSize: "25px"
+    fontWeight: 600
+    lineHeight: 1.3
+    letterSpacing: "0.015em"
+  folio-work-title:
+    fontFamily: "Source Han Serif SC, Noto Serif CJK SC, Songti SC, SimSun, serif"
+    fontSize: "23px"
+    fontWeight: 600
+    lineHeight: 1.5
+  folio-reading-heading:
+    fontFamily: "Source Han Serif SC, Noto Serif CJK SC, Songti SC, SimSun, serif"
+    fontSize: "24px"
+    fontWeight: 600
+    lineHeight: 1.6
+  folio-display:
+    fontFamily: "Source Han Serif SC, Noto Serif CJK SC, Songti SC, SimSun, serif"
+    fontSize: "28px"
+    fontWeight: 600
+    lineHeight: 1.5
+  folio-message:
+    fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.95
+  pixel-work-title:
+    fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
+    fontSize: "18px"
+    fontWeight: 600
+  pixel-directory-title:
+    fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
+    fontSize: "19px"
+    fontWeight: 650
+  pixel-reading-heading:
+    fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
+    fontSize: "20px"
+    fontWeight: 650
+    lineHeight: 1.5
+  pixel-knowledge-title:
+    fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
+    fontSize: "23px"
+    fontWeight: 650
+  pixel-message:
+    fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.75
 rounded:
   card: "4px"
   control: "8px"
@@ -135,6 +400,11 @@ rounded:
   dialog: "16px"
   pill: "999px"
   cindy-pill: "9999px"
+  pixel-swatch: "2px"
+  pixel-badge: "3px"
+  pixel-control: "4px"
+  folio-control: "6px"
+  studio-dialog: "12px"
 spacing:
   space-3xs: "2px"
   space-2xs: "4px"
@@ -147,6 +417,13 @@ spacing:
   space-3xl: "96px"
   space-4xl: "144px"
   ui-72: "72px"
+  studio-navigation-gap: "5px"
+  studio-knowledge-control-gap: "6px"
+  pixel-navigation-inset: "7px"
+  pixel-work-row-inset-inline: "10px"
+  folio-message-interval: "30px"
+  folio-reading-inset: "32px"
+  pixel-reading-inset: "24px"
 components:
   button-primary:
     backgroundColor: "{colors.blue-action}"
@@ -217,133 +494,221 @@ components:
     textColor: "{colors.blue-action-emphasis}"
     rounded: "{rounded.control}"
     padding: "6px 8px"
+  navigation-selected-folio:
+    backgroundColor: "{colors.folio-light-studio-selection}"
+    textColor: "{colors.folio-light-studio-nav-ink}"
+    typography: "{typography.studio-navigation}"
+    rounded: "{rounded.folio-control}"
+    padding: "9px 12px"
+    height: "40px"
+  navigation-selected-pixel:
+    backgroundColor: "{colors.pixel-light-studio-selection}"
+    textColor: "{colors.pixel-light-studio-nav-ink}"
+    typography: "{typography.studio-navigation}"
+    rounded: "{rounded.pixel-control}"
+    padding: "7px 12px"
+    height: "36px"
+  composer-folio:
+    backgroundColor: "{colors.folio-light-surface-elevated}"
+    textColor: "{colors.folio-light-text-primary}"
+    typography: "{typography.folio-message}"
+    rounded: "{rounded.folio-control}"
+    padding: "18px 20px 8px"
+  composer-pixel:
+    backgroundColor: "{colors.pixel-light-surface-elevated}"
+    textColor: "{colors.pixel-light-text-primary}"
+    typography: "{typography.pixel-message}"
+    rounded: "{rounded.pixel-control}"
+    padding: "14px 16px 6px"
+  user-message-folio:
+    backgroundColor: "{colors.folio-light-studio-user}"
+    textColor: "{colors.folio-light-text-primary}"
+    typography: "{typography.folio-message}"
+    rounded: "{rounded.folio-control}"
+    padding: "15px 20px"
+  user-message-pixel:
+    backgroundColor: "{colors.pixel-light-studio-user}"
+    textColor: "{colors.pixel-light-text-primary}"
+    typography: "{typography.pixel-message}"
+    rounded: "{rounded.pixel-control}"
+    padding: "12px 16px"
+
+  navigation-selected-folio-dark:
+    backgroundColor: "{colors.folio-dark-studio-selection}"
+    textColor: "{colors.folio-dark-studio-nav-ink}"
+    typography: "{typography.studio-navigation}"
+    rounded: "{rounded.folio-control}"
+    padding: "9px 12px"
+    height: "40px"
+  navigation-selected-pixel-dark:
+    backgroundColor: "{colors.pixel-dark-studio-selection}"
+    textColor: "{colors.pixel-dark-studio-nav-ink}"
+    typography: "{typography.studio-navigation}"
+    rounded: "{rounded.pixel-control}"
+    padding: "7px 12px"
+    height: "36px"
+  composer-folio-dark:
+    backgroundColor: "{colors.folio-dark-surface-elevated}"
+    textColor: "{colors.folio-dark-text-primary}"
+    typography: "{typography.folio-message}"
+    rounded: "{rounded.folio-control}"
+    padding: "18px 20px 8px"
+  composer-pixel-dark:
+    backgroundColor: "{colors.pixel-dark-surface-elevated}"
+    textColor: "{colors.pixel-dark-text-primary}"
+    typography: "{typography.pixel-message}"
+    rounded: "{rounded.pixel-control}"
+    padding: "14px 16px 6px"
+  user-message-folio-dark:
+    backgroundColor: "{colors.folio-dark-studio-user}"
+    textColor: "{colors.folio-dark-text-primary}"
+    typography: "{typography.folio-message}"
+    rounded: "{rounded.folio-control}"
+    padding: "15px 20px"
+  user-message-pixel-dark:
+    backgroundColor: "{colors.pixel-dark-studio-user}"
+    textColor: "{colors.pixel-dark-text-primary}"
+    typography: "{typography.pixel-message}"
+    rounded: "{rounded.pixel-control}"
+    padding: "12px 16px"
+
 ---
 
 # Design System: Lucyna
 
 ## Overview
 
-**Creative North Star: "The Blue Local Workbench"**
+**Creative North Star: "Four Ways Into the Same Work"**
 
-Lucyna's Blue scheme makes the local work loop legible as four adjacent regions: application navigation, the Work directory, conversation, and contextual tools. Deep navy anchors navigation, pale blue separates the directory, and bright reading planes keep the conversation and knowledge content easy to scan. Existing Cindy controls carry familiar input and button behavior; the silver-haired character and black cat remain the established brand artwork.
+Lucyna offers four visual schemes for the same local Work loop. Blue keeps application navigation and the Work directory in separate columns, with a cool reading plane and cobalt selection. Classic retains the original compact neutral interface. Folio joins navigation and Work in a forest-green sidebar beside warm paper surfaces, with serif styling confined to reading headings. Pixel uses a charcoal sidebar, periwinkle selection, square controls, and the original geometric wordmark.
 
-This specification records the renderer as built. The appearance selector currently offers two distinct visual schemes, Blue and Classic. Each scheme has its own Light and Dark appearance. Classic retains the incumbent neutral Cindy palette and compact horizontal navigation; Blue is the new four-region scheme. Light and Dark are appearance variants, not extra visual schemes, and other requested schemes remain deferred.
+Light and Dark are independent appearances within Blue, Classic, Folio, and Pixel. Theme changes affect presentation while the current Work, session, transcript, and mounted draft stay in place. The silver-haired character and black cat remain the existing illustration assets; Pixel adds only the original 5×7 geometric SVG wordmark.
 
 **Key Characteristics:**
-- Four clear work areas with the conversation as the primary reading plane.
-- Navy application navigation, a cool-blue Work directory, cobalt active states, and bright reading surfaces in Blue.
-- The original neutral Classic scheme remains available and keeps its compact layout.
-- Existing silver-haired character and black cat artwork stays intact.
+- Blue keeps its separate application navigation and Work directory.
+- Classic keeps the original compact neutral palette and horizontal navigation.
+- Folio pairs a forest sidebar and sage accents with warm paper and spacious reading.
+- Pixel pairs a charcoal sidebar with periwinkle selection, compact sans text, and four-pixel controls.
+- Every scheme has independent Light and Dark palettes.
+- Existing character and cat artwork remain shared brand assets.
 
 ## Colors
 
-The Blue scheme assigns separate color roles to navigation, the directory, reading surfaces, user messages, selection, and action. Frontmatter keys are the source of truth for both Blue appearances and the retained Classic palette.
+Four palette families share the same Work loop. The frontmatter records the renderer’s literal Blue and Classic values and every color-valued Folio and Pixel root palette property in both appearances. Folio and Pixel also expose the sidebar’s semantic text remaps as distinct tokens, while the sidebar surface, selection, border, and focus aliases are described below.
 
 ### Primary
 
-- **Studio Cobalt** ({colors.blue-action}): Primary actions and the selected application destination.
-- **Cobalt Emphasis** ({colors.blue-action-emphasis}): Selected Work text, active context tabs, and links.
-- **Hover Cobalt** ({colors.blue-action-hover}): Hover treatment for the primary action.
+- **Studio Cobalt:** Blue actions and selected destinations use the existing cobalt roles.
+- **Folio Forest Action:** Folio’s light action uses the forest accent; its dark action switches to the lighter sage accent.
+- **Pixel Periwinkle Action:** Pixel uses a periwinkle action and a lighter periwinkle accent in Dark.
+- **Classic Graphite Action:** Classic keeps its original monochrome action.
 
 ### Secondary
 
-- **Work Selection** ({colors.blue-selected}): The selected Work row in the Blue directory.
-- **User Message Blue** ({colors.blue-user}): The user's message surface, distinct from the reading plane.
-- **Navigation Blue** ({colors.blue-nav}): Persistent application navigation; it stays visually separate from the directory.
+- **Blue Navigation Navy:** Blue keeps a dedicated navy application rail, separate from its pale Work directory.
+- **Folio Forest Sidebar:** Folio uses forest green for the shared navigation and Work sidebar, with sage selection.
+- **Pixel Charcoal Sidebar:** Pixel uses charcoal for the shared sidebar and periwinkle for selection.
+- **User Message Surfaces:** Each theme separates user-message fill from the main reading surface.
 
 ### Neutral
 
-- **Reading White** ({colors.blue-reading}): Conversation, knowledge article, and focused contextual reading surfaces.
-- **Blue Mist** ({colors.blue-canvas}): General Blue canvas around reading surfaces.
-- **Inspector Mist** ({colors.blue-panel}): Contextual panel background.
-- **Primary Ink** ({colors.blue-text}): Main Blue text.
-- **Readable Secondary Ink** ({colors.blue-secondary}): Supporting labels, dates, source details, and secondary navigation.
-- **Classic Warm Paper** ({colors.classic-paper}) and **Classic Graphite** ({colors.classic-ink}): The original Classic light palette.
-- **Classic Night** ({colors.classic-dark-paper}) and **Classic Light Ink** ({colors.classic-dark-ink}): The retained Classic dark appearance.
+- **Folio Paper and Ink:** Warm paper, elevated ivory, and forest-tinted ink form the light reading palette; Dark uses deep green surfaces and warm light text.
+- **Pixel White and Graphite:** Cool white and graphite form the light reading palette; Dark uses charcoal-blue surfaces and pale lavender text.
+- **Classic Paper and Graphite:** The existing neutral light and dark surfaces remain available.
+- **Blue Reading White and Primary Ink:** The original bright Blue reading plane and separate dark palette remain intact.
 
-**The Four-Surface Rule.** Keep navigation, the Work directory, reading, and contextual tools visually distinct. Reserve saturated cobalt for actions and selection; do not turn the reading plane into another navigation surface.
+**The Four-Scheme Rule.** Keep Blue, Classic, Folio, and Pixel as distinct visual schemes. Each scheme has independent Light and Dark appearances; appearance mode is not another scheme.
 
-**The Two-Scheme Rule.** The shipped selector exposes Blue and Classic as the two visual schemes. Light and Dark are independent appearance variants. Do not describe them as four distinct visual schemes or invent unseen palette variants.
+**The Sidebar Role Mapping Rule.** In Folio and Pixel, primary and body-strong sidebar text map to navigation ink; muted-readable, secondary, and placeholder text map to navigation muted. The sidebar surface uses studio-nav; elevated surfaces, chips, and hover use studio-nav-hover; selection uses studio-selection; borders and input outlines use studio-nav-border; focus uses studio-nav-ink.
 
 ## Typography
 
-**Display Font:** Source Han Sans SC, with Microsoft YaHei, system-ui, and sans-serif fallbacks.
-**Body Font:** The same Source Han Sans SC stack.
+**Display Font:** Source Han Sans SC, bundled as a variable font, with Microsoft YaHei, system-ui, and sans-serif fallbacks.
+**Body Font:** Source Han Sans SC, with the same fallback stack.
 **Label/Mono Font:** The interface uses the body stack for labels and Cascadia Mono, Consolas, Source Han Sans SC, ui-monospace, monospace for code.
 
-**Character:** Chinese reading text stays open and steady, while compact labels and contextual headings keep the desktop tool easy to scan. Blue overrides the shared type scale by surface.
+**Character:** Blue and Classic keep the compact Chinese interface hierarchy. Folio uses the CSS-declared serif stack for the brand and sustained-reading headings, while message copy stays in the bundled sans font. Pixel keeps all interface text in the bundled sans font and confines its bitmap geometry to the wordmark SVG. The renderer bundles Source Han Sans only; availability of the Folio serif fallback families depends on the operating system.
 
 ### Hierarchy
 
-- **Display** ({typography.display}): Workbench welcome heading.
-- **Brand** ({typography.brand}): Lucyna wordmark in the full Blue navigation.
-- **Current Work** ({typography.current-work-title}): Current Work heading above the conversation.
-- **Knowledge title** ({typography.knowledge-title}): Knowledge page title.
-- **Headline** ({typography.headline}): Assistant Markdown section heading.
-- **Directory title** ({typography.directory-title}): Work directory and settings section headings.
-- **Application navigation** ({typography.app-navigation}): Main destination tabs.
-- **Body** ({typography.body}): Blue conversation messages.
-- **Compact body** ({typography.compact-body}): Work directory rows and compact body copy.
-- **Label** ({typography.label}): Settings and contextual labels.
-- **Rail label** ({typography.rail-label}): Icon-rail labels at intermediate widths.
+- **Display:** Blue welcome heading (28px); Folio welcome and knowledge headings (28px, 600, 1.5).
+- **Brand:** Blue wordmark (22px); Folio brand word (25px, 600, 1.3).
+- **Current Work:** Blue work heading (21px); Folio heading (23px, 600, 1.5); Pixel heading (18px, 600).
+- **Reading headings:** Folio assistant and knowledge headings (24px, 600, 1.6); Pixel assistant heading (20px, 650, 1.5).
+- **Work details:** Folio identity heading (23px, 600); Pixel identity heading (19px, 650); Pixel knowledge page title (23px, 650).
+- **Body:** Blue messages (14px, 1.85); Folio messages (15px, 1.95); Pixel messages (14px, 1.75). At narrow widths, Folio and Pixel messages step down to 13px.
+- **Navigation:** Blue destination tabs (14px); Folio and Pixel destination tabs (13px); compact Knowledge subnavigation (12px).
+- **Labels:** Existing Cindy labels, compact body, and icon-rail roles remain available in frontmatter.
 
-The shared root scale remains available for Cindy-default surfaces: display 1.728rem, section 1.2rem, title 1rem, and lead 1rem. The renderer body uses its compact app text token; Blue's workbench hierarchy above uses the direct sizes recorded in frontmatter. Code uses the separate monospace stack.
+**The Folio Reading Stack Rule.** Keep the declared Source Han Serif SC, Noto Serif CJK SC, Songti SC, SimSun, serif fallback stack to the Folio brand and reading headings. Body text remains Source Han Sans; the repository does not bundle a serif face.
+
+**The Pixel Wordmark Rule.** Keep the original 5×7 geometric SVG lettering in the Pixel wordmark only. Chinese interface copy remains normal Source Han Sans text.
 
 ## Layout
 
-Blue uses a resizable Work directory next to a dedicated application-navigation column. The default directory width is 248px and the user-resizable range is 200–420px. Application navigation is 184px when the viewport is wider than 1100px, 72px from 761–1100px, and a 64px rail at 760px or narrower. At 1100px and below, the character artwork is hidden to protect navigation space; at short window heights it is reduced.
+Blue uses separate application navigation and Work-directory columns; its navigation contracts from a labeled 184px column to 72px and then to the existing 64px rail. Classic retains the original single-sidebar compact shell and horizontal navigation. Folio and Pixel use one user-resizable Work sidebar, defaulting to 248px within a 200–420px range, with vertical primary navigation above the Work list. At widths above 760px, New Chat and the accessible Search button share one compact row.
 
-The conversation keeps a 640px minimum when the inspector sits beside it. The inspector defaults to 370px and can be resized from 320–520px. At 1280px and below the inspector becomes a right-side overlay drawer, sized to the lesser of its configured width or the viewport width minus 64px. At 760px and below, the Work directory contracts away, the 64px navigation rail remains, and conversation content stays in view. At 470px and below, message text and section headings step down for the narrow reading column.
+The Knowledge sidebar has its own independent 340px default width and 280–480px range. Its primary subnavigation uses two columns at narrower container widths and three columns when the sidebar container exceeds 300px. The companion occupies a 120px-high slot at the foot of the wide Folio/Pixel sidebar only when the window is taller than 820px; it is hidden while Knowledge is open, in the compact rail, and in short windows. The redundant informational profile row stays hidden, while the runtime and action footer remains available.
 
-The knowledge destination keeps a directory/list plus a reading pane. Settings use a 680px maximum modal width; the visual-style cards become a single column at 470px, and runtime choices stack at 600px. On Classic, the original single-sidebar compact layout and horizontal navigation remain. The Blue-specific palette and shell rules are scoped under the blue visual-theme root selector; shared theme controls remain usable in either scheme.
+At 760px and below, Folio and Pixel use the existing 64px compact rail. At 1280px and below, the tools panel becomes the existing overlay drawer. The conversation stays the central reading surface; Folio uses a wider, more open transcript and composer, while Pixel uses tighter insets and a shorter composer. Blue keeps its separate reading and inspector columns when space permits.
+
+The visual scheme persists under lucyna.visual-theme; an unknown stored value falls back to Blue. The Light/Dark appearance persists separately. The header selector applies immediately; settings keep the theme in a draft until Save, and Cancel keeps the active scheme. Switching visual schemes preserves the mounted conversation, composer draft, active session, and transcript.
 
 ## Elevation & Depth
 
-Blue relies on tonal layering and fine borders for ordinary separation. The composer has a quiet ambient shadow and a slightly stronger focus shadow; modal elevation uses a deeper cool shadow behind a translucent scrim. The Classic scheme keeps its incumbent neutral shadow tokens. Exact shadow declarations, easing, and durations live in the sidecar so they are not duplicated here.
+Blue relies on tonal layering, fine borders, and a quiet composer shadow. Classic keeps its neutral modal elevation. Folio and Pixel use flat composers without a composer shadow; fine borders and filled surfaces provide ordinary separation, while their modal overlays retain their theme-specific shadow. Exact retained and added shadow values, easing, and durations live in the sidecar.
 
 ## Shapes
 
-Blue uses softly rounded controls, work rows, message bubbles, and the settings dialog. The frontmatter radius keys are the shared size vocabulary; the actual components retain their role-specific silhouettes. Most separation uses 1px strokes or a filled selection surface rather than a raised card. The composer has a wider, more substantial shape than a compact form field. Focus outlines sit outside controls unless a dense navigation control deliberately insets its ring.
+Blue keeps its softened workbench controls, rows, message bubbles, composer, and dialog. Folio uses six-pixel control corners, including navigation, rows, user messages, and composer. Pixel uses four-pixel control corners, with three-pixel badges and nested tabs and a two-pixel swatch. Borders remain fine outlines; selected states rely on a filled color surface as well as text and icon color.
 
 ## Components
 
 ### Buttons
 
-Primary actions use the cobalt fill and readable foreground. The New Chat action has a compact control height; the active application destination is taller and uses a wider hit area. Hover changes the action color. Cindy's pressed button face scales to 96% while its hitbox and label remain stationary; disabled controls use muted surfaces and readable secondary text.
+Blue primary actions use cobalt. Folio and Pixel New Chat controls use their sidebar selection fill and a one-pixel border; their composer send buttons use the theme action color. The send control follows the theme’s square-corner role. Keep disabled states legible and retain the visible keyboard focus treatment.
 
 ### Work directory rows
 
-Directory rows are quiet at rest and fill with the selected surface when current. The selected text and folder icon take the action-emphasis color; labels truncate rather than push into adjacent controls. Keep the selected Work visually connected to the current Work heading and inspector.
+The selected Work row uses the same selection surface and readable navigation ink as the selected primary destination in Folio and Pixel. Pixel rows stay compact at 36px high with 9px vertical and 10px horizontal padding; Folio keeps the shared 40px row height and 12px inset. Labels truncate before neighboring controls.
 
 ### Inputs and composer
 
-Single-line fields use an outlined edge, a raised surface, and the shared visible focus ring. The conversation composer has a transparent textarea inside a bordered surface; its textarea starts at 72px, can grow to 200px, and uses 16px 18px 8px internal padding in Blue. The send control is a cobalt square with softly rounded corners. The surrounding focus-within treatment makes the entire composer easy to locate.
+Folio’s reading column is capped at 850px with 30px message intervals; its composer column is capped at 786px, with a 78px minimum textarea and 18px 20px 8px inset. Pixel’s transcript uses 22px 24px 16px insets; its composer column is capped at 800px, with a 64px minimum textarea and 14px 16px 6px inset. Both use the scheme’s control radius, a fine border, and no composer shadow. Focus remains visible around the composer and its controls.
 
 ### Navigation
 
-Blue application navigation is a vertical tablist with labels on the wide rail and icon-plus-label controls as the rail contracts. Tabs expose aria-selected state and support Arrow keys, Home, and End. Selected tabs fill with cobalt; hover uses the darker navigation surface. When custom window chrome is active, the native caption follows the selected scheme: Blue uses the same navigation surface and ink as the app rail, while Classic keeps its neutral palette. Active menubar items use the Blue navigation hover surface and ink. Classic retains the horizontal compact navigation. At 960px the tools remain an accessible overlay drawer; closing returns keyboard focus to the invoking control.
+Folio and Pixel use vertical destinations inside their shared Work sidebar. Folio uses the six-pixel corner and Pixel uses the four-pixel corner; both fill the selected row with the scheme selection and navigation ink. Blue retains its separate vertical application navigation, while Classic keeps the original horizontal navigation. At 960px the tools remain an accessible overlay drawer; closing returns keyboard focus to the invoking control.
 
 ### Appearance settings
 
-The appearance section presents Blue and Classic as labeled radio-card choices, then a separate Light/Dark selector. Settings keep the scheme choice in a draft until Save; Cancel keeps the active scheme. The header selector applies the scheme immediately. The visual choice is stored under lucyna.visual-theme; Light/Dark is stored separately under omp.theme. Changing schemes keeps the mounted conversation, composer, draft, and active session.
+The appearance section offers Blue, Classic, Folio, and Pixel as visual choices, followed by a separate Light/Dark selector. Settings keep a draft until Save; Cancel keeps the active scheme. The header selector applies the scheme immediately. The visual choice is stored under lucyna.visual-theme; Light/Dark remains separate. Theme changes preserve mounted inputs and session state.
 
 ### Knowledge reading
 
-The knowledge surface keeps a document list and a source reader. Use selected-row color to locate the current document, and keep article content on the reading plane. Do not turn source metadata into decorative dashboard cards.
+Knowledge keeps a document list and source reader. Use the selected-row color to locate the current document and keep article content on the theme’s reading plane. Folio applies its serif stack to reading headings; Pixel keeps its compact sans hierarchy. The companion does not take space while Knowledge is open.
+
+### Brand assets
+
+Keep the silver-haired character and black cat as the existing illustrations. Pixel’s original 5×7 geometric SVG wordmark is the only bitmap-style typography; the Chinese UI remains ordinary text.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** keep the Blue navigation, Work directory, conversation, and inspector recognizable as separate regions.
-- **Do** use the frontmatter palette and type roles as the normative Blue and Classic values.
-- **Do** keep Light/Dark independent from the Blue/Classic visual-scheme choice.
-- **Do** preserve the existing silver-haired character and black cat artwork.
-- **Do** keep actual Work, session, and knowledge states legible as application content.
+- **Do** keep all four visual schemes and their independent Light/Dark appearances.
+- **Do** retain Blue’s separate application navigation and Work directory; Folio and Pixel share the resizable 248px Work sidebar.
+- **Do** keep Source Han Sans for interface and body text. Folio’s serif fallback stack is scoped to the brand and reading headings.
+- **Do** keep Pixel’s original 5×7 geometric SVG lettering in the wordmark only; Chinese interface copy stays typographic.
+- **Do** preserve the existing silver-haired character and black cat assets and their theme-specific placement.
+- **Do** preserve Work, session, draft, and transcript state while switching schemes.
+- **Do** use the runtime and action footer in the compact Folio/Pixel sidebar.
 
 ### Don't:
 
-- **Don't** claim that four distinct visual schemes are implemented; only Blue and Classic are present.
-- **Don't** collapse Classic into Blue's four-region shell.
-- **Don't** turn the conversation or knowledge reader into another saturated navigation surface.
-- **Don't** invent runtime statuses, document counts, or illustration assets.
+- **Don't** describe Blue, Classic, Folio, and Pixel as Light/Dark appearance modes.
+- **Don't** merge Blue’s separate navigation and Work directory into the Folio/Pixel sidebar layout.
+- **Don't** make Folio body copy serif or Pixel Chinese copy bitmap-style.
+- **Don't** add new illustration assets or replace the existing character and cat.
+- **Don't** add a redundant informational profile row to the Folio/Pixel sidebar.
+- **Don't** invent runtime statuses, Work counts, knowledge records, or session facts.

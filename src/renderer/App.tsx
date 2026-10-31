@@ -32,7 +32,7 @@ import { WorkDetails } from './components/WorkDetails';
 import { KnowledgeWorkspace as KnowledgePanel } from './components/KnowledgeWorkspace';
 import { TriangleAlert, Info, ClipboardCheck } from 'lucide-react';
 import { WorkDiagnostics, WorkHealthNotice, workIssues } from './components/WorkDiagnostics';
-import { BrandLogo, BrandCompanions } from './components/BrandVisuals';
+import { BrandLogo, BrandCompanions, PixelWordmark } from './components/BrandVisuals';
 import {ConnectionProgress} from './components/ConnectionProgress';
 import {historyBatch,historyStart,historyEnd,jumpWindow} from './transcript-window';
 import {Trash2,Undo2} from 'lucide-react';
@@ -76,6 +76,7 @@ export function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('omp.theme') === 'dark' ? 'dark' : 'light');
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(readVisualTheme);
   const blue = visualTheme === 'blue';
+  const readingStudio = visualTheme === 'folio' || visualTheme === 'pixel';
   const {draft, setDraft,setDraftForKey, error: draftError,values:allDrafts,loaded:draftsLoaded,retry:retryDrafts} = useDrafts(w.draftKey);
   const {value:images,set:setImages,setForKey:setImagesForKey,error:imageError,values:allImages,loaded:imagesLoaded,retry:retryImages}=useStoredDrafts<DraftImage[]>('images',w.draftKey,()=>({}),noImages);
   const {value:textAttachments,set:setTextAttachments,error:textAttachmentError,values:allTextAttachments,loaded:textAttachmentsLoaded,retry:retryTextAttachments}=useStoredDrafts<DraftTextAttachment[]>('textAttachments',w.draftKey,()=>({}),noTextAttachments);
@@ -325,16 +326,16 @@ export function App() {
         onPointerUp={e => {if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); endSidebarDrag();}}
         onPointerCancel={endSidebarDrag} onLostPointerCapture={endSidebarDrag}/>} 
       <div className="application-navigation">
-      <div className="brand-row"><button className="brand" onClick={() => setAbout(true)} aria-label="关于 Lucyna"><span className="brand-symbol"><BrandLogo size={32}/></span>{sidebar && <span>Lucyna<span className="brand-caption">{blue?'本地 AI 工作伙伴':knowledgeOpen?'知识库':'工作台'}</span></span>}</button>{sidebar && <SidebarIconButton icon={PanelLeftClose} label="收起侧栏 · Ctrl B" onClick={() => setSidebar(false)}/>}</div>
+      <div className="brand-row"><button className="brand" onClick={() => setAbout(true)} aria-label="关于 Lucyna"><span className="brand-symbol"><BrandLogo size={32}/></span>{sidebar && <span>{visualTheme==='pixel'?<PixelWordmark/>:'Lucyna'}<span className="brand-caption">{readingStudio?visualThemes.find(option=>option.id===visualTheme)?.name:blue?'本地 AI 工作伙伴':knowledgeOpen?'知识库':'工作台'}</span></span>}</button>{sidebar && <SidebarIconButton icon={PanelLeftClose} label="收起侧栏 · Ctrl B" onClick={() => setSidebar(false)}/>}</div>
       {!sidebar && <SidebarIconButton icon={PanelLeftOpen} label="展开侧栏 · Ctrl B" onClick={() => setSidebar(true)}/>}
-      <PrimaryNavigation section={section} expanded={sidebar&&viewportWidth>(blue?1100:760)} vertical={blue} count={w.sessions.filter(s=>s.connection!=='idle').length} onChange={next=>{if(next==='knowledge')setKnowledgeVisited(true);setSection(next);}}/>
+      <PrimaryNavigation section={section} expanded={sidebar&&viewportWidth>(blue?1100:760)} vertical={blue||readingStudio} count={w.sessions.filter(s=>s.connection!=='idle').length} onChange={next=>{if(next==='knowledge')setKnowledgeVisited(true);setSection(next);}}/>
       {blue&&(!sidebar||viewportWidth<=760)&&<div className="knowledge-sidebar-slot navigation-knowledge" ref={setKnowledgeSidebarTarget} hidden={!knowledgeOpen}/>}
       {blue&&<><div className="application-actions">{(!sidebar||viewportWidth<=760)&&!knowledgeOpen&&<><button className="application-action" aria-label="新会话" disabled={!workValid} onClick={()=>void newConversation()}><Plus size={18}/><span>新会话</span></button><button className="application-action" aria-label="搜索工作区" onClick={()=>{setPalette(true);setFilter('');}}><Search size={18}/><span>工作区</span></button></>}<button className="application-action" aria-label="设置" onClick={()=>setSettingsOpen(true)}><SlidersHorizontal size={18}/><span>设置</span></button><button className="application-action" aria-label={theme==='light'?'切换深色外观':'切换浅色外观'} onClick={()=>setTheme(theme==='light'?'dark':'light')}>{theme==='light'?<Moon size={18}/>:<Sun size={18}/>}<span>{theme==='light'?'深色外观':'浅色外观'}</span></button></div><div className="sidebar-companion" aria-hidden="true"><BrandCompanions/><div><strong>Lucyna</strong><span>银发搭档与黑猫</span></div></div><div className="navigation-runtime"><TerminalSquare size={13}/><span>{runtimeLabel}</span></div></>}
       </div>
       <div className="work-directory">
       {blue&&sidebar&&<div className="directory-heading"><h2>{knowledgeOpen?'知识目录':'我的工作'}</h2><SidebarIconButton icon={Search} label="搜索工作目录" onClick={()=>{setPalette(true);setFilter('');}}/></div>}
       <div className="work-sidebar-content" hidden={knowledgeOpen}>
-      {sidebar ? <><button className="nav-action new-chat" onClick={() => void newConversation()} disabled={!workValid}><Plus size={17}/><span>新会话</span></button><button className="nav-action" onClick={() => {setPalette(true); setFilter('');}}><Search size={16}/><span>搜索工作区</span><kbd>Ctrl K</kbd></button></> : <><SidebarIconButton icon={Plus} label="新会话" disabled={!workValid} onClick={() => void newConversation()}/><SidebarIconButton icon={Search} label="搜索工作区" onClick={() => setPalette(true)}/></>}
+      {sidebar ? <><button className="nav-action new-chat" onClick={() => void newConversation()} disabled={!workValid}><Plus size={17}/><span>新会话</span></button><button className="nav-action" aria-label="搜索工作区" title="搜索工作区 · Ctrl K" onClick={() => {setPalette(true); setFilter('');}}><Search size={16}/><span>搜索工作区</span><kbd>Ctrl K</kbd></button></> : <><SidebarIconButton icon={Plus} label="新会话" disabled={!workValid} onClick={() => void newConversation()}/><SidebarIconButton icon={Search} label="搜索工作区" onClick={() => setPalette(true)}/></>}
       {!sidebar && <SidebarIconButton icon={ClipboardCheck} label="查看工作区检查" onClick={() => setWorkChecksOpen(true)}/>}
       <nav className="compact-navigation" aria-label="工作区快捷导航"><span className="rail-divider"/>
         <SidebarIconButton icon={FolderOpen} label={w.work ? `当前工作区：${w.work.name} · 查看概览` : '选择工作区'} active={!!w.work} onClick={() => w.work ? openPanel('work') : setPalette(true)}/>
@@ -349,6 +350,7 @@ export function App() {
       {sidebar && w.work && <button className="nav-action history-shortcut" onClick={() => openPanel('history')}><HistoryIcon size={16}/><span>历史会话</span>{entries.length > 0 && <span className="count">{entries.length}</span>}</button>}
       </div>
       <div className="knowledge-sidebar-slot" ref={blue&&(!sidebar||viewportWidth<=760)?undefined:setKnowledgeSidebarTarget} hidden={!knowledgeOpen}/>
+      {readingStudio&&<div className="directory-companion" aria-hidden="true"><BrandCompanions/></div>}
       <div className="sidebar-bottom"><div className="sidebar-footer-actions"><SidebarIconButton icon={SlidersHorizontal} label="设置" onClick={()=>setSettingsOpen(true)}/><SidebarIconButton icon={theme === 'light' ? Moon : Sun} label={theme === 'light' ? '切换深色外观' : '切换浅色外观'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}/>{sidebar && <><span className="footer-host">{runtimeLabel}</span><SidebarIconButton icon={CircleHelp} label="关于与快捷键" onClick={() => setAbout(true)}/></>}</div>{sidebar && <div className="profile-row"><span className="profile-avatar">L</span><span>{remote?"远端工作空间":"本地工作空间"}<small>{previewMode ? '浏览器界面预览' : runtimeLabel+' · 原生运行时'}</small></span><Check size={13}/></div>}</div>
       </div>
     </aside>

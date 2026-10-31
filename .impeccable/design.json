@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-30T11:03:05Z",
+  "generatedAt": "2026-10-31T04:10:58Z",
   "title": "Design System: Lucyna",
   "extensions": {
     "colorMeta": {
@@ -933,6 +933,3186 @@
           "oklch(80% 0.000 89.9)",
           "oklch(95% 0.000 89.9)"
         ]
+      },
+      "folio-light-surface": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface",
+        "canonical": "#f6f2e8",
+        "tonalRamp": [
+          "oklch(15% 0.007 88.7)",
+          "oklch(25% 0.010 88.7)",
+          "oklch(35% 0.012 88.7)",
+          "oklch(45% 0.013 88.7)",
+          "oklch(55% 0.013 88.7)",
+          "oklch(65% 0.012 88.7)",
+          "oklch(80% 0.008 88.7)",
+          "oklch(95% 0.003 88.7)"
+        ]
+      },
+      "folio-light-surface-hsl": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface Hsl",
+        "canonical": "hsl(43 44% 94%)",
+        "tonalRamp": [
+          "oklch(15% 0.006 88.9)",
+          "oklch(25% 0.009 88.9)",
+          "oklch(35% 0.011 88.9)",
+          "oklch(45% 0.013 88.9)",
+          "oklch(55% 0.013 88.9)",
+          "oklch(65% 0.011 88.9)",
+          "oklch(80% 0.008 88.9)",
+          "oklch(95% 0.003 88.9)"
+        ]
+      },
+      "folio-light-surface-elevated": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface Elevated",
+        "canonical": "#fffdf7",
+        "tonalRamp": [
+          "oklch(15% 0.004 91.5)",
+          "oklch(25% 0.006 91.5)",
+          "oklch(35% 0.007 91.5)",
+          "oklch(45% 0.008 91.5)",
+          "oklch(55% 0.008 91.5)",
+          "oklch(65% 0.007 91.5)",
+          "oklch(80% 0.005 91.5)",
+          "oklch(95% 0.002 91.5)"
+        ]
+      },
+      "folio-light-surface-elevated-soft": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface Elevated Soft",
+        "canonical": "#eeeade",
+        "tonalRamp": [
+          "oklch(15% 0.008 91.6)",
+          "oklch(25% 0.012 91.6)",
+          "oklch(35% 0.014 91.6)",
+          "oklch(45% 0.016 91.6)",
+          "oklch(55% 0.016 91.6)",
+          "oklch(65% 0.014 91.6)",
+          "oklch(80% 0.010 91.6)",
+          "oklch(95% 0.003 91.6)"
+        ]
+      },
+      "folio-light-surface-card-ivory": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface Card Ivory",
+        "canonical": "#f6f2e8",
+        "tonalRamp": [
+          "oklch(15% 0.007 88.7)",
+          "oklch(25% 0.010 88.7)",
+          "oklch(35% 0.012 88.7)",
+          "oklch(45% 0.013 88.7)",
+          "oklch(55% 0.013 88.7)",
+          "oklch(65% 0.012 88.7)",
+          "oklch(80% 0.008 88.7)",
+          "oklch(95% 0.003 88.7)"
+        ]
+      },
+      "folio-light-surface-chip": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface Chip",
+        "canonical": "#e5e8da",
+        "tonalRamp": [
+          "oklch(15% 0.009 116.6)",
+          "oklch(25% 0.013 116.6)",
+          "oklch(35% 0.016 116.6)",
+          "oklch(45% 0.018 116.6)",
+          "oklch(55% 0.018 116.6)",
+          "oklch(65% 0.016 116.6)",
+          "oklch(80% 0.011 116.6)",
+          "oklch(95% 0.004 116.6)"
+        ]
+      },
+      "folio-light-surface-chip-alt": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface Chip Alt",
+        "canonical": "#ede9dd",
+        "tonalRamp": [
+          "oklch(15% 0.008 91.6)",
+          "oklch(25% 0.012 91.6)",
+          "oklch(35% 0.014 91.6)",
+          "oklch(45% 0.016 91.6)",
+          "oklch(55% 0.016 91.6)",
+          "oklch(65% 0.014 91.6)",
+          "oklch(80% 0.010 91.6)",
+          "oklch(95% 0.003 91.6)"
+        ]
+      },
+      "folio-light-surface-hover": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface Hover",
+        "canonical": "#e2e7d9",
+        "tonalRamp": [
+          "oklch(15% 0.009 122.8)",
+          "oklch(25% 0.014 122.8)",
+          "oklch(35% 0.016 122.8)",
+          "oklch(45% 0.018 122.8)",
+          "oklch(55% 0.018 122.8)",
+          "oklch(65% 0.016 122.8)",
+          "oklch(80% 0.011 122.8)",
+          "oklch(95% 0.004 122.8)"
+        ]
+      },
+      "folio-light-surface-hover-soft": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface Hover Soft",
+        "canonical": "#eceee2",
+        "tonalRamp": [
+          "oklch(15% 0.008 114.4)",
+          "oklch(25% 0.011 114.4)",
+          "oklch(35% 0.013 114.4)",
+          "oklch(45% 0.015 114.4)",
+          "oklch(55% 0.015 114.4)",
+          "oklch(65% 0.013 114.4)",
+          "oklch(80% 0.009 114.4)",
+          "oklch(95% 0.003 114.4)"
+        ]
+      },
+      "folio-light-surface-on-card": {
+        "role": "neutral",
+        "displayName": "Folio Light Surface On Card",
+        "canonical": "#fffdf7",
+        "tonalRamp": [
+          "oklch(15% 0.004 91.5)",
+          "oklch(25% 0.006 91.5)",
+          "oklch(35% 0.007 91.5)",
+          "oklch(45% 0.008 91.5)",
+          "oklch(55% 0.008 91.5)",
+          "oklch(65% 0.007 91.5)",
+          "oklch(80% 0.005 91.5)",
+          "oklch(95% 0.002 91.5)"
+        ]
+      },
+      "folio-light-panel-bg": {
+        "role": "neutral",
+        "displayName": "Folio Light Panel Bg",
+        "canonical": "#efeee2",
+        "tonalRamp": [
+          "oklch(15% 0.008 102.8)",
+          "oklch(25% 0.011 102.8)",
+          "oklch(35% 0.013 102.8)",
+          "oklch(45% 0.015 102.8)",
+          "oklch(55% 0.015 102.8)",
+          "oklch(65% 0.013 102.8)",
+          "oklch(80% 0.009 102.8)",
+          "oklch(95% 0.003 102.8)"
+        ]
+      },
+      "folio-light-border-default": {
+        "role": "neutral",
+        "displayName": "Folio Light Border Default",
+        "canonical": "#c2c8b6",
+        "tonalRamp": [
+          "oklch(15% 0.012 122.0)",
+          "oklch(25% 0.018 122.0)",
+          "oklch(35% 0.021 122.0)",
+          "oklch(45% 0.024 122.0)",
+          "oklch(55% 0.024 122.0)",
+          "oklch(65% 0.021 122.0)",
+          "oklch(80% 0.015 122.0)",
+          "oklch(95% 0.005 122.0)"
+        ]
+      },
+      "folio-light-soft-border": {
+        "role": "neutral",
+        "displayName": "Folio Light Soft Border",
+        "canonical": "#d8d9c9",
+        "tonalRamp": [
+          "oklch(15% 0.010 109.7)",
+          "oklch(25% 0.015 109.7)",
+          "oklch(35% 0.018 109.7)",
+          "oklch(45% 0.020 109.7)",
+          "oklch(55% 0.020 109.7)",
+          "oklch(65% 0.018 109.7)",
+          "oklch(80% 0.013 109.7)",
+          "oklch(95% 0.004 109.7)"
+        ]
+      },
+      "folio-light-input-border": {
+        "role": "neutral",
+        "displayName": "Folio Light Input Border",
+        "canonical": "#788370",
+        "tonalRamp": [
+          "oklch(15% 0.015 132.0)",
+          "oklch(25% 0.022 132.0)",
+          "oklch(35% 0.026 132.0)",
+          "oklch(45% 0.029 132.0)",
+          "oklch(55% 0.029 132.0)",
+          "oklch(65% 0.026 132.0)",
+          "oklch(80% 0.018 132.0)",
+          "oklch(95% 0.006 132.0)"
+        ]
+      },
+      "folio-light-text-primary": {
+        "role": "neutral",
+        "displayName": "Folio Light Text Primary",
+        "canonical": "#293c31",
+        "tonalRamp": [
+          "oklch(15% 0.015 158.8)",
+          "oklch(25% 0.022 158.8)",
+          "oklch(35% 0.026 158.8)",
+          "oklch(45% 0.029 158.8)",
+          "oklch(55% 0.029 158.8)",
+          "oklch(65% 0.026 158.8)",
+          "oklch(80% 0.018 158.8)",
+          "oklch(95% 0.006 158.8)"
+        ]
+      },
+      "folio-light-text-primary-emphasis": {
+        "role": "neutral",
+        "displayName": "Folio Light Text Primary Emphasis",
+        "canonical": "#203c33",
+        "tonalRamp": [
+          "oklch(15% 0.013 171.3)",
+          "oklch(25% 0.027 171.3)",
+          "oklch(35% 0.032 171.3)",
+          "oklch(45% 0.036 171.3)",
+          "oklch(55% 0.036 171.3)",
+          "oklch(65% 0.032 171.3)",
+          "oklch(80% 0.022 171.3)",
+          "oklch(95% 0.008 171.3)"
+        ]
+      },
+      "folio-light-text-primary-body-strong": {
+        "role": "neutral",
+        "displayName": "Folio Light Text Primary Body Strong",
+        "canonical": "#3f5143",
+        "tonalRamp": [
+          "oklch(15% 0.015 151.5)",
+          "oklch(25% 0.023 151.5)",
+          "oklch(35% 0.027 151.5)",
+          "oklch(45% 0.030 151.5)",
+          "oklch(55% 0.030 151.5)",
+          "oklch(65% 0.027 151.5)",
+          "oklch(80% 0.019 151.5)",
+          "oklch(95% 0.006 151.5)"
+        ]
+      },
+      "folio-light-text-secondary": {
+        "role": "neutral",
+        "displayName": "Folio Light Text Secondary",
+        "canonical": "#5c685a",
+        "tonalRamp": [
+          "oklch(15% 0.013 141.2)",
+          "oklch(25% 0.018 141.2)",
+          "oklch(35% 0.022 141.2)",
+          "oklch(45% 0.025 141.2)",
+          "oklch(55% 0.025 141.2)",
+          "oklch(65% 0.022 141.2)",
+          "oklch(80% 0.015 141.2)",
+          "oklch(95% 0.005 141.2)"
+        ]
+      },
+      "folio-light-text-secondary-mid": {
+        "role": "neutral",
+        "displayName": "Folio Light Text Secondary Mid",
+        "canonical": "#5c685a",
+        "tonalRamp": [
+          "oklch(15% 0.013 141.2)",
+          "oklch(25% 0.018 141.2)",
+          "oklch(35% 0.022 141.2)",
+          "oklch(45% 0.025 141.2)",
+          "oklch(55% 0.025 141.2)",
+          "oklch(65% 0.022 141.2)",
+          "oklch(80% 0.015 141.2)",
+          "oklch(95% 0.005 141.2)"
+        ]
+      },
+      "folio-light-muted-readable": {
+        "role": "neutral",
+        "displayName": "Folio Light Muted Readable",
+        "canonical": "#5c685a",
+        "tonalRamp": [
+          "oklch(15% 0.013 141.2)",
+          "oklch(25% 0.018 141.2)",
+          "oklch(35% 0.022 141.2)",
+          "oklch(45% 0.025 141.2)",
+          "oklch(55% 0.025 141.2)",
+          "oklch(65% 0.022 141.2)",
+          "oklch(80% 0.015 141.2)",
+          "oklch(95% 0.005 141.2)"
+        ]
+      },
+      "folio-light-text-placeholder": {
+        "role": "neutral",
+        "displayName": "Folio Light Text Placeholder",
+        "canonical": "#65705e",
+        "tonalRamp": [
+          "oklch(15% 0.015 133.2)",
+          "oklch(25% 0.021 133.2)",
+          "oklch(35% 0.026 133.2)",
+          "oklch(45% 0.029 133.2)",
+          "oklch(55% 0.029 133.2)",
+          "oklch(65% 0.026 133.2)",
+          "oklch(80% 0.018 133.2)",
+          "oklch(95% 0.006 133.2)"
+        ]
+      },
+      "folio-light-accent-cta-bg": {
+        "role": "primary",
+        "displayName": "Folio Light Accent Cta Bg",
+        "canonical": "#315b46",
+        "tonalRamp": [
+          "oklch(15% 0.015 160.8)",
+          "oklch(25% 0.037 160.8)",
+          "oklch(35% 0.050 160.8)",
+          "oklch(45% 0.056 160.8)",
+          "oklch(55% 0.056 160.8)",
+          "oklch(65% 0.050 160.8)",
+          "oklch(80% 0.034 160.8)",
+          "oklch(95% 0.012 160.8)"
+        ]
+      },
+      "folio-light-accent-cta-bg-pure": {
+        "role": "primary",
+        "displayName": "Folio Light Accent Cta Bg Pure",
+        "canonical": "#315b46",
+        "tonalRamp": [
+          "oklch(15% 0.015 160.8)",
+          "oklch(25% 0.037 160.8)",
+          "oklch(35% 0.050 160.8)",
+          "oklch(45% 0.056 160.8)",
+          "oklch(55% 0.056 160.8)",
+          "oklch(65% 0.050 160.8)",
+          "oklch(80% 0.034 160.8)",
+          "oklch(95% 0.012 160.8)"
+        ]
+      },
+      "folio-light-accent-emphasis": {
+        "role": "primary",
+        "displayName": "Folio Light Accent Emphasis",
+        "canonical": "#315b46",
+        "tonalRamp": [
+          "oklch(15% 0.015 160.8)",
+          "oklch(25% 0.037 160.8)",
+          "oklch(35% 0.050 160.8)",
+          "oklch(45% 0.056 160.8)",
+          "oklch(55% 0.056 160.8)",
+          "oklch(65% 0.050 160.8)",
+          "oklch(80% 0.034 160.8)",
+          "oklch(95% 0.012 160.8)"
+        ]
+      },
+      "folio-light-accent-soft": {
+        "role": "neutral",
+        "displayName": "Folio Light Accent Soft",
+        "canonical": "#dfe5d6",
+        "tonalRamp": [
+          "oklch(15% 0.010 124.7)",
+          "oklch(25% 0.015 124.7)",
+          "oklch(35% 0.018 124.7)",
+          "oklch(45% 0.020 124.7)",
+          "oklch(55% 0.020 124.7)",
+          "oklch(65% 0.018 124.7)",
+          "oklch(80% 0.012 124.7)",
+          "oklch(95% 0.004 124.7)"
+        ]
+      },
+      "folio-light-accent-hover": {
+        "role": "primary",
+        "displayName": "Folio Light Accent Hover",
+        "canonical": "#244836",
+        "tonalRamp": [
+          "oklch(15% 0.015 160.5)",
+          "oklch(25% 0.037 160.5)",
+          "oklch(35% 0.044 160.5)",
+          "oklch(45% 0.049 160.5)",
+          "oklch(55% 0.049 160.5)",
+          "oklch(65% 0.044 160.5)",
+          "oklch(80% 0.030 160.5)",
+          "oklch(95% 0.011 160.5)"
+        ]
+      },
+      "folio-light-accent-pure-cta-fg": {
+        "role": "neutral",
+        "displayName": "Folio Light Accent Pure Cta Fg",
+        "canonical": "#fffdf7",
+        "tonalRamp": [
+          "oklch(15% 0.004 91.5)",
+          "oklch(25% 0.006 91.5)",
+          "oklch(35% 0.007 91.5)",
+          "oklch(45% 0.008 91.5)",
+          "oklch(55% 0.008 91.5)",
+          "oklch(65% 0.007 91.5)",
+          "oklch(80% 0.005 91.5)",
+          "oklch(95% 0.002 91.5)"
+        ]
+      },
+      "folio-light-segmented-option-fg": {
+        "role": "neutral",
+        "displayName": "Folio Light Segmented Option Fg",
+        "canonical": "#5c685a",
+        "tonalRamp": [
+          "oklch(15% 0.013 141.2)",
+          "oklch(25% 0.018 141.2)",
+          "oklch(35% 0.022 141.2)",
+          "oklch(45% 0.025 141.2)",
+          "oklch(55% 0.025 141.2)",
+          "oklch(65% 0.022 141.2)",
+          "oklch(80% 0.015 141.2)",
+          "oklch(95% 0.005 141.2)"
+        ]
+      },
+      "folio-light-focus-ring": {
+        "role": "primary",
+        "displayName": "Folio Light Focus Ring",
+        "canonical": "#3d674e",
+        "tonalRamp": [
+          "oklch(15% 0.016 156.9)",
+          "oklch(25% 0.039 156.9)",
+          "oklch(35% 0.052 156.9)",
+          "oklch(45% 0.059 156.9)",
+          "oklch(55% 0.059 156.9)",
+          "oklch(65% 0.052 156.9)",
+          "oklch(80% 0.036 156.9)",
+          "oklch(95% 0.012 156.9)"
+        ]
+      },
+      "folio-light-primary": {
+        "role": "primary",
+        "displayName": "Folio Light Primary",
+        "canonical": "hsl(150 30% 27%)",
+        "tonalRamp": [
+          "oklch(15% 0.015 160.8)",
+          "oklch(25% 0.037 160.8)",
+          "oklch(35% 0.049 160.8)",
+          "oklch(45% 0.055 160.8)",
+          "oklch(55% 0.055 160.8)",
+          "oklch(65% 0.049 160.8)",
+          "oklch(80% 0.034 160.8)",
+          "oklch(95% 0.012 160.8)"
+        ]
+      },
+      "folio-light-primary-foreground": {
+        "role": "neutral",
+        "displayName": "Folio Light Primary Foreground",
+        "canonical": "hsl(45 100% 98%)",
+        "tonalRamp": [
+          "oklch(15% 0.005 91.5)",
+          "oklch(25% 0.007 91.5)",
+          "oklch(35% 0.009 91.5)",
+          "oklch(45% 0.010 91.5)",
+          "oklch(55% 0.010 91.5)",
+          "oklch(65% 0.009 91.5)",
+          "oklch(80% 0.006 91.5)",
+          "oklch(95% 0.002 91.5)"
+        ]
+      },
+      "folio-light-ring": {
+        "role": "primary",
+        "displayName": "Folio Light Ring",
+        "canonical": "hsl(144 26% 32%)",
+        "tonalRamp": [
+          "oklch(15% 0.016 156.6)",
+          "oklch(25% 0.039 156.6)",
+          "oklch(35% 0.053 156.6)",
+          "oklch(45% 0.060 156.6)",
+          "oklch(55% 0.060 156.6)",
+          "oklch(65% 0.053 156.6)",
+          "oklch(80% 0.037 156.6)",
+          "oklch(95% 0.013 156.6)"
+        ]
+      },
+      "folio-light-code-bg": {
+        "role": "neutral",
+        "displayName": "Folio Light Code Bg",
+        "canonical": "#ececdf",
+        "tonalRamp": [
+          "oklch(15% 0.008 106.7)",
+          "oklch(25% 0.012 106.7)",
+          "oklch(35% 0.014 106.7)",
+          "oklch(45% 0.016 106.7)",
+          "oklch(55% 0.016 106.7)",
+          "oklch(65% 0.014 106.7)",
+          "oklch(80% 0.010 106.7)",
+          "oklch(95% 0.003 106.7)"
+        ]
+      },
+      "folio-light-md-table-bg": {
+        "role": "neutral",
+        "displayName": "Folio Light Md Table Bg",
+        "canonical": "#eeeee1",
+        "tonalRamp": [
+          "oklch(15% 0.008 106.7)",
+          "oklch(25% 0.012 106.7)",
+          "oklch(35% 0.014 106.7)",
+          "oklch(45% 0.016 106.7)",
+          "oklch(55% 0.016 106.7)",
+          "oklch(65% 0.014 106.7)",
+          "oklch(80% 0.010 106.7)",
+          "oklch(95% 0.003 106.7)"
+        ]
+      },
+      "folio-light-terminal-bg": {
+        "role": "neutral",
+        "displayName": "Folio Light Terminal Bg",
+        "canonical": "#f1f0e4",
+        "tonalRamp": [
+          "oklch(15% 0.008 102.8)",
+          "oklch(25% 0.011 102.8)",
+          "oklch(35% 0.013 102.8)",
+          "oklch(45% 0.015 102.8)",
+          "oklch(55% 0.015 102.8)",
+          "oklch(65% 0.013 102.8)",
+          "oklch(80% 0.009 102.8)",
+          "oklch(95% 0.003 102.8)"
+        ]
+      },
+      "folio-light-terminal-fg": {
+        "role": "neutral",
+        "displayName": "Folio Light Terminal Fg",
+        "canonical": "#293c31",
+        "tonalRamp": [
+          "oklch(15% 0.015 158.8)",
+          "oklch(25% 0.022 158.8)",
+          "oklch(35% 0.026 158.8)",
+          "oklch(45% 0.029 158.8)",
+          "oklch(55% 0.029 158.8)",
+          "oklch(65% 0.026 158.8)",
+          "oklch(80% 0.018 158.8)",
+          "oklch(95% 0.006 158.8)"
+        ]
+      },
+      "folio-light-terminal-selection": {
+        "role": "neutral",
+        "displayName": "Folio Light Terminal Selection",
+        "canonical": "#d1dcc6",
+        "tonalRamp": [
+          "oklch(15% 0.015 128.9)",
+          "oklch(25% 0.022 128.9)",
+          "oklch(35% 0.027 128.9)",
+          "oklch(45% 0.030 128.9)",
+          "oklch(55% 0.030 128.9)",
+          "oklch(65% 0.027 128.9)",
+          "oklch(80% 0.019 128.9)",
+          "oklch(95% 0.006 128.9)"
+        ]
+      },
+      "folio-light-studio-nav": {
+        "role": "secondary",
+        "displayName": "Folio Light Studio Nav",
+        "canonical": "#203c33",
+        "tonalRamp": [
+          "oklch(15% 0.013 171.3)",
+          "oklch(25% 0.027 171.3)",
+          "oklch(35% 0.032 171.3)",
+          "oklch(45% 0.036 171.3)",
+          "oklch(55% 0.036 171.3)",
+          "oklch(65% 0.032 171.3)",
+          "oklch(80% 0.022 171.3)",
+          "oklch(95% 0.008 171.3)"
+        ]
+      },
+      "folio-light-studio-nav-ink": {
+        "role": "secondary",
+        "displayName": "Folio Light Studio Nav Ink",
+        "canonical": "#f4f1e6",
+        "tonalRamp": [
+          "oklch(15% 0.007 94.2)",
+          "oklch(25% 0.010 94.2)",
+          "oklch(35% 0.013 94.2)",
+          "oklch(45% 0.014 94.2)",
+          "oklch(55% 0.014 94.2)",
+          "oklch(65% 0.013 94.2)",
+          "oklch(80% 0.009 94.2)",
+          "oklch(95% 0.003 94.2)"
+        ]
+      },
+      "folio-light-studio-nav-muted": {
+        "role": "secondary",
+        "displayName": "Folio Light Studio Nav Muted",
+        "canonical": "#c7d3c3",
+        "tonalRamp": [
+          "oklch(15% 0.012 137.8)",
+          "oklch(25% 0.018 137.8)",
+          "oklch(35% 0.021 137.8)",
+          "oklch(45% 0.024 137.8)",
+          "oklch(55% 0.024 137.8)",
+          "oklch(65% 0.021 137.8)",
+          "oklch(80% 0.015 137.8)",
+          "oklch(95% 0.005 137.8)"
+        ]
+      },
+      "folio-light-studio-nav-hover": {
+        "role": "secondary",
+        "displayName": "Folio Light Studio Nav Hover",
+        "canonical": "#2b493d",
+        "tonalRamp": [
+          "oklch(15% 0.014 166.9)",
+          "oklch(25% 0.029 166.9)",
+          "oklch(35% 0.035 166.9)",
+          "oklch(45% 0.039 166.9)",
+          "oklch(55% 0.039 166.9)",
+          "oklch(65% 0.035 166.9)",
+          "oklch(80% 0.024 166.9)",
+          "oklch(95% 0.008 166.9)"
+        ]
+      },
+      "folio-light-studio-nav-border": {
+        "role": "secondary",
+        "displayName": "Folio Light Studio Nav Border",
+        "canonical": "#526951",
+        "tonalRamp": [
+          "oklch(15% 0.022 143.8)",
+          "oklch(25% 0.033 143.8)",
+          "oklch(35% 0.039 143.8)",
+          "oklch(45% 0.044 143.8)",
+          "oklch(55% 0.044 143.8)",
+          "oklch(65% 0.039 143.8)",
+          "oklch(80% 0.027 143.8)",
+          "oklch(95% 0.009 143.8)"
+        ]
+      },
+      "folio-light-studio-selection": {
+        "role": "secondary",
+        "displayName": "Folio Light Studio Selection",
+        "canonical": "#36564a",
+        "tonalRamp": [
+          "oklch(15% 0.014 168.7)",
+          "oklch(25% 0.030 168.7)",
+          "oklch(35% 0.036 168.7)",
+          "oklch(45% 0.040 168.7)",
+          "oklch(55% 0.040 168.7)",
+          "oklch(65% 0.036 168.7)",
+          "oklch(80% 0.025 168.7)",
+          "oklch(95% 0.009 168.7)"
+        ]
+      },
+      "folio-light-studio-reading": {
+        "role": "secondary",
+        "displayName": "Folio Light Studio Reading",
+        "canonical": "#fffdf7",
+        "tonalRamp": [
+          "oklch(15% 0.004 91.5)",
+          "oklch(25% 0.006 91.5)",
+          "oklch(35% 0.007 91.5)",
+          "oklch(45% 0.008 91.5)",
+          "oklch(55% 0.008 91.5)",
+          "oklch(65% 0.007 91.5)",
+          "oklch(80% 0.005 91.5)",
+          "oklch(95% 0.002 91.5)"
+        ]
+      },
+      "folio-light-studio-user": {
+        "role": "secondary",
+        "displayName": "Folio Light Studio User",
+        "canonical": "#e6e9db",
+        "tonalRamp": [
+          "oklch(15% 0.009 116.6)",
+          "oklch(25% 0.013 116.6)",
+          "oklch(35% 0.016 116.6)",
+          "oklch(45% 0.018 116.6)",
+          "oklch(55% 0.018 116.6)",
+          "oklch(65% 0.016 116.6)",
+          "oklch(80% 0.011 116.6)",
+          "oklch(95% 0.004 116.6)"
+        ]
+      },
+      "folio-light-studio-caption": {
+        "role": "neutral",
+        "displayName": "Folio Light Studio Caption",
+        "canonical": "#203c33",
+        "tonalRamp": [
+          "oklch(15% 0.013 171.3)",
+          "oklch(25% 0.027 171.3)",
+          "oklch(35% 0.032 171.3)",
+          "oklch(45% 0.036 171.3)",
+          "oklch(55% 0.036 171.3)",
+          "oklch(65% 0.032 171.3)",
+          "oklch(80% 0.022 171.3)",
+          "oklch(95% 0.008 171.3)"
+        ]
+      },
+      "folio-light-studio-caption-ink": {
+        "role": "neutral",
+        "displayName": "Folio Light Studio Caption Ink",
+        "canonical": "#f4f1e6",
+        "tonalRamp": [
+          "oklch(15% 0.007 94.2)",
+          "oklch(25% 0.010 94.2)",
+          "oklch(35% 0.013 94.2)",
+          "oklch(45% 0.014 94.2)",
+          "oklch(55% 0.014 94.2)",
+          "oklch(65% 0.013 94.2)",
+          "oklch(80% 0.009 94.2)",
+          "oklch(95% 0.003 94.2)"
+        ]
+      },
+      "folio-light-overlay-bg": {
+        "role": "neutral",
+        "displayName": "Folio Light Overlay Bg",
+        "canonical": "rgb(24 42 30 / 30%)",
+        "tonalRamp": [
+          "oklch(15% 0.016 154.4)",
+          "oklch(25% 0.023 154.4)",
+          "oklch(35% 0.028 154.4)",
+          "oklch(45% 0.031 154.4)",
+          "oklch(55% 0.031 154.4)",
+          "oklch(65% 0.028 154.4)",
+          "oklch(80% 0.019 154.4)",
+          "oklch(95% 0.007 154.4)"
+        ]
+      },
+      "folio-light-sidebar-text-primary": {
+        "role": "neutral",
+        "displayName": "Folio Light Sidebar Text Primary",
+        "canonical": "#f4f1e6",
+        "tonalRamp": [
+          "oklch(15% 0.007 94.2)",
+          "oklch(25% 0.010 94.2)",
+          "oklch(35% 0.013 94.2)",
+          "oklch(45% 0.014 94.2)",
+          "oklch(55% 0.014 94.2)",
+          "oklch(65% 0.013 94.2)",
+          "oklch(80% 0.009 94.2)",
+          "oklch(95% 0.003 94.2)"
+        ]
+      },
+      "folio-light-sidebar-text-body-strong": {
+        "role": "neutral",
+        "displayName": "Folio Light Sidebar Text Body Strong",
+        "canonical": "#f4f1e6",
+        "tonalRamp": [
+          "oklch(15% 0.007 94.2)",
+          "oklch(25% 0.010 94.2)",
+          "oklch(35% 0.013 94.2)",
+          "oklch(45% 0.014 94.2)",
+          "oklch(55% 0.014 94.2)",
+          "oklch(65% 0.013 94.2)",
+          "oklch(80% 0.009 94.2)",
+          "oklch(95% 0.003 94.2)"
+        ]
+      },
+      "folio-light-sidebar-muted-readable": {
+        "role": "neutral",
+        "displayName": "Folio Light Sidebar Muted Readable",
+        "canonical": "#c7d3c3",
+        "tonalRamp": [
+          "oklch(15% 0.012 137.8)",
+          "oklch(25% 0.018 137.8)",
+          "oklch(35% 0.021 137.8)",
+          "oklch(45% 0.024 137.8)",
+          "oklch(55% 0.024 137.8)",
+          "oklch(65% 0.021 137.8)",
+          "oklch(80% 0.015 137.8)",
+          "oklch(95% 0.005 137.8)"
+        ]
+      },
+      "folio-light-sidebar-text-secondary": {
+        "role": "neutral",
+        "displayName": "Folio Light Sidebar Text Secondary",
+        "canonical": "#c7d3c3",
+        "tonalRamp": [
+          "oklch(15% 0.012 137.8)",
+          "oklch(25% 0.018 137.8)",
+          "oklch(35% 0.021 137.8)",
+          "oklch(45% 0.024 137.8)",
+          "oklch(55% 0.024 137.8)",
+          "oklch(65% 0.021 137.8)",
+          "oklch(80% 0.015 137.8)",
+          "oklch(95% 0.005 137.8)"
+        ]
+      },
+      "folio-light-sidebar-text-placeholder": {
+        "role": "neutral",
+        "displayName": "Folio Light Sidebar Text Placeholder",
+        "canonical": "#c7d3c3",
+        "tonalRamp": [
+          "oklch(15% 0.012 137.8)",
+          "oklch(25% 0.018 137.8)",
+          "oklch(35% 0.021 137.8)",
+          "oklch(45% 0.024 137.8)",
+          "oklch(55% 0.024 137.8)",
+          "oklch(65% 0.021 137.8)",
+          "oklch(80% 0.015 137.8)",
+          "oklch(95% 0.005 137.8)"
+        ]
+      },
+      "folio-dark-surface": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface",
+        "canonical": "#1c2723",
+        "tonalRamp": [
+          "oklch(15% 0.008 170.7)",
+          "oklch(25% 0.012 170.7)",
+          "oklch(35% 0.014 170.7)",
+          "oklch(45% 0.016 170.7)",
+          "oklch(55% 0.016 170.7)",
+          "oklch(65% 0.014 170.7)",
+          "oklch(80% 0.010 170.7)",
+          "oklch(95% 0.003 170.7)"
+        ]
+      },
+      "folio-dark-surface-hsl": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface Hsl",
+        "canonical": "hsl(158 16% 13%)",
+        "tonalRamp": [
+          "oklch(15% 0.008 170.6)",
+          "oklch(25% 0.012 170.6)",
+          "oklch(35% 0.014 170.6)",
+          "oklch(45% 0.016 170.6)",
+          "oklch(55% 0.016 170.6)",
+          "oklch(65% 0.014 170.6)",
+          "oklch(80% 0.010 170.6)",
+          "oklch(95% 0.003 170.6)"
+        ]
+      },
+      "folio-dark-surface-elevated": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface Elevated",
+        "canonical": "#25352c",
+        "tonalRamp": [
+          "oklch(15% 0.013 159.7)",
+          "oklch(25% 0.019 159.7)",
+          "oklch(35% 0.022 159.7)",
+          "oklch(45% 0.025 159.7)",
+          "oklch(55% 0.025 159.7)",
+          "oklch(65% 0.022 159.7)",
+          "oklch(80% 0.015 159.7)",
+          "oklch(95% 0.005 159.7)"
+        ]
+      },
+      "folio-dark-surface-elevated-soft": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface Elevated Soft",
+        "canonical": "#2d3d32",
+        "tonalRamp": [
+          "oklch(15% 0.014 154.6)",
+          "oklch(25% 0.020 154.6)",
+          "oklch(35% 0.024 154.6)",
+          "oklch(45% 0.027 154.6)",
+          "oklch(55% 0.027 154.6)",
+          "oklch(65% 0.024 154.6)",
+          "oklch(80% 0.016 154.6)",
+          "oklch(95% 0.006 154.6)"
+        ]
+      },
+      "folio-dark-surface-card-ivory": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface Card Ivory",
+        "canonical": "#25352c",
+        "tonalRamp": [
+          "oklch(15% 0.013 159.7)",
+          "oklch(25% 0.019 159.7)",
+          "oklch(35% 0.022 159.7)",
+          "oklch(45% 0.025 159.7)",
+          "oklch(55% 0.025 159.7)",
+          "oklch(65% 0.022 159.7)",
+          "oklch(80% 0.015 159.7)",
+          "oklch(95% 0.005 159.7)"
+        ]
+      },
+      "folio-dark-surface-chip": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface Chip",
+        "canonical": "#344638",
+        "tonalRamp": [
+          "oklch(15% 0.016 151.3)",
+          "oklch(25% 0.023 151.3)",
+          "oklch(35% 0.028 151.3)",
+          "oklch(45% 0.031 151.3)",
+          "oklch(55% 0.031 151.3)",
+          "oklch(65% 0.028 151.3)",
+          "oklch(80% 0.019 151.3)",
+          "oklch(95% 0.007 151.3)"
+        ]
+      },
+      "folio-dark-surface-chip-alt": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface Chip Alt",
+        "canonical": "#2a3b30",
+        "tonalRamp": [
+          "oklch(15% 0.014 156.1)",
+          "oklch(25% 0.021 156.1)",
+          "oklch(35% 0.025 156.1)",
+          "oklch(45% 0.028 156.1)",
+          "oklch(55% 0.028 156.1)",
+          "oklch(65% 0.025 156.1)",
+          "oklch(80% 0.017 156.1)",
+          "oklch(95% 0.006 156.1)"
+        ]
+      },
+      "folio-dark-surface-hover": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface Hover",
+        "canonical": "#394d3e",
+        "tonalRamp": [
+          "oklch(15% 0.017 152.3)",
+          "oklch(25% 0.025 152.3)",
+          "oklch(35% 0.030 152.3)",
+          "oklch(45% 0.033 152.3)",
+          "oklch(55% 0.033 152.3)",
+          "oklch(65% 0.030 152.3)",
+          "oklch(80% 0.021 152.3)",
+          "oklch(95% 0.007 152.3)"
+        ]
+      },
+      "folio-dark-surface-hover-soft": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface Hover Soft",
+        "canonical": "#304235",
+        "tonalRamp": [
+          "oklch(15% 0.015 153.2)",
+          "oklch(25% 0.022 153.2)",
+          "oklch(35% 0.027 153.2)",
+          "oklch(45% 0.030 153.2)",
+          "oklch(55% 0.030 153.2)",
+          "oklch(65% 0.027 153.2)",
+          "oklch(80% 0.019 153.2)",
+          "oklch(95% 0.006 153.2)"
+        ]
+      },
+      "folio-dark-surface-on-card": {
+        "role": "neutral",
+        "displayName": "Folio Dark Surface On Card",
+        "canonical": "#25352c",
+        "tonalRamp": [
+          "oklch(15% 0.013 159.7)",
+          "oklch(25% 0.019 159.7)",
+          "oklch(35% 0.022 159.7)",
+          "oklch(45% 0.025 159.7)",
+          "oklch(55% 0.025 159.7)",
+          "oklch(65% 0.022 159.7)",
+          "oklch(80% 0.015 159.7)",
+          "oklch(95% 0.005 159.7)"
+        ]
+      },
+      "folio-dark-panel-bg": {
+        "role": "neutral",
+        "displayName": "Folio Dark Panel Bg",
+        "canonical": "#233128",
+        "tonalRamp": [
+          "oklch(15% 0.012 156.4)",
+          "oklch(25% 0.017 156.4)",
+          "oklch(35% 0.021 156.4)",
+          "oklch(45% 0.023 156.4)",
+          "oklch(55% 0.023 156.4)",
+          "oklch(65% 0.021 156.4)",
+          "oklch(80% 0.014 156.4)",
+          "oklch(95% 0.005 156.4)"
+        ]
+      },
+      "folio-dark-border-default": {
+        "role": "neutral",
+        "displayName": "Folio Dark Border Default",
+        "canonical": "#52654f",
+        "tonalRamp": [
+          "oklch(15% 0.020 141.3)",
+          "oklch(25% 0.029 141.3)",
+          "oklch(35% 0.035 141.3)",
+          "oklch(45% 0.039 141.3)",
+          "oklch(55% 0.039 141.3)",
+          "oklch(65% 0.035 141.3)",
+          "oklch(80% 0.024 141.3)",
+          "oklch(95% 0.008 141.3)"
+        ]
+      },
+      "folio-dark-soft-border": {
+        "role": "neutral",
+        "displayName": "Folio Dark Soft Border",
+        "canonical": "#3e5140",
+        "tonalRamp": [
+          "oklch(15% 0.018 147.7)",
+          "oklch(25% 0.026 147.7)",
+          "oklch(35% 0.031 147.7)",
+          "oklch(45% 0.035 147.7)",
+          "oklch(55% 0.035 147.7)",
+          "oklch(65% 0.031 147.7)",
+          "oklch(80% 0.021 147.7)",
+          "oklch(95% 0.007 147.7)"
+        ]
+      },
+      "folio-dark-input-border": {
+        "role": "neutral",
+        "displayName": "Folio Dark Input Border",
+        "canonical": "#8b9d80",
+        "tonalRamp": [
+          "oklch(15% 0.019 133.6)",
+          "oklch(25% 0.033 133.6)",
+          "oklch(35% 0.039 133.6)",
+          "oklch(45% 0.044 133.6)",
+          "oklch(55% 0.044 133.6)",
+          "oklch(65% 0.039 133.6)",
+          "oklch(80% 0.027 133.6)",
+          "oklch(95% 0.009 133.6)"
+        ]
+      },
+      "folio-dark-text-primary": {
+        "role": "neutral",
+        "displayName": "Folio Dark Text Primary",
+        "canonical": "#e9e7dc",
+        "tonalRamp": [
+          "oklch(15% 0.007 98.3)",
+          "oklch(25% 0.010 98.3)",
+          "oklch(35% 0.012 98.3)",
+          "oklch(45% 0.014 98.3)",
+          "oklch(55% 0.014 98.3)",
+          "oklch(65% 0.012 98.3)",
+          "oklch(80% 0.009 98.3)",
+          "oklch(95% 0.003 98.3)"
+        ]
+      },
+      "folio-dark-text-primary-emphasis": {
+        "role": "neutral",
+        "displayName": "Folio Dark Text Primary Emphasis",
+        "canonical": "#f4f1e6",
+        "tonalRamp": [
+          "oklch(15% 0.007 94.2)",
+          "oklch(25% 0.010 94.2)",
+          "oklch(35% 0.013 94.2)",
+          "oklch(45% 0.014 94.2)",
+          "oklch(55% 0.014 94.2)",
+          "oklch(65% 0.013 94.2)",
+          "oklch(80% 0.009 94.2)",
+          "oklch(95% 0.003 94.2)"
+        ]
+      },
+      "folio-dark-text-primary-body-strong": {
+        "role": "neutral",
+        "displayName": "Folio Dark Text Primary Body Strong",
+        "canonical": "#d5decc",
+        "tonalRamp": [
+          "oklch(15% 0.013 128.8)",
+          "oklch(25% 0.018 128.8)",
+          "oklch(35% 0.022 128.8)",
+          "oklch(45% 0.025 128.8)",
+          "oklch(55% 0.025 128.8)",
+          "oklch(65% 0.022 128.8)",
+          "oklch(80% 0.015 128.8)",
+          "oklch(95% 0.005 128.8)"
+        ]
+      },
+      "folio-dark-text-secondary": {
+        "role": "neutral",
+        "displayName": "Folio Dark Text Secondary",
+        "canonical": "#bac7b0",
+        "tonalRamp": [
+          "oklch(15% 0.017 131.4)",
+          "oklch(25% 0.024 131.4)",
+          "oklch(35% 0.029 131.4)",
+          "oklch(45% 0.033 131.4)",
+          "oklch(55% 0.033 131.4)",
+          "oklch(65% 0.029 131.4)",
+          "oklch(80% 0.020 131.4)",
+          "oklch(95% 0.007 131.4)"
+        ]
+      },
+      "folio-dark-text-secondary-mid": {
+        "role": "neutral",
+        "displayName": "Folio Dark Text Secondary Mid",
+        "canonical": "#bac7b0",
+        "tonalRamp": [
+          "oklch(15% 0.017 131.4)",
+          "oklch(25% 0.024 131.4)",
+          "oklch(35% 0.029 131.4)",
+          "oklch(45% 0.033 131.4)",
+          "oklch(55% 0.033 131.4)",
+          "oklch(65% 0.029 131.4)",
+          "oklch(80% 0.020 131.4)",
+          "oklch(95% 0.007 131.4)"
+        ]
+      },
+      "folio-dark-muted-readable": {
+        "role": "neutral",
+        "displayName": "Folio Dark Muted Readable",
+        "canonical": "#bac7b0",
+        "tonalRamp": [
+          "oklch(15% 0.017 131.4)",
+          "oklch(25% 0.024 131.4)",
+          "oklch(35% 0.029 131.4)",
+          "oklch(45% 0.033 131.4)",
+          "oklch(55% 0.033 131.4)",
+          "oklch(65% 0.029 131.4)",
+          "oklch(80% 0.020 131.4)",
+          "oklch(95% 0.007 131.4)"
+        ]
+      },
+      "folio-dark-text-placeholder": {
+        "role": "neutral",
+        "displayName": "Folio Dark Text Placeholder",
+        "canonical": "#afbea5",
+        "tonalRamp": [
+          "oklch(15% 0.018 132.7)",
+          "oklch(25% 0.027 132.7)",
+          "oklch(35% 0.032 132.7)",
+          "oklch(45% 0.036 132.7)",
+          "oklch(55% 0.036 132.7)",
+          "oklch(65% 0.032 132.7)",
+          "oklch(80% 0.022 132.7)",
+          "oklch(95% 0.008 132.7)"
+        ]
+      },
+      "folio-dark-accent-cta-bg": {
+        "role": "primary",
+        "displayName": "Folio Dark Accent Cta Bg",
+        "canonical": "#b4d4a8",
+        "tonalRamp": [
+          "oklch(15% 0.021 137.2)",
+          "oklch(25% 0.048 137.2)",
+          "oklch(35% 0.058 137.2)",
+          "oklch(45% 0.065 137.2)",
+          "oklch(55% 0.065 137.2)",
+          "oklch(65% 0.058 137.2)",
+          "oklch(80% 0.040 137.2)",
+          "oklch(95% 0.014 137.2)"
+        ]
+      },
+      "folio-dark-accent-cta-bg-pure": {
+        "role": "primary",
+        "displayName": "Folio Dark Accent Cta Bg Pure",
+        "canonical": "#b4d4a8",
+        "tonalRamp": [
+          "oklch(15% 0.021 137.2)",
+          "oklch(25% 0.048 137.2)",
+          "oklch(35% 0.058 137.2)",
+          "oklch(45% 0.065 137.2)",
+          "oklch(55% 0.065 137.2)",
+          "oklch(65% 0.058 137.2)",
+          "oklch(80% 0.040 137.2)",
+          "oklch(95% 0.014 137.2)"
+        ]
+      },
+      "folio-dark-accent-emphasis": {
+        "role": "primary",
+        "displayName": "Folio Dark Accent Emphasis",
+        "canonical": "#c0dbb4",
+        "tonalRamp": [
+          "oklch(15% 0.020 136.0)",
+          "oklch(25% 0.042 136.0)",
+          "oklch(35% 0.051 136.0)",
+          "oklch(45% 0.057 136.0)",
+          "oklch(55% 0.057 136.0)",
+          "oklch(65% 0.051 136.0)",
+          "oklch(80% 0.035 136.0)",
+          "oklch(95% 0.012 136.0)"
+        ]
+      },
+      "folio-dark-accent-soft": {
+        "role": "neutral",
+        "displayName": "Folio Dark Accent Soft",
+        "canonical": "#344e39",
+        "tonalRamp": [
+          "oklch(15% 0.019 149.8)",
+          "oklch(25% 0.033 149.8)",
+          "oklch(35% 0.040 149.8)",
+          "oklch(45% 0.045 149.8)",
+          "oklch(55% 0.045 149.8)",
+          "oklch(65% 0.040 149.8)",
+          "oklch(80% 0.028 149.8)",
+          "oklch(95% 0.009 149.8)"
+        ]
+      },
+      "folio-dark-accent-hover": {
+        "role": "primary",
+        "displayName": "Folio Dark Accent Hover",
+        "canonical": "#c6dfbb",
+        "tonalRamp": [
+          "oklch(15% 0.020 136.1)",
+          "oklch(25% 0.039 136.1)",
+          "oklch(35% 0.047 136.1)",
+          "oklch(45% 0.052 136.1)",
+          "oklch(55% 0.052 136.1)",
+          "oklch(65% 0.047 136.1)",
+          "oklch(80% 0.032 136.1)",
+          "oklch(95% 0.011 136.1)"
+        ]
+      },
+      "folio-dark-accent-pure-cta-fg": {
+        "role": "neutral",
+        "displayName": "Folio Dark Accent Pure Cta Fg",
+        "canonical": "#1b2d21",
+        "tonalRamp": [
+          "oklch(15% 0.016 154.6)",
+          "oklch(25% 0.023 154.6)",
+          "oklch(35% 0.027 154.6)",
+          "oklch(45% 0.031 154.6)",
+          "oklch(55% 0.031 154.6)",
+          "oklch(65% 0.027 154.6)",
+          "oklch(80% 0.019 154.6)",
+          "oklch(95% 0.007 154.6)"
+        ]
+      },
+      "folio-dark-segmented-option-fg": {
+        "role": "neutral",
+        "displayName": "Folio Dark Segmented Option Fg",
+        "canonical": "#bac7b0",
+        "tonalRamp": [
+          "oklch(15% 0.017 131.4)",
+          "oklch(25% 0.024 131.4)",
+          "oklch(35% 0.029 131.4)",
+          "oklch(45% 0.033 131.4)",
+          "oklch(55% 0.033 131.4)",
+          "oklch(65% 0.029 131.4)",
+          "oklch(80% 0.020 131.4)",
+          "oklch(95% 0.007 131.4)"
+        ]
+      },
+      "folio-dark-focus-ring": {
+        "role": "primary",
+        "displayName": "Folio Dark Focus Ring",
+        "canonical": "#b4d4a8",
+        "tonalRamp": [
+          "oklch(15% 0.021 137.2)",
+          "oklch(25% 0.048 137.2)",
+          "oklch(35% 0.058 137.2)",
+          "oklch(45% 0.065 137.2)",
+          "oklch(55% 0.065 137.2)",
+          "oklch(65% 0.058 137.2)",
+          "oklch(80% 0.040 137.2)",
+          "oklch(95% 0.014 137.2)"
+        ]
+      },
+      "folio-dark-primary": {
+        "role": "primary",
+        "displayName": "Folio Dark Primary",
+        "canonical": "hsl(104 34% 75%)",
+        "tonalRamp": [
+          "oklch(15% 0.021 137.4)",
+          "oklch(25% 0.048 137.4)",
+          "oklch(35% 0.057 137.4)",
+          "oklch(45% 0.064 137.4)",
+          "oklch(55% 0.064 137.4)",
+          "oklch(65% 0.057 137.4)",
+          "oklch(80% 0.040 137.4)",
+          "oklch(95% 0.014 137.4)"
+        ]
+      },
+      "folio-dark-primary-foreground": {
+        "role": "neutral",
+        "displayName": "Folio Dark Primary Foreground",
+        "canonical": "hsl(141 25% 14%)",
+        "tonalRamp": [
+          "oklch(15% 0.015 155.2)",
+          "oklch(25% 0.022 155.2)",
+          "oklch(35% 0.027 155.2)",
+          "oklch(45% 0.030 155.2)",
+          "oklch(55% 0.030 155.2)",
+          "oklch(65% 0.027 155.2)",
+          "oklch(80% 0.019 155.2)",
+          "oklch(95% 0.006 155.2)"
+        ]
+      },
+      "folio-dark-ring": {
+        "role": "primary",
+        "displayName": "Folio Dark Ring",
+        "canonical": "hsl(104 34% 75%)",
+        "tonalRamp": [
+          "oklch(15% 0.021 137.4)",
+          "oklch(25% 0.048 137.4)",
+          "oklch(35% 0.057 137.4)",
+          "oklch(45% 0.064 137.4)",
+          "oklch(55% 0.064 137.4)",
+          "oklch(65% 0.057 137.4)",
+          "oklch(80% 0.040 137.4)",
+          "oklch(95% 0.014 137.4)"
+        ]
+      },
+      "folio-dark-code-bg": {
+        "role": "neutral",
+        "displayName": "Folio Dark Code Bg",
+        "canonical": "#2a3b2e",
+        "tonalRamp": [
+          "oklch(15% 0.015 151.6)",
+          "oklch(25% 0.022 151.6)",
+          "oklch(35% 0.027 151.6)",
+          "oklch(45% 0.030 151.6)",
+          "oklch(55% 0.030 151.6)",
+          "oklch(65% 0.027 151.6)",
+          "oklch(80% 0.018 151.6)",
+          "oklch(95% 0.006 151.6)"
+        ]
+      },
+      "folio-dark-md-table-bg": {
+        "role": "neutral",
+        "displayName": "Folio Dark Md Table Bg",
+        "canonical": "#293b2f",
+        "tonalRamp": [
+          "oklch(15% 0.015 155.2)",
+          "oklch(25% 0.022 155.2)",
+          "oklch(35% 0.026 155.2)",
+          "oklch(45% 0.030 155.2)",
+          "oklch(55% 0.030 155.2)",
+          "oklch(65% 0.026 155.2)",
+          "oklch(80% 0.018 155.2)",
+          "oklch(95% 0.006 155.2)"
+        ]
+      },
+      "folio-dark-terminal-bg": {
+        "role": "neutral",
+        "displayName": "Folio Dark Terminal Bg",
+        "canonical": "#1c2b22",
+        "tonalRamp": [
+          "oklch(15% 0.013 157.8)",
+          "oklch(25% 0.018 157.8)",
+          "oklch(35% 0.022 157.8)",
+          "oklch(45% 0.025 157.8)",
+          "oklch(55% 0.025 157.8)",
+          "oklch(65% 0.022 157.8)",
+          "oklch(80% 0.015 157.8)",
+          "oklch(95% 0.005 157.8)"
+        ]
+      },
+      "folio-dark-terminal-fg": {
+        "role": "neutral",
+        "displayName": "Folio Dark Terminal Fg",
+        "canonical": "#e0e8d9",
+        "tonalRamp": [
+          "oklch(15% 0.010 130.0)",
+          "oklch(25% 0.015 130.0)",
+          "oklch(35% 0.018 130.0)",
+          "oklch(45% 0.020 130.0)",
+          "oklch(55% 0.020 130.0)",
+          "oklch(65% 0.018 130.0)",
+          "oklch(80% 0.013 130.0)",
+          "oklch(95% 0.004 130.0)"
+        ]
+      },
+      "folio-dark-terminal-selection": {
+        "role": "neutral",
+        "displayName": "Folio Dark Terminal Selection",
+        "canonical": "#435b41",
+        "tonalRamp": [
+          "oklch(15% 0.023 142.8)",
+          "oklch(25% 0.036 142.8)",
+          "oklch(35% 0.043 142.8)",
+          "oklch(45% 0.048 142.8)",
+          "oklch(55% 0.048 142.8)",
+          "oklch(65% 0.043 142.8)",
+          "oklch(80% 0.030 142.8)",
+          "oklch(95% 0.010 142.8)"
+        ]
+      },
+      "folio-dark-studio-nav": {
+        "role": "secondary",
+        "displayName": "Folio Dark Studio Nav",
+        "canonical": "#12241d",
+        "tonalRamp": [
+          "oklch(15% 0.013 167.3)",
+          "oklch(25% 0.019 167.3)",
+          "oklch(35% 0.023 167.3)",
+          "oklch(45% 0.026 167.3)",
+          "oklch(55% 0.026 167.3)",
+          "oklch(65% 0.023 167.3)",
+          "oklch(80% 0.016 167.3)",
+          "oklch(95% 0.006 167.3)"
+        ]
+      },
+      "folio-dark-studio-nav-ink": {
+        "role": "secondary",
+        "displayName": "Folio Dark Studio Nav Ink",
+        "canonical": "#e4eadf",
+        "tonalRamp": [
+          "oklch(15% 0.008 130.4)",
+          "oklch(25% 0.011 130.4)",
+          "oklch(35% 0.013 130.4)",
+          "oklch(45% 0.015 130.4)",
+          "oklch(55% 0.015 130.4)",
+          "oklch(65% 0.013 130.4)",
+          "oklch(80% 0.009 130.4)",
+          "oklch(95% 0.003 130.4)"
+        ]
+      },
+      "folio-dark-studio-nav-muted": {
+        "role": "secondary",
+        "displayName": "Folio Dark Studio Nav Muted",
+        "canonical": "#bbcbb5",
+        "tonalRamp": [
+          "oklch(15% 0.017 137.1)",
+          "oklch(25% 0.024 137.1)",
+          "oklch(35% 0.029 137.1)",
+          "oklch(45% 0.033 137.1)",
+          "oklch(55% 0.033 137.1)",
+          "oklch(65% 0.029 137.1)",
+          "oklch(80% 0.020 137.1)",
+          "oklch(95% 0.007 137.1)"
+        ]
+      },
+      "folio-dark-studio-nav-hover": {
+        "role": "secondary",
+        "displayName": "Folio Dark Studio Nav Hover",
+        "canonical": "#283f2f",
+        "tonalRamp": [
+          "oklch(15% 0.017 153.5)",
+          "oklch(25% 0.028 153.5)",
+          "oklch(35% 0.034 153.5)",
+          "oklch(45% 0.038 153.5)",
+          "oklch(55% 0.038 153.5)",
+          "oklch(65% 0.034 153.5)",
+          "oklch(80% 0.023 153.5)",
+          "oklch(95% 0.008 153.5)"
+        ]
+      },
+      "folio-dark-studio-nav-border": {
+        "role": "secondary",
+        "displayName": "Folio Dark Studio Nav Border",
+        "canonical": "#4c6449",
+        "tonalRamp": [
+          "oklch(15% 0.023 141.9)",
+          "oklch(25% 0.036 141.9)",
+          "oklch(35% 0.043 141.9)",
+          "oklch(45% 0.048 141.9)",
+          "oklch(55% 0.048 141.9)",
+          "oklch(65% 0.043 141.9)",
+          "oklch(80% 0.030 141.9)",
+          "oklch(95% 0.010 141.9)"
+        ]
+      },
+      "folio-dark-studio-selection": {
+        "role": "secondary",
+        "displayName": "Folio Dark Studio Selection",
+        "canonical": "#35523d",
+        "tonalRamp": [
+          "oklch(15% 0.018 152.4)",
+          "oklch(25% 0.035 152.4)",
+          "oklch(35% 0.042 152.4)",
+          "oklch(45% 0.047 152.4)",
+          "oklch(55% 0.047 152.4)",
+          "oklch(65% 0.042 152.4)",
+          "oklch(80% 0.029 152.4)",
+          "oklch(95% 0.010 152.4)"
+        ]
+      },
+      "folio-dark-studio-reading": {
+        "role": "secondary",
+        "displayName": "Folio Dark Studio Reading",
+        "canonical": "#202d27",
+        "tonalRamp": [
+          "oklch(15% 0.010 165.0)",
+          "oklch(25% 0.015 165.0)",
+          "oklch(35% 0.018 165.0)",
+          "oklch(45% 0.020 165.0)",
+          "oklch(55% 0.020 165.0)",
+          "oklch(65% 0.018 165.0)",
+          "oklch(80% 0.012 165.0)",
+          "oklch(95% 0.004 165.0)"
+        ]
+      },
+      "folio-dark-studio-user": {
+        "role": "secondary",
+        "displayName": "Folio Dark Studio User",
+        "canonical": "#314333",
+        "tonalRamp": [
+          "oklch(15% 0.017 147.7)",
+          "oklch(25% 0.025 147.7)",
+          "oklch(35% 0.030 147.7)",
+          "oklch(45% 0.034 147.7)",
+          "oklch(55% 0.034 147.7)",
+          "oklch(65% 0.030 147.7)",
+          "oklch(80% 0.021 147.7)",
+          "oklch(95% 0.007 147.7)"
+        ]
+      },
+      "folio-dark-studio-caption": {
+        "role": "neutral",
+        "displayName": "Folio Dark Studio Caption",
+        "canonical": "#12241d",
+        "tonalRamp": [
+          "oklch(15% 0.013 167.3)",
+          "oklch(25% 0.019 167.3)",
+          "oklch(35% 0.023 167.3)",
+          "oklch(45% 0.026 167.3)",
+          "oklch(55% 0.026 167.3)",
+          "oklch(65% 0.023 167.3)",
+          "oklch(80% 0.016 167.3)",
+          "oklch(95% 0.006 167.3)"
+        ]
+      },
+      "folio-dark-studio-caption-ink": {
+        "role": "neutral",
+        "displayName": "Folio Dark Studio Caption Ink",
+        "canonical": "#e4eadf",
+        "tonalRamp": [
+          "oklch(15% 0.008 130.4)",
+          "oklch(25% 0.011 130.4)",
+          "oklch(35% 0.013 130.4)",
+          "oklch(45% 0.015 130.4)",
+          "oklch(55% 0.015 130.4)",
+          "oklch(65% 0.013 130.4)",
+          "oklch(80% 0.009 130.4)",
+          "oklch(95% 0.003 130.4)"
+        ]
+      },
+      "folio-dark-overlay-bg": {
+        "role": "neutral",
+        "displayName": "Folio Dark Overlay Bg",
+        "canonical": "rgb(24 42 30 / 30%)",
+        "tonalRamp": [
+          "oklch(15% 0.016 154.4)",
+          "oklch(25% 0.023 154.4)",
+          "oklch(35% 0.028 154.4)",
+          "oklch(45% 0.031 154.4)",
+          "oklch(55% 0.031 154.4)",
+          "oklch(65% 0.028 154.4)",
+          "oklch(80% 0.019 154.4)",
+          "oklch(95% 0.007 154.4)"
+        ]
+      },
+      "folio-dark-sidebar-text-primary": {
+        "role": "neutral",
+        "displayName": "Folio Dark Sidebar Text Primary",
+        "canonical": "#e4eadf",
+        "tonalRamp": [
+          "oklch(15% 0.008 130.4)",
+          "oklch(25% 0.011 130.4)",
+          "oklch(35% 0.013 130.4)",
+          "oklch(45% 0.015 130.4)",
+          "oklch(55% 0.015 130.4)",
+          "oklch(65% 0.013 130.4)",
+          "oklch(80% 0.009 130.4)",
+          "oklch(95% 0.003 130.4)"
+        ]
+      },
+      "folio-dark-sidebar-text-body-strong": {
+        "role": "neutral",
+        "displayName": "Folio Dark Sidebar Text Body Strong",
+        "canonical": "#e4eadf",
+        "tonalRamp": [
+          "oklch(15% 0.008 130.4)",
+          "oklch(25% 0.011 130.4)",
+          "oklch(35% 0.013 130.4)",
+          "oklch(45% 0.015 130.4)",
+          "oklch(55% 0.015 130.4)",
+          "oklch(65% 0.013 130.4)",
+          "oklch(80% 0.009 130.4)",
+          "oklch(95% 0.003 130.4)"
+        ]
+      },
+      "folio-dark-sidebar-muted-readable": {
+        "role": "neutral",
+        "displayName": "Folio Dark Sidebar Muted Readable",
+        "canonical": "#bbcbb5",
+        "tonalRamp": [
+          "oklch(15% 0.017 137.1)",
+          "oklch(25% 0.024 137.1)",
+          "oklch(35% 0.029 137.1)",
+          "oklch(45% 0.033 137.1)",
+          "oklch(55% 0.033 137.1)",
+          "oklch(65% 0.029 137.1)",
+          "oklch(80% 0.020 137.1)",
+          "oklch(95% 0.007 137.1)"
+        ]
+      },
+      "folio-dark-sidebar-text-secondary": {
+        "role": "neutral",
+        "displayName": "Folio Dark Sidebar Text Secondary",
+        "canonical": "#bbcbb5",
+        "tonalRamp": [
+          "oklch(15% 0.017 137.1)",
+          "oklch(25% 0.024 137.1)",
+          "oklch(35% 0.029 137.1)",
+          "oklch(45% 0.033 137.1)",
+          "oklch(55% 0.033 137.1)",
+          "oklch(65% 0.029 137.1)",
+          "oklch(80% 0.020 137.1)",
+          "oklch(95% 0.007 137.1)"
+        ]
+      },
+      "folio-dark-sidebar-text-placeholder": {
+        "role": "neutral",
+        "displayName": "Folio Dark Sidebar Text Placeholder",
+        "canonical": "#bbcbb5",
+        "tonalRamp": [
+          "oklch(15% 0.017 137.1)",
+          "oklch(25% 0.024 137.1)",
+          "oklch(35% 0.029 137.1)",
+          "oklch(45% 0.033 137.1)",
+          "oklch(55% 0.033 137.1)",
+          "oklch(65% 0.029 137.1)",
+          "oklch(80% 0.020 137.1)",
+          "oklch(95% 0.007 137.1)"
+        ]
+      },
+      "pixel-light-surface": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface",
+        "canonical": "#f1f1f6",
+        "tonalRamp": [
+          "oklch(15% 0.003 286.3)",
+          "oklch(25% 0.005 286.3)",
+          "oklch(35% 0.006 286.3)",
+          "oklch(45% 0.006 286.3)",
+          "oklch(55% 0.006 286.3)",
+          "oklch(65% 0.006 286.3)",
+          "oklch(80% 0.004 286.3)",
+          "oklch(95% 0.001 286.3)"
+        ]
+      },
+      "pixel-light-surface-hsl": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface Hsl",
+        "canonical": "hsl(240 22% 95%)",
+        "tonalRamp": [
+          "oklch(15% 0.004 286.3)",
+          "oklch(25% 0.005 286.3)",
+          "oklch(35% 0.006 286.3)",
+          "oklch(45% 0.007 286.3)",
+          "oklch(55% 0.007 286.3)",
+          "oklch(65% 0.006 286.3)",
+          "oklch(80% 0.004 286.3)",
+          "oklch(95% 0.001 286.3)"
+        ]
+      },
+      "pixel-light-surface-elevated": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface Elevated",
+        "canonical": "#fff",
+        "tonalRamp": [
+          "oklch(15% 0.000 0.0)",
+          "oklch(25% 0.000 0.0)",
+          "oklch(35% 0.000 0.0)",
+          "oklch(45% 0.000 0.0)",
+          "oklch(55% 0.000 0.0)",
+          "oklch(65% 0.000 0.0)",
+          "oklch(80% 0.000 0.0)",
+          "oklch(95% 0.000 0.0)"
+        ]
+      },
+      "pixel-light-surface-elevated-soft": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface Elevated Soft",
+        "canonical": "#eeeefa",
+        "tonalRamp": [
+          "oklch(15% 0.008 286.1)",
+          "oklch(25% 0.011 286.1)",
+          "oklch(35% 0.013 286.1)",
+          "oklch(45% 0.015 286.1)",
+          "oklch(55% 0.015 286.1)",
+          "oklch(65% 0.013 286.1)",
+          "oklch(80% 0.009 286.1)",
+          "oklch(95% 0.003 286.1)"
+        ]
+      },
+      "pixel-light-surface-card-ivory": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface Card Ivory",
+        "canonical": "#f5f5fa",
+        "tonalRamp": [
+          "oklch(15% 0.003 286.3)",
+          "oklch(25% 0.005 286.3)",
+          "oklch(35% 0.006 286.3)",
+          "oklch(45% 0.006 286.3)",
+          "oklch(55% 0.006 286.3)",
+          "oklch(65% 0.006 286.3)",
+          "oklch(80% 0.004 286.3)",
+          "oklch(95% 0.001 286.3)"
+        ]
+      },
+      "pixel-light-surface-chip": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface Chip",
+        "canonical": "#e6e7f1",
+        "tonalRamp": [
+          "oklch(15% 0.006 281.6)",
+          "oklch(25% 0.009 281.6)",
+          "oklch(35% 0.011 281.6)",
+          "oklch(45% 0.013 281.6)",
+          "oklch(55% 0.013 281.6)",
+          "oklch(65% 0.011 281.6)",
+          "oklch(80% 0.008 281.6)",
+          "oklch(95% 0.003 281.6)"
+        ]
+      },
+      "pixel-light-surface-chip-alt": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface Chip Alt",
+        "canonical": "#eeeef7",
+        "tonalRamp": [
+          "oklch(15% 0.006 286.2)",
+          "oklch(25% 0.008 286.2)",
+          "oklch(35% 0.010 286.2)",
+          "oklch(45% 0.011 286.2)",
+          "oklch(55% 0.011 286.2)",
+          "oklch(65% 0.010 286.2)",
+          "oklch(80% 0.007 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "pixel-light-surface-hover": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface Hover",
+        "canonical": "#e3e4f3",
+        "tonalRamp": [
+          "oklch(15% 0.010 282.9)",
+          "oklch(25% 0.014 282.9)",
+          "oklch(35% 0.017 282.9)",
+          "oklch(45% 0.019 282.9)",
+          "oklch(55% 0.019 282.9)",
+          "oklch(65% 0.017 282.9)",
+          "oklch(80% 0.012 282.9)",
+          "oklch(95% 0.004 282.9)"
+        ]
+      },
+      "pixel-light-surface-hover-soft": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface Hover Soft",
+        "canonical": "#ededf8",
+        "tonalRamp": [
+          "oklch(15% 0.007 286.1)",
+          "oklch(25% 0.010 286.1)",
+          "oklch(35% 0.012 286.1)",
+          "oklch(45% 0.014 286.1)",
+          "oklch(55% 0.014 286.1)",
+          "oklch(65% 0.012 286.1)",
+          "oklch(80% 0.009 286.1)",
+          "oklch(95% 0.003 286.1)"
+        ]
+      },
+      "pixel-light-surface-on-card": {
+        "role": "neutral",
+        "displayName": "Pixel Light Surface On Card",
+        "canonical": "#fff",
+        "tonalRamp": [
+          "oklch(15% 0.000 0.0)",
+          "oklch(25% 0.000 0.0)",
+          "oklch(35% 0.000 0.0)",
+          "oklch(45% 0.000 0.0)",
+          "oklch(55% 0.000 0.0)",
+          "oklch(65% 0.000 0.0)",
+          "oklch(80% 0.000 0.0)",
+          "oklch(95% 0.000 0.0)"
+        ]
+      },
+      "pixel-light-panel-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Light Panel Bg",
+        "canonical": "#f3f3f8",
+        "tonalRamp": [
+          "oklch(15% 0.003 286.3)",
+          "oklch(25% 0.005 286.3)",
+          "oklch(35% 0.006 286.3)",
+          "oklch(45% 0.006 286.3)",
+          "oklch(55% 0.006 286.3)",
+          "oklch(65% 0.006 286.3)",
+          "oklch(80% 0.004 286.3)",
+          "oklch(95% 0.001 286.3)"
+        ]
+      },
+      "pixel-light-border-default": {
+        "role": "neutral",
+        "displayName": "Pixel Light Border Default",
+        "canonical": "#c5c6d8",
+        "tonalRamp": [
+          "oklch(15% 0.012 283.3)",
+          "oklch(25% 0.018 283.3)",
+          "oklch(35% 0.021 283.3)",
+          "oklch(45% 0.024 283.3)",
+          "oklch(55% 0.024 283.3)",
+          "oklch(65% 0.021 283.3)",
+          "oklch(80% 0.015 283.3)",
+          "oklch(95% 0.005 283.3)"
+        ]
+      },
+      "pixel-light-soft-border": {
+        "role": "neutral",
+        "displayName": "Pixel Light Soft Border",
+        "canonical": "#dddde9",
+        "tonalRamp": [
+          "oklch(15% 0.008 286.1)",
+          "oklch(25% 0.011 286.1)",
+          "oklch(35% 0.014 286.1)",
+          "oklch(45% 0.015 286.1)",
+          "oklch(55% 0.015 286.1)",
+          "oklch(65% 0.014 286.1)",
+          "oklch(80% 0.009 286.1)",
+          "oklch(95% 0.003 286.1)"
+        ]
+      },
+      "pixel-light-input-border": {
+        "role": "neutral",
+        "displayName": "Pixel Light Input Border",
+        "canonical": "#8586a5",
+        "tonalRamp": [
+          "oklch(15% 0.022 283.5)",
+          "oklch(25% 0.032 283.5)",
+          "oklch(35% 0.039 283.5)",
+          "oklch(45% 0.044 283.5)",
+          "oklch(55% 0.044 283.5)",
+          "oklch(65% 0.039 283.5)",
+          "oklch(80% 0.027 283.5)",
+          "oklch(95% 0.005 283.5)"
+        ]
+      },
+      "pixel-light-text-primary": {
+        "role": "neutral",
+        "displayName": "Pixel Light Text Primary",
+        "canonical": "#262633",
+        "tonalRamp": [
+          "oklch(15% 0.011 284.7)",
+          "oklch(25% 0.017 284.7)",
+          "oklch(35% 0.020 284.7)",
+          "oklch(45% 0.022 284.7)",
+          "oklch(55% 0.022 284.7)",
+          "oklch(65% 0.020 284.7)",
+          "oklch(80% 0.014 284.7)",
+          "oklch(95% 0.005 284.7)"
+        ]
+      },
+      "pixel-light-text-primary-emphasis": {
+        "role": "neutral",
+        "displayName": "Pixel Light Text Primary Emphasis",
+        "canonical": "#191925",
+        "tonalRamp": [
+          "oklch(15% 0.011 284.3)",
+          "oklch(25% 0.016 284.3)",
+          "oklch(35% 0.020 284.3)",
+          "oklch(45% 0.022 284.3)",
+          "oklch(55% 0.022 284.3)",
+          "oklch(65% 0.020 284.3)",
+          "oklch(80% 0.014 284.3)",
+          "oklch(95% 0.005 284.3)"
+        ]
+      },
+      "pixel-light-text-primary-body-strong": {
+        "role": "neutral",
+        "displayName": "Pixel Light Text Primary Body Strong",
+        "canonical": "#44445b",
+        "tonalRamp": [
+          "oklch(15% 0.019 284.5)",
+          "oklch(25% 0.027 284.5)",
+          "oklch(35% 0.032 284.5)",
+          "oklch(45% 0.036 284.5)",
+          "oklch(55% 0.036 284.5)",
+          "oklch(65% 0.032 284.5)",
+          "oklch(80% 0.022 284.5)",
+          "oklch(95% 0.005 284.5)"
+        ]
+      },
+      "pixel-light-text-secondary": {
+        "role": "neutral",
+        "displayName": "Pixel Light Text Secondary",
+        "canonical": "#606074",
+        "tonalRamp": [
+          "oklch(15% 0.015 285.2)",
+          "oklch(25% 0.022 285.2)",
+          "oklch(35% 0.027 285.2)",
+          "oklch(45% 0.030 285.2)",
+          "oklch(55% 0.030 285.2)",
+          "oklch(65% 0.027 285.2)",
+          "oklch(80% 0.018 285.2)",
+          "oklch(95% 0.005 285.2)"
+        ]
+      },
+      "pixel-light-text-secondary-mid": {
+        "role": "neutral",
+        "displayName": "Pixel Light Text Secondary Mid",
+        "canonical": "#606074",
+        "tonalRamp": [
+          "oklch(15% 0.015 285.2)",
+          "oklch(25% 0.022 285.2)",
+          "oklch(35% 0.027 285.2)",
+          "oklch(45% 0.030 285.2)",
+          "oklch(55% 0.030 285.2)",
+          "oklch(65% 0.027 285.2)",
+          "oklch(80% 0.018 285.2)",
+          "oklch(95% 0.005 285.2)"
+        ]
+      },
+      "pixel-light-muted-readable": {
+        "role": "neutral",
+        "displayName": "Pixel Light Muted Readable",
+        "canonical": "#606074",
+        "tonalRamp": [
+          "oklch(15% 0.015 285.2)",
+          "oklch(25% 0.022 285.2)",
+          "oklch(35% 0.027 285.2)",
+          "oklch(45% 0.030 285.2)",
+          "oklch(55% 0.030 285.2)",
+          "oklch(65% 0.027 285.2)",
+          "oklch(80% 0.018 285.2)",
+          "oklch(95% 0.005 285.2)"
+        ]
+      },
+      "pixel-light-text-placeholder": {
+        "role": "neutral",
+        "displayName": "Pixel Light Text Placeholder",
+        "canonical": "#6a6a80",
+        "tonalRamp": [
+          "oklch(15% 0.016 285.2)",
+          "oklch(25% 0.024 285.2)",
+          "oklch(35% 0.029 285.2)",
+          "oklch(45% 0.032 285.2)",
+          "oklch(55% 0.032 285.2)",
+          "oklch(65% 0.029 285.2)",
+          "oklch(80% 0.020 285.2)",
+          "oklch(95% 0.005 285.2)"
+        ]
+      },
+      "pixel-light-accent-cta-bg": {
+        "role": "primary",
+        "displayName": "Pixel Light Accent Cta Bg",
+        "canonical": "#4e58c4",
+        "tonalRamp": [
+          "oklch(15% 0.043 274.9)",
+          "oklch(25% 0.103 274.9)",
+          "oklch(35% 0.140 274.9)",
+          "oklch(45% 0.157 274.9)",
+          "oklch(55% 0.157 274.9)",
+          "oklch(65% 0.140 274.9)",
+          "oklch(80% 0.055 274.9)",
+          "oklch(95% 0.004 274.9)"
+        ]
+      },
+      "pixel-light-accent-cta-bg-pure": {
+        "role": "primary",
+        "displayName": "Pixel Light Accent Cta Bg Pure",
+        "canonical": "#4e58c4",
+        "tonalRamp": [
+          "oklch(15% 0.043 274.9)",
+          "oklch(25% 0.103 274.9)",
+          "oklch(35% 0.140 274.9)",
+          "oklch(45% 0.157 274.9)",
+          "oklch(55% 0.157 274.9)",
+          "oklch(65% 0.140 274.9)",
+          "oklch(80% 0.055 274.9)",
+          "oklch(95% 0.004 274.9)"
+        ]
+      },
+      "pixel-light-accent-emphasis": {
+        "role": "primary",
+        "displayName": "Pixel Light Accent Emphasis",
+        "canonical": "#464fb5",
+        "tonalRamp": [
+          "oklch(15% 0.043 274.8)",
+          "oklch(25% 0.104 274.8)",
+          "oklch(35% 0.134 274.8)",
+          "oklch(45% 0.150 274.8)",
+          "oklch(55% 0.150 274.8)",
+          "oklch(65% 0.134 274.8)",
+          "oklch(80% 0.055 274.8)",
+          "oklch(95% 0.004 274.8)"
+        ]
+      },
+      "pixel-light-accent-soft": {
+        "role": "neutral",
+        "displayName": "Pixel Light Accent Soft",
+        "canonical": "#e1e3fc",
+        "tonalRamp": [
+          "oklch(15% 0.016 282.1)",
+          "oklch(25% 0.024 282.1)",
+          "oklch(35% 0.029 282.1)",
+          "oklch(45% 0.032 282.1)",
+          "oklch(55% 0.032 282.1)",
+          "oklch(65% 0.029 282.1)",
+          "oklch(80% 0.020 282.1)",
+          "oklch(95% 0.005 282.1)"
+        ]
+      },
+      "pixel-light-accent-hover": {
+        "role": "primary",
+        "displayName": "Pixel Light Accent Hover",
+        "canonical": "#3d47aa",
+        "tonalRamp": [
+          "oklch(15% 0.043 273.9)",
+          "oklch(25% 0.104 273.9)",
+          "oklch(35% 0.132 273.9)",
+          "oklch(45% 0.148 273.9)",
+          "oklch(55% 0.148 273.9)",
+          "oklch(65% 0.132 273.9)",
+          "oklch(80% 0.055 273.9)",
+          "oklch(95% 0.004 273.9)"
+        ]
+      },
+      "pixel-light-accent-pure-cta-fg": {
+        "role": "neutral",
+        "displayName": "Pixel Light Accent Pure Cta Fg",
+        "canonical": "#fff",
+        "tonalRamp": [
+          "oklch(15% 0.000 0.0)",
+          "oklch(25% 0.000 0.0)",
+          "oklch(35% 0.000 0.0)",
+          "oklch(45% 0.000 0.0)",
+          "oklch(55% 0.000 0.0)",
+          "oklch(65% 0.000 0.0)",
+          "oklch(80% 0.000 0.0)",
+          "oklch(95% 0.000 0.0)"
+        ]
+      },
+      "pixel-light-segmented-option-fg": {
+        "role": "neutral",
+        "displayName": "Pixel Light Segmented Option Fg",
+        "canonical": "#606074",
+        "tonalRamp": [
+          "oklch(15% 0.015 285.2)",
+          "oklch(25% 0.022 285.2)",
+          "oklch(35% 0.027 285.2)",
+          "oklch(45% 0.030 285.2)",
+          "oklch(55% 0.030 285.2)",
+          "oklch(65% 0.027 285.2)",
+          "oklch(80% 0.018 285.2)",
+          "oklch(95% 0.005 285.2)"
+        ]
+      },
+      "pixel-light-focus-ring": {
+        "role": "primary",
+        "displayName": "Pixel Light Focus Ring",
+        "canonical": "#4e58c4",
+        "tonalRamp": [
+          "oklch(15% 0.043 274.9)",
+          "oklch(25% 0.103 274.9)",
+          "oklch(35% 0.140 274.9)",
+          "oklch(45% 0.157 274.9)",
+          "oklch(55% 0.157 274.9)",
+          "oklch(65% 0.140 274.9)",
+          "oklch(80% 0.055 274.9)",
+          "oklch(95% 0.004 274.9)"
+        ]
+      },
+      "pixel-light-primary": {
+        "role": "primary",
+        "displayName": "Pixel Light Primary",
+        "canonical": "hsl(235 50% 54%)",
+        "tonalRamp": [
+          "oklch(15% 0.043 275.0)",
+          "oklch(25% 0.103 275.0)",
+          "oklch(35% 0.139 275.0)",
+          "oklch(45% 0.156 275.0)",
+          "oklch(55% 0.156 275.0)",
+          "oklch(65% 0.139 275.0)",
+          "oklch(80% 0.055 275.0)",
+          "oklch(95% 0.004 275.0)"
+        ]
+      },
+      "pixel-light-primary-foreground": {
+        "role": "neutral",
+        "displayName": "Pixel Light Primary Foreground",
+        "canonical": "hsl(0 0% 100%)",
+        "tonalRamp": [
+          "oklch(15% 0.000 0.0)",
+          "oklch(25% 0.000 0.0)",
+          "oklch(35% 0.000 0.0)",
+          "oklch(45% 0.000 0.0)",
+          "oklch(55% 0.000 0.0)",
+          "oklch(65% 0.000 0.0)",
+          "oklch(80% 0.000 0.0)",
+          "oklch(95% 0.000 0.0)"
+        ]
+      },
+      "pixel-light-ring": {
+        "role": "primary",
+        "displayName": "Pixel Light Ring",
+        "canonical": "hsl(235 50% 54%)",
+        "tonalRamp": [
+          "oklch(15% 0.043 275.0)",
+          "oklch(25% 0.103 275.0)",
+          "oklch(35% 0.139 275.0)",
+          "oklch(45% 0.156 275.0)",
+          "oklch(55% 0.156 275.0)",
+          "oklch(65% 0.139 275.0)",
+          "oklch(80% 0.055 275.0)",
+          "oklch(95% 0.004 275.0)"
+        ]
+      },
+      "pixel-light-code-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Light Code Bg",
+        "canonical": "#efeff8",
+        "tonalRamp": [
+          "oklch(15% 0.006 286.2)",
+          "oklch(25% 0.008 286.2)",
+          "oklch(35% 0.010 286.2)",
+          "oklch(45% 0.011 286.2)",
+          "oklch(55% 0.011 286.2)",
+          "oklch(65% 0.010 286.2)",
+          "oklch(80% 0.007 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "pixel-light-md-table-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Light Md Table Bg",
+        "canonical": "#f0f0f9",
+        "tonalRamp": [
+          "oklch(15% 0.006 286.2)",
+          "oklch(25% 0.008 286.2)",
+          "oklch(35% 0.010 286.2)",
+          "oklch(45% 0.011 286.2)",
+          "oklch(55% 0.011 286.2)",
+          "oklch(65% 0.010 286.2)",
+          "oklch(80% 0.007 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "pixel-light-terminal-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Light Terminal Bg",
+        "canonical": "#efeff6",
+        "tonalRamp": [
+          "oklch(15% 0.004 286.2)",
+          "oklch(25% 0.007 286.2)",
+          "oklch(35% 0.008 286.2)",
+          "oklch(45% 0.009 286.2)",
+          "oklch(55% 0.009 286.2)",
+          "oklch(65% 0.008 286.2)",
+          "oklch(80% 0.005 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "pixel-light-terminal-fg": {
+        "role": "neutral",
+        "displayName": "Pixel Light Terminal Fg",
+        "canonical": "#333345",
+        "tonalRamp": [
+          "oklch(15% 0.015 284.5)",
+          "oklch(25% 0.022 284.5)",
+          "oklch(35% 0.027 284.5)",
+          "oklch(45% 0.030 284.5)",
+          "oklch(55% 0.030 284.5)",
+          "oklch(65% 0.027 284.5)",
+          "oklch(80% 0.018 284.5)",
+          "oklch(95% 0.005 284.5)"
+        ]
+      },
+      "pixel-light-terminal-selection": {
+        "role": "neutral",
+        "displayName": "Pixel Light Terminal Selection",
+        "canonical": "#d6d8f3",
+        "tonalRamp": [
+          "oklch(15% 0.018 282.3)",
+          "oklch(25% 0.026 282.3)",
+          "oklch(35% 0.031 282.3)",
+          "oklch(45% 0.035 282.3)",
+          "oklch(55% 0.035 282.3)",
+          "oklch(65% 0.031 282.3)",
+          "oklch(80% 0.021 282.3)",
+          "oklch(95% 0.005 282.3)"
+        ]
+      },
+      "pixel-light-studio-nav": {
+        "role": "secondary",
+        "displayName": "Pixel Light Studio Nav",
+        "canonical": "#202127",
+        "tonalRamp": [
+          "oklch(15% 0.005 278.0)",
+          "oklch(25% 0.008 278.0)",
+          "oklch(35% 0.010 278.0)",
+          "oklch(45% 0.011 278.0)",
+          "oklch(55% 0.011 278.0)",
+          "oklch(65% 0.010 278.0)",
+          "oklch(80% 0.007 278.0)",
+          "oklch(95% 0.002 278.0)"
+        ]
+      },
+      "pixel-light-studio-nav-ink": {
+        "role": "secondary",
+        "displayName": "Pixel Light Studio Nav Ink",
+        "canonical": "#f0f0f8",
+        "tonalRamp": [
+          "oklch(15% 0.005 286.2)",
+          "oklch(25% 0.007 286.2)",
+          "oklch(35% 0.009 286.2)",
+          "oklch(45% 0.010 286.2)",
+          "oklch(55% 0.010 286.2)",
+          "oklch(65% 0.009 286.2)",
+          "oklch(80% 0.006 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "pixel-light-studio-nav-muted": {
+        "role": "secondary",
+        "displayName": "Pixel Light Studio Nav Muted",
+        "canonical": "#bcbeca",
+        "tonalRamp": [
+          "oklch(15% 0.008 278.4)",
+          "oklch(25% 0.012 278.4)",
+          "oklch(35% 0.014 278.4)",
+          "oklch(45% 0.016 278.4)",
+          "oklch(55% 0.016 278.4)",
+          "oklch(65% 0.014 278.4)",
+          "oklch(80% 0.010 278.4)",
+          "oklch(95% 0.003 278.4)"
+        ]
+      },
+      "pixel-light-studio-nav-hover": {
+        "role": "secondary",
+        "displayName": "Pixel Light Studio Nav Hover",
+        "canonical": "#30313e",
+        "tonalRamp": [
+          "oklch(15% 0.011 281.5)",
+          "oklch(25% 0.016 281.5)",
+          "oklch(35% 0.019 281.5)",
+          "oklch(45% 0.022 281.5)",
+          "oklch(55% 0.022 281.5)",
+          "oklch(65% 0.019 281.5)",
+          "oklch(80% 0.013 281.5)",
+          "oklch(95% 0.005 281.5)"
+        ]
+      },
+      "pixel-light-studio-nav-border": {
+        "role": "secondary",
+        "displayName": "Pixel Light Studio Nav Border",
+        "canonical": "#575969",
+        "tonalRamp": [
+          "oklch(15% 0.012 279.7)",
+          "oklch(25% 0.018 279.7)",
+          "oklch(35% 0.022 279.7)",
+          "oklch(45% 0.024 279.7)",
+          "oklch(55% 0.024 279.7)",
+          "oklch(65% 0.022 279.7)",
+          "oklch(80% 0.015 279.7)",
+          "oklch(95% 0.005 279.7)"
+        ]
+      },
+      "pixel-light-studio-selection": {
+        "role": "secondary",
+        "displayName": "Pixel Light Studio Selection",
+        "canonical": "#4e58c4",
+        "tonalRamp": [
+          "oklch(15% 0.043 274.9)",
+          "oklch(25% 0.103 274.9)",
+          "oklch(35% 0.140 274.9)",
+          "oklch(45% 0.157 274.9)",
+          "oklch(55% 0.157 274.9)",
+          "oklch(65% 0.140 274.9)",
+          "oklch(80% 0.055 274.9)",
+          "oklch(95% 0.004 274.9)"
+        ]
+      },
+      "pixel-light-studio-reading": {
+        "role": "secondary",
+        "displayName": "Pixel Light Studio Reading",
+        "canonical": "#fff",
+        "tonalRamp": [
+          "oklch(15% 0.000 0.0)",
+          "oklch(25% 0.000 0.0)",
+          "oklch(35% 0.000 0.0)",
+          "oklch(45% 0.000 0.0)",
+          "oklch(55% 0.000 0.0)",
+          "oklch(65% 0.000 0.0)",
+          "oklch(80% 0.000 0.0)",
+          "oklch(95% 0.000 0.0)"
+        ]
+      },
+      "pixel-light-studio-user": {
+        "role": "secondary",
+        "displayName": "Pixel Light Studio User",
+        "canonical": "#e7e9fc",
+        "tonalRamp": [
+          "oklch(15% 0.012 281.1)",
+          "oklch(25% 0.018 281.1)",
+          "oklch(35% 0.022 281.1)",
+          "oklch(45% 0.024 281.1)",
+          "oklch(55% 0.024 281.1)",
+          "oklch(65% 0.022 281.1)",
+          "oklch(80% 0.015 281.1)",
+          "oklch(95% 0.005 281.1)"
+        ]
+      },
+      "pixel-light-studio-caption": {
+        "role": "neutral",
+        "displayName": "Pixel Light Studio Caption",
+        "canonical": "#202127",
+        "tonalRamp": [
+          "oklch(15% 0.005 278.0)",
+          "oklch(25% 0.008 278.0)",
+          "oklch(35% 0.010 278.0)",
+          "oklch(45% 0.011 278.0)",
+          "oklch(55% 0.011 278.0)",
+          "oklch(65% 0.010 278.0)",
+          "oklch(80% 0.007 278.0)",
+          "oklch(95% 0.002 278.0)"
+        ]
+      },
+      "pixel-light-studio-caption-ink": {
+        "role": "neutral",
+        "displayName": "Pixel Light Studio Caption Ink",
+        "canonical": "#f0f0f8",
+        "tonalRamp": [
+          "oklch(15% 0.005 286.2)",
+          "oklch(25% 0.007 286.2)",
+          "oklch(35% 0.009 286.2)",
+          "oklch(45% 0.010 286.2)",
+          "oklch(55% 0.010 286.2)",
+          "oklch(65% 0.009 286.2)",
+          "oklch(80% 0.006 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "pixel-light-overlay-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Light Overlay Bg",
+        "canonical": "rgb(22 23 35 / 34%)",
+        "tonalRamp": [
+          "oklch(15% 0.011 280.4)",
+          "oklch(25% 0.017 280.4)",
+          "oklch(35% 0.020 280.4)",
+          "oklch(45% 0.022 280.4)",
+          "oklch(55% 0.022 280.4)",
+          "oklch(65% 0.020 280.4)",
+          "oklch(80% 0.014 280.4)",
+          "oklch(95% 0.005 280.4)"
+        ]
+      },
+      "pixel-light-sidebar-text-primary": {
+        "role": "neutral",
+        "displayName": "Pixel Light Sidebar Text Primary",
+        "canonical": "#f0f0f8",
+        "tonalRamp": [
+          "oklch(15% 0.005 286.2)",
+          "oklch(25% 0.007 286.2)",
+          "oklch(35% 0.009 286.2)",
+          "oklch(45% 0.010 286.2)",
+          "oklch(55% 0.010 286.2)",
+          "oklch(65% 0.009 286.2)",
+          "oklch(80% 0.006 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "pixel-light-sidebar-text-body-strong": {
+        "role": "neutral",
+        "displayName": "Pixel Light Sidebar Text Body Strong",
+        "canonical": "#f0f0f8",
+        "tonalRamp": [
+          "oklch(15% 0.005 286.2)",
+          "oklch(25% 0.007 286.2)",
+          "oklch(35% 0.009 286.2)",
+          "oklch(45% 0.010 286.2)",
+          "oklch(55% 0.010 286.2)",
+          "oklch(65% 0.009 286.2)",
+          "oklch(80% 0.006 286.2)",
+          "oklch(95% 0.002 286.2)"
+        ]
+      },
+      "pixel-light-sidebar-muted-readable": {
+        "role": "neutral",
+        "displayName": "Pixel Light Sidebar Muted Readable",
+        "canonical": "#bcbeca",
+        "tonalRamp": [
+          "oklch(15% 0.008 278.4)",
+          "oklch(25% 0.012 278.4)",
+          "oklch(35% 0.014 278.4)",
+          "oklch(45% 0.016 278.4)",
+          "oklch(55% 0.016 278.4)",
+          "oklch(65% 0.014 278.4)",
+          "oklch(80% 0.010 278.4)",
+          "oklch(95% 0.003 278.4)"
+        ]
+      },
+      "pixel-light-sidebar-text-secondary": {
+        "role": "neutral",
+        "displayName": "Pixel Light Sidebar Text Secondary",
+        "canonical": "#bcbeca",
+        "tonalRamp": [
+          "oklch(15% 0.008 278.4)",
+          "oklch(25% 0.012 278.4)",
+          "oklch(35% 0.014 278.4)",
+          "oklch(45% 0.016 278.4)",
+          "oklch(55% 0.016 278.4)",
+          "oklch(65% 0.014 278.4)",
+          "oklch(80% 0.010 278.4)",
+          "oklch(95% 0.003 278.4)"
+        ]
+      },
+      "pixel-light-sidebar-text-placeholder": {
+        "role": "neutral",
+        "displayName": "Pixel Light Sidebar Text Placeholder",
+        "canonical": "#bcbeca",
+        "tonalRamp": [
+          "oklch(15% 0.008 278.4)",
+          "oklch(25% 0.012 278.4)",
+          "oklch(35% 0.014 278.4)",
+          "oklch(45% 0.016 278.4)",
+          "oklch(55% 0.016 278.4)",
+          "oklch(65% 0.014 278.4)",
+          "oklch(80% 0.010 278.4)",
+          "oklch(95% 0.003 278.4)"
+        ]
+      },
+      "pixel-dark-surface": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface",
+        "canonical": "#1b1c25",
+        "tonalRamp": [
+          "oklch(15% 0.008 280.0)",
+          "oklch(25% 0.012 280.0)",
+          "oklch(35% 0.015 280.0)",
+          "oklch(45% 0.016 280.0)",
+          "oklch(55% 0.016 280.0)",
+          "oklch(65% 0.015 280.0)",
+          "oklch(80% 0.010 280.0)",
+          "oklch(95% 0.003 280.0)"
+        ]
+      },
+      "pixel-dark-surface-hsl": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface Hsl",
+        "canonical": "hsl(234 16% 13%)",
+        "tonalRamp": [
+          "oklch(15% 0.009 279.9)",
+          "oklch(25% 0.013 279.9)",
+          "oklch(35% 0.015 279.9)",
+          "oklch(45% 0.017 279.9)",
+          "oklch(55% 0.017 279.9)",
+          "oklch(65% 0.015 279.9)",
+          "oklch(80% 0.011 279.9)",
+          "oklch(95% 0.004 279.9)"
+        ]
+      },
+      "pixel-dark-surface-elevated": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface Elevated",
+        "canonical": "#292b3b",
+        "tonalRamp": [
+          "oklch(15% 0.014 278.9)",
+          "oklch(25% 0.020 278.9)",
+          "oklch(35% 0.025 278.9)",
+          "oklch(45% 0.027 278.9)",
+          "oklch(55% 0.027 278.9)",
+          "oklch(65% 0.025 278.9)",
+          "oklch(80% 0.017 278.9)",
+          "oklch(95% 0.005 278.9)"
+        ]
+      },
+      "pixel-dark-surface-elevated-soft": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface Elevated Soft",
+        "canonical": "#323549",
+        "tonalRamp": [
+          "oklch(15% 0.017 277.7)",
+          "oklch(25% 0.025 277.7)",
+          "oklch(35% 0.030 277.7)",
+          "oklch(45% 0.033 277.7)",
+          "oklch(55% 0.033 277.7)",
+          "oklch(65% 0.030 277.7)",
+          "oklch(80% 0.021 277.7)",
+          "oklch(95% 0.004 277.7)"
+        ]
+      },
+      "pixel-dark-surface-card-ivory": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface Card Ivory",
+        "canonical": "#292b3b",
+        "tonalRamp": [
+          "oklch(15% 0.014 278.9)",
+          "oklch(25% 0.020 278.9)",
+          "oklch(35% 0.025 278.9)",
+          "oklch(45% 0.027 278.9)",
+          "oklch(55% 0.027 278.9)",
+          "oklch(65% 0.025 278.9)",
+          "oklch(80% 0.017 278.9)",
+          "oklch(95% 0.005 278.9)"
+        ]
+      },
+      "pixel-dark-surface-chip": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface Chip",
+        "canonical": "#3a3d52",
+        "tonalRamp": [
+          "oklch(15% 0.017 278.1)",
+          "oklch(25% 0.025 278.1)",
+          "oklch(35% 0.031 278.1)",
+          "oklch(45% 0.034 278.1)",
+          "oklch(55% 0.034 278.1)",
+          "oklch(65% 0.031 278.1)",
+          "oklch(80% 0.021 278.1)",
+          "oklch(95% 0.005 278.1)"
+        ]
+      },
+      "pixel-dark-surface-chip-alt": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface Chip Alt",
+        "canonical": "#2e3143",
+        "tonalRamp": [
+          "oklch(15% 0.016 277.0)",
+          "oklch(25% 0.023 277.0)",
+          "oklch(35% 0.027 277.0)",
+          "oklch(45% 0.030 277.0)",
+          "oklch(55% 0.030 277.0)",
+          "oklch(65% 0.027 277.0)",
+          "oklch(80% 0.019 277.0)",
+          "oklch(95% 0.004 277.0)"
+        ]
+      },
+      "pixel-dark-surface-hover": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface Hover",
+        "canonical": "#41455e",
+        "tonalRamp": [
+          "oklch(15% 0.020 277.2)",
+          "oklch(25% 0.030 277.2)",
+          "oklch(35% 0.036 277.2)",
+          "oklch(45% 0.040 277.2)",
+          "oklch(55% 0.040 277.2)",
+          "oklch(65% 0.036 277.2)",
+          "oklch(80% 0.025 277.2)",
+          "oklch(95% 0.004 277.2)"
+        ]
+      },
+      "pixel-dark-surface-hover-soft": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface Hover Soft",
+        "canonical": "#34384d",
+        "tonalRamp": [
+          "oklch(15% 0.018 275.9)",
+          "oklch(25% 0.026 275.9)",
+          "oklch(35% 0.031 275.9)",
+          "oklch(45% 0.035 275.9)",
+          "oklch(55% 0.035 275.9)",
+          "oklch(65% 0.031 275.9)",
+          "oklch(80% 0.022 275.9)",
+          "oklch(95% 0.004 275.9)"
+        ]
+      },
+      "pixel-dark-surface-on-card": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Surface On Card",
+        "canonical": "#292b3b",
+        "tonalRamp": [
+          "oklch(15% 0.014 278.9)",
+          "oklch(25% 0.020 278.9)",
+          "oklch(35% 0.025 278.9)",
+          "oklch(45% 0.027 278.9)",
+          "oklch(55% 0.027 278.9)",
+          "oklch(65% 0.025 278.9)",
+          "oklch(80% 0.017 278.9)",
+          "oklch(95% 0.005 278.9)"
+        ]
+      },
+      "pixel-dark-panel-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Panel Bg",
+        "canonical": "#242634",
+        "tonalRamp": [
+          "oklch(15% 0.013 278.2)",
+          "oklch(25% 0.018 278.2)",
+          "oklch(35% 0.022 278.2)",
+          "oklch(45% 0.025 278.2)",
+          "oklch(55% 0.025 278.2)",
+          "oklch(65% 0.022 278.2)",
+          "oklch(80% 0.015 278.2)",
+          "oklch(95% 0.005 278.2)"
+        ]
+      },
+      "pixel-dark-border-default": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Border Default",
+        "canonical": "#555a78",
+        "tonalRamp": [
+          "oklch(15% 0.023 277.0)",
+          "oklch(25% 0.034 277.0)",
+          "oklch(35% 0.041 277.0)",
+          "oklch(45% 0.046 277.0)",
+          "oklch(55% 0.046 277.0)",
+          "oklch(65% 0.041 277.0)",
+          "oklch(80% 0.028 277.0)",
+          "oklch(95% 0.004 277.0)"
+        ]
+      },
+      "pixel-dark-soft-border": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Soft Border",
+        "canonical": "#3f435d",
+        "tonalRamp": [
+          "oklch(15% 0.021 277.4)",
+          "oklch(25% 0.031 277.4)",
+          "oklch(35% 0.037 277.4)",
+          "oklch(45% 0.042 277.4)",
+          "oklch(55% 0.042 277.4)",
+          "oklch(65% 0.037 277.4)",
+          "oklch(80% 0.026 277.4)",
+          "oklch(95% 0.004 277.4)"
+        ]
+      },
+      "pixel-dark-input-border": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Input Border",
+        "canonical": "#959cc0",
+        "tonalRamp": [
+          "oklch(15% 0.026 276.3)",
+          "oklch(25% 0.037 276.3)",
+          "oklch(35% 0.045 276.3)",
+          "oklch(45% 0.050 276.3)",
+          "oklch(55% 0.050 276.3)",
+          "oklch(65% 0.045 276.3)",
+          "oklch(80% 0.031 276.3)",
+          "oklch(95% 0.004 276.3)"
+        ]
+      },
+      "pixel-dark-text-primary": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Text Primary",
+        "canonical": "#e9ebf7",
+        "tonalRamp": [
+          "oklch(15% 0.008 278.5)",
+          "oklch(25% 0.011 278.5)",
+          "oklch(35% 0.014 278.5)",
+          "oklch(45% 0.015 278.5)",
+          "oklch(55% 0.015 278.5)",
+          "oklch(65% 0.014 278.5)",
+          "oklch(80% 0.009 278.5)",
+          "oklch(95% 0.003 278.5)"
+        ]
+      },
+      "pixel-dark-text-primary-emphasis": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Text Primary Emphasis",
+        "canonical": "#f4f5fe",
+        "tonalRamp": [
+          "oklch(15% 0.006 281.1)",
+          "oklch(25% 0.008 281.1)",
+          "oklch(35% 0.010 281.1)",
+          "oklch(45% 0.011 281.1)",
+          "oklch(55% 0.011 281.1)",
+          "oklch(65% 0.010 281.1)",
+          "oklch(80% 0.007 281.1)",
+          "oklch(95% 0.002 281.1)"
+        ]
+      },
+      "pixel-dark-text-primary-body-strong": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Text Primary Body Strong",
+        "canonical": "#d0d4ea",
+        "tonalRamp": [
+          "oklch(15% 0.015 277.6)",
+          "oklch(25% 0.021 277.6)",
+          "oklch(35% 0.026 277.6)",
+          "oklch(45% 0.029 277.6)",
+          "oklch(55% 0.029 277.6)",
+          "oklch(65% 0.026 277.6)",
+          "oklch(80% 0.018 277.6)",
+          "oklch(95% 0.004 277.6)"
+        ]
+      },
+      "pixel-dark-text-secondary": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Text Secondary",
+        "canonical": "#b7bdd8",
+        "tonalRamp": [
+          "oklch(15% 0.019 275.6)",
+          "oklch(25% 0.027 275.6)",
+          "oklch(35% 0.032 275.6)",
+          "oklch(45% 0.036 275.6)",
+          "oklch(55% 0.036 275.6)",
+          "oklch(65% 0.032 275.6)",
+          "oklch(80% 0.022 275.6)",
+          "oklch(95% 0.004 275.6)"
+        ]
+      },
+      "pixel-dark-text-secondary-mid": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Text Secondary Mid",
+        "canonical": "#b7bdd8",
+        "tonalRamp": [
+          "oklch(15% 0.019 275.6)",
+          "oklch(25% 0.027 275.6)",
+          "oklch(35% 0.032 275.6)",
+          "oklch(45% 0.036 275.6)",
+          "oklch(55% 0.036 275.6)",
+          "oklch(65% 0.032 275.6)",
+          "oklch(80% 0.022 275.6)",
+          "oklch(95% 0.004 275.6)"
+        ]
+      },
+      "pixel-dark-muted-readable": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Muted Readable",
+        "canonical": "#b7bdd8",
+        "tonalRamp": [
+          "oklch(15% 0.019 275.6)",
+          "oklch(25% 0.027 275.6)",
+          "oklch(35% 0.032 275.6)",
+          "oklch(45% 0.036 275.6)",
+          "oklch(55% 0.036 275.6)",
+          "oklch(65% 0.032 275.6)",
+          "oklch(80% 0.022 275.6)",
+          "oklch(95% 0.004 275.6)"
+        ]
+      },
+      "pixel-dark-text-placeholder": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Text Placeholder",
+        "canonical": "#aeb6d2",
+        "tonalRamp": [
+          "oklch(15% 0.020 272.8)",
+          "oklch(25% 0.029 272.8)",
+          "oklch(35% 0.034 272.8)",
+          "oklch(45% 0.038 272.8)",
+          "oklch(55% 0.038 272.8)",
+          "oklch(65% 0.034 272.8)",
+          "oklch(80% 0.024 272.8)",
+          "oklch(95% 0.004 272.8)"
+        ]
+      },
+      "pixel-dark-accent-cta-bg": {
+        "role": "primary",
+        "displayName": "Pixel Dark Accent Cta Bg",
+        "canonical": "#b7bfff",
+        "tonalRamp": [
+          "oklch(15% 0.041 278.7)",
+          "oklch(25% 0.063 278.7)",
+          "oklch(35% 0.076 278.7)",
+          "oklch(45% 0.085 278.7)",
+          "oklch(55% 0.085 278.7)",
+          "oklch(65% 0.076 278.7)",
+          "oklch(80% 0.052 278.7)",
+          "oklch(95% 0.005 278.7)"
+        ]
+      },
+      "pixel-dark-accent-cta-bg-pure": {
+        "role": "primary",
+        "displayName": "Pixel Dark Accent Cta Bg Pure",
+        "canonical": "#b7bfff",
+        "tonalRamp": [
+          "oklch(15% 0.041 278.7)",
+          "oklch(25% 0.063 278.7)",
+          "oklch(35% 0.076 278.7)",
+          "oklch(45% 0.085 278.7)",
+          "oklch(55% 0.085 278.7)",
+          "oklch(65% 0.076 278.7)",
+          "oklch(80% 0.052 278.7)",
+          "oklch(95% 0.005 278.7)"
+        ]
+      },
+      "pixel-dark-accent-emphasis": {
+        "role": "primary",
+        "displayName": "Pixel Dark Accent Emphasis",
+        "canonical": "#c4cbff",
+        "tonalRamp": [
+          "oklch(15% 0.035 278.7)",
+          "oklch(25% 0.051 278.7)",
+          "oklch(35% 0.061 278.7)",
+          "oklch(45% 0.068 278.7)",
+          "oklch(55% 0.068 278.7)",
+          "oklch(65% 0.061 278.7)",
+          "oklch(80% 0.042 278.7)",
+          "oklch(95% 0.005 278.7)"
+        ]
+      },
+      "pixel-dark-accent-soft": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Accent Soft",
+        "canonical": "#383f6c",
+        "tonalRamp": [
+          "oklch(15% 0.037 275.5)",
+          "oklch(25% 0.054 275.5)",
+          "oklch(35% 0.065 275.5)",
+          "oklch(45% 0.072 275.5)",
+          "oklch(55% 0.072 275.5)",
+          "oklch(65% 0.065 275.5)",
+          "oklch(80% 0.045 275.5)",
+          "oklch(95% 0.004 275.5)"
+        ]
+      },
+      "pixel-dark-accent-hover": {
+        "role": "primary",
+        "displayName": "Pixel Dark Accent Hover",
+        "canonical": "#ced3ff",
+        "tonalRamp": [
+          "oklch(15% 0.029 280.0)",
+          "oklch(25% 0.043 280.0)",
+          "oklch(35% 0.051 280.0)",
+          "oklch(45% 0.057 280.0)",
+          "oklch(55% 0.057 280.0)",
+          "oklch(65% 0.051 280.0)",
+          "oklch(80% 0.035 280.0)",
+          "oklch(95% 0.005 280.0)"
+        ]
+      },
+      "pixel-dark-accent-pure-cta-fg": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Accent Pure Cta Fg",
+        "canonical": "#20213b",
+        "tonalRamp": [
+          "oklch(15% 0.023 280.8)",
+          "oklch(25% 0.034 280.8)",
+          "oklch(35% 0.041 280.8)",
+          "oklch(45% 0.045 280.8)",
+          "oklch(55% 0.045 280.8)",
+          "oklch(65% 0.041 280.8)",
+          "oklch(80% 0.028 280.8)",
+          "oklch(95% 0.005 280.8)"
+        ]
+      },
+      "pixel-dark-segmented-option-fg": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Segmented Option Fg",
+        "canonical": "#b7bdd8",
+        "tonalRamp": [
+          "oklch(15% 0.019 275.6)",
+          "oklch(25% 0.027 275.6)",
+          "oklch(35% 0.032 275.6)",
+          "oklch(45% 0.036 275.6)",
+          "oklch(55% 0.036 275.6)",
+          "oklch(65% 0.032 275.6)",
+          "oklch(80% 0.022 275.6)",
+          "oklch(95% 0.004 275.6)"
+        ]
+      },
+      "pixel-dark-focus-ring": {
+        "role": "primary",
+        "displayName": "Pixel Dark Focus Ring",
+        "canonical": "#b7bfff",
+        "tonalRamp": [
+          "oklch(15% 0.041 278.7)",
+          "oklch(25% 0.063 278.7)",
+          "oklch(35% 0.076 278.7)",
+          "oklch(45% 0.085 278.7)",
+          "oklch(55% 0.085 278.7)",
+          "oklch(65% 0.076 278.7)",
+          "oklch(80% 0.052 278.7)",
+          "oklch(95% 0.005 278.7)"
+        ]
+      },
+      "pixel-dark-primary": {
+        "role": "primary",
+        "displayName": "Pixel Dark Primary",
+        "canonical": "hsl(233 100% 86%)",
+        "tonalRamp": [
+          "oklch(15% 0.041 278.4)",
+          "oklch(25% 0.062 278.4)",
+          "oklch(35% 0.075 278.4)",
+          "oklch(45% 0.084 278.4)",
+          "oklch(55% 0.084 278.4)",
+          "oklch(65% 0.075 278.4)",
+          "oklch(80% 0.052 278.4)",
+          "oklch(95% 0.005 278.4)"
+        ]
+      },
+      "pixel-dark-primary-foreground": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Primary Foreground",
+        "canonical": "hsl(238 30% 18%)",
+        "tonalRamp": [
+          "oklch(15% 0.024 280.9)",
+          "oklch(25% 0.035 280.9)",
+          "oklch(35% 0.042 280.9)",
+          "oklch(45% 0.047 280.9)",
+          "oklch(55% 0.047 280.9)",
+          "oklch(65% 0.042 280.9)",
+          "oklch(80% 0.029 280.9)",
+          "oklch(95% 0.005 280.9)"
+        ]
+      },
+      "pixel-dark-ring": {
+        "role": "primary",
+        "displayName": "Pixel Dark Ring",
+        "canonical": "hsl(233 100% 86%)",
+        "tonalRamp": [
+          "oklch(15% 0.041 278.4)",
+          "oklch(25% 0.062 278.4)",
+          "oklch(35% 0.075 278.4)",
+          "oklch(45% 0.084 278.4)",
+          "oklch(55% 0.084 278.4)",
+          "oklch(65% 0.075 278.4)",
+          "oklch(80% 0.052 278.4)",
+          "oklch(95% 0.005 278.4)"
+        ]
+      },
+      "pixel-dark-code-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Code Bg",
+        "canonical": "#2e3248",
+        "tonalRamp": [
+          "oklch(15% 0.019 276.0)",
+          "oklch(25% 0.028 276.0)",
+          "oklch(35% 0.033 276.0)",
+          "oklch(45% 0.037 276.0)",
+          "oklch(55% 0.037 276.0)",
+          "oklch(65% 0.033 276.0)",
+          "oklch(80% 0.023 276.0)",
+          "oklch(95% 0.004 276.0)"
+        ]
+      },
+      "pixel-dark-md-table-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Md Table Bg",
+        "canonical": "#2c3045",
+        "tonalRamp": [
+          "oklch(15% 0.018 275.7)",
+          "oklch(25% 0.027 275.7)",
+          "oklch(35% 0.032 275.7)",
+          "oklch(45% 0.036 275.7)",
+          "oklch(55% 0.036 275.7)",
+          "oklch(65% 0.032 275.7)",
+          "oklch(80% 0.022 275.7)",
+          "oklch(95% 0.004 275.7)"
+        ]
+      },
+      "pixel-dark-terminal-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Terminal Bg",
+        "canonical": "#1b1e2c",
+        "tonalRamp": [
+          "oklch(15% 0.013 274.8)",
+          "oklch(25% 0.019 274.8)",
+          "oklch(35% 0.023 274.8)",
+          "oklch(45% 0.026 274.8)",
+          "oklch(55% 0.026 274.8)",
+          "oklch(65% 0.023 274.8)",
+          "oklch(80% 0.016 274.8)",
+          "oklch(95% 0.004 274.8)"
+        ]
+      },
+      "pixel-dark-terminal-fg": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Terminal Fg",
+        "canonical": "#e0e4f8",
+        "tonalRamp": [
+          "oklch(15% 0.013 276.8)",
+          "oklch(25% 0.019 276.8)",
+          "oklch(35% 0.023 276.8)",
+          "oklch(45% 0.026 276.8)",
+          "oklch(55% 0.026 276.8)",
+          "oklch(65% 0.023 276.8)",
+          "oklch(80% 0.016 276.8)",
+          "oklch(95% 0.004 276.8)"
+        ]
+      },
+      "pixel-dark-terminal-selection": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Terminal Selection",
+        "canonical": "#454f7b",
+        "tonalRamp": [
+          "oklch(15% 0.035 273.3)",
+          "oklch(25% 0.052 273.3)",
+          "oklch(35% 0.062 273.3)",
+          "oklch(45% 0.069 273.3)",
+          "oklch(55% 0.069 273.3)",
+          "oklch(65% 0.062 273.3)",
+          "oklch(80% 0.043 273.3)",
+          "oklch(95% 0.004 273.3)"
+        ]
+      },
+      "pixel-dark-studio-nav": {
+        "role": "secondary",
+        "displayName": "Pixel Dark Studio Nav",
+        "canonical": "#15161e",
+        "tonalRamp": [
+          "oklch(15% 0.008 279.3)",
+          "oklch(25% 0.011 279.3)",
+          "oklch(35% 0.013 279.3)",
+          "oklch(45% 0.015 279.3)",
+          "oklch(55% 0.015 279.3)",
+          "oklch(65% 0.013 279.3)",
+          "oklch(80% 0.009 279.3)",
+          "oklch(95% 0.003 279.3)"
+        ]
+      },
+      "pixel-dark-studio-nav-ink": {
+        "role": "secondary",
+        "displayName": "Pixel Dark Studio Nav Ink",
+        "canonical": "#ededf8",
+        "tonalRamp": [
+          "oklch(15% 0.007 286.1)",
+          "oklch(25% 0.010 286.1)",
+          "oklch(35% 0.012 286.1)",
+          "oklch(45% 0.014 286.1)",
+          "oklch(55% 0.014 286.1)",
+          "oklch(65% 0.012 286.1)",
+          "oklch(80% 0.009 286.1)",
+          "oklch(95% 0.003 286.1)"
+        ]
+      },
+      "pixel-dark-studio-nav-muted": {
+        "role": "secondary",
+        "displayName": "Pixel Dark Studio Nav Muted",
+        "canonical": "#b6bbd4",
+        "tonalRamp": [
+          "oklch(15% 0.017 276.6)",
+          "oklch(25% 0.025 276.6)",
+          "oklch(35% 0.030 276.6)",
+          "oklch(45% 0.034 276.6)",
+          "oklch(55% 0.034 276.6)",
+          "oklch(65% 0.030 276.6)",
+          "oklch(80% 0.021 276.6)",
+          "oklch(95% 0.004 276.6)"
+        ]
+      },
+      "pixel-dark-studio-nav-hover": {
+        "role": "secondary",
+        "displayName": "Pixel Dark Studio Nav Hover",
+        "canonical": "#292e43",
+        "tonalRamp": [
+          "oklch(15% 0.019 273.6)",
+          "oklch(25% 0.027 273.6)",
+          "oklch(35% 0.032 273.6)",
+          "oklch(45% 0.036 273.6)",
+          "oklch(55% 0.036 273.6)",
+          "oklch(65% 0.032 273.6)",
+          "oklch(80% 0.022 273.6)",
+          "oklch(95% 0.004 273.6)"
+        ]
+      },
+      "pixel-dark-studio-nav-border": {
+        "role": "secondary",
+        "displayName": "Pixel Dark Studio Nav Border",
+        "canonical": "#535c7e",
+        "tonalRamp": [
+          "oklch(15% 0.027 272.7)",
+          "oklch(25% 0.039 272.7)",
+          "oklch(35% 0.047 272.7)",
+          "oklch(45% 0.053 272.7)",
+          "oklch(55% 0.053 272.7)",
+          "oklch(65% 0.047 272.7)",
+          "oklch(80% 0.033 272.7)",
+          "oklch(95% 0.004 272.7)"
+        ]
+      },
+      "pixel-dark-studio-selection": {
+        "role": "secondary",
+        "displayName": "Pixel Dark Studio Selection",
+        "canonical": "#424c90",
+        "tonalRamp": [
+          "oklch(15% 0.043 274.6)",
+          "oklch(25% 0.078 274.6)",
+          "oklch(35% 0.094 274.6)",
+          "oklch(45% 0.105 274.6)",
+          "oklch(55% 0.105 274.6)",
+          "oklch(65% 0.094 274.6)",
+          "oklch(80% 0.055 274.6)",
+          "oklch(95% 0.004 274.6)"
+        ]
+      },
+      "pixel-dark-studio-reading": {
+        "role": "secondary",
+        "displayName": "Pixel Dark Studio Reading",
+        "canonical": "#20232f",
+        "tonalRamp": [
+          "oklch(15% 0.011 273.8)",
+          "oklch(25% 0.016 273.8)",
+          "oklch(35% 0.019 273.8)",
+          "oklch(45% 0.022 273.8)",
+          "oklch(55% 0.022 273.8)",
+          "oklch(65% 0.019 273.8)",
+          "oklch(80% 0.013 273.8)",
+          "oklch(95% 0.004 273.8)"
+        ]
+      },
+      "pixel-dark-studio-user": {
+        "role": "secondary",
+        "displayName": "Pixel Dark Studio User",
+        "canonical": "#323b61",
+        "tonalRamp": [
+          "oklch(15% 0.032 272.6)",
+          "oklch(25% 0.047 272.6)",
+          "oklch(35% 0.056 272.6)",
+          "oklch(45% 0.063 272.6)",
+          "oklch(55% 0.063 272.6)",
+          "oklch(65% 0.056 272.6)",
+          "oklch(80% 0.039 272.6)",
+          "oklch(95% 0.004 272.6)"
+        ]
+      },
+      "pixel-dark-studio-caption": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Studio Caption",
+        "canonical": "#15161e",
+        "tonalRamp": [
+          "oklch(15% 0.008 279.3)",
+          "oklch(25% 0.011 279.3)",
+          "oklch(35% 0.013 279.3)",
+          "oklch(45% 0.015 279.3)",
+          "oklch(55% 0.015 279.3)",
+          "oklch(65% 0.013 279.3)",
+          "oklch(80% 0.009 279.3)",
+          "oklch(95% 0.003 279.3)"
+        ]
+      },
+      "pixel-dark-studio-caption-ink": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Studio Caption Ink",
+        "canonical": "#ededf8",
+        "tonalRamp": [
+          "oklch(15% 0.007 286.1)",
+          "oklch(25% 0.010 286.1)",
+          "oklch(35% 0.012 286.1)",
+          "oklch(45% 0.014 286.1)",
+          "oklch(55% 0.014 286.1)",
+          "oklch(65% 0.012 286.1)",
+          "oklch(80% 0.009 286.1)",
+          "oklch(95% 0.003 286.1)"
+        ]
+      },
+      "pixel-dark-overlay-bg": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Overlay Bg",
+        "canonical": "rgb(22 23 35 / 34%)",
+        "tonalRamp": [
+          "oklch(15% 0.011 280.4)",
+          "oklch(25% 0.017 280.4)",
+          "oklch(35% 0.020 280.4)",
+          "oklch(45% 0.022 280.4)",
+          "oklch(55% 0.022 280.4)",
+          "oklch(65% 0.020 280.4)",
+          "oklch(80% 0.014 280.4)",
+          "oklch(95% 0.005 280.4)"
+        ]
+      },
+      "pixel-dark-sidebar-text-primary": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Sidebar Text Primary",
+        "canonical": "#ededf8",
+        "tonalRamp": [
+          "oklch(15% 0.007 286.1)",
+          "oklch(25% 0.010 286.1)",
+          "oklch(35% 0.012 286.1)",
+          "oklch(45% 0.014 286.1)",
+          "oklch(55% 0.014 286.1)",
+          "oklch(65% 0.012 286.1)",
+          "oklch(80% 0.009 286.1)",
+          "oklch(95% 0.003 286.1)"
+        ]
+      },
+      "pixel-dark-sidebar-text-body-strong": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Sidebar Text Body Strong",
+        "canonical": "#ededf8",
+        "tonalRamp": [
+          "oklch(15% 0.007 286.1)",
+          "oklch(25% 0.010 286.1)",
+          "oklch(35% 0.012 286.1)",
+          "oklch(45% 0.014 286.1)",
+          "oklch(55% 0.014 286.1)",
+          "oklch(65% 0.012 286.1)",
+          "oklch(80% 0.009 286.1)",
+          "oklch(95% 0.003 286.1)"
+        ]
+      },
+      "pixel-dark-sidebar-muted-readable": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Sidebar Muted Readable",
+        "canonical": "#b6bbd4",
+        "tonalRamp": [
+          "oklch(15% 0.017 276.6)",
+          "oklch(25% 0.025 276.6)",
+          "oklch(35% 0.030 276.6)",
+          "oklch(45% 0.034 276.6)",
+          "oklch(55% 0.034 276.6)",
+          "oklch(65% 0.030 276.6)",
+          "oklch(80% 0.021 276.6)",
+          "oklch(95% 0.004 276.6)"
+        ]
+      },
+      "pixel-dark-sidebar-text-secondary": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Sidebar Text Secondary",
+        "canonical": "#b6bbd4",
+        "tonalRamp": [
+          "oklch(15% 0.017 276.6)",
+          "oklch(25% 0.025 276.6)",
+          "oklch(35% 0.030 276.6)",
+          "oklch(45% 0.034 276.6)",
+          "oklch(55% 0.034 276.6)",
+          "oklch(65% 0.030 276.6)",
+          "oklch(80% 0.021 276.6)",
+          "oklch(95% 0.004 276.6)"
+        ]
+      },
+      "pixel-dark-sidebar-text-placeholder": {
+        "role": "neutral",
+        "displayName": "Pixel Dark Sidebar Text Placeholder",
+        "canonical": "#b6bbd4",
+        "tonalRamp": [
+          "oklch(15% 0.017 276.6)",
+          "oklch(25% 0.025 276.6)",
+          "oklch(35% 0.030 276.6)",
+          "oklch(45% 0.034 276.6)",
+          "oklch(55% 0.034 276.6)",
+          "oklch(65% 0.030 276.6)",
+          "oklch(80% 0.021 276.6)",
+          "oklch(95% 0.004 276.6)"
+        ]
       }
     },
     "typographyMeta": {
@@ -979,6 +4159,50 @@
       "rail-label": {
         "displayName": "Rail label",
         "purpose": "Small label in the contracted navigation rail."
+      },
+      "studio-navigation": {
+        "displayName": "Studio navigation",
+        "purpose": "Vertical Folio and Pixel destination tabs."
+      },
+      "folio-brand": {
+        "displayName": "Folio brand",
+        "purpose": "Serif-styled Lucyna brand word in Folio."
+      },
+      "folio-work-title": {
+        "displayName": "Folio Work title",
+        "purpose": "Current Work heading in Folio."
+      },
+      "folio-reading-heading": {
+        "displayName": "Folio reading heading",
+        "purpose": "Assistant and Knowledge reading headings in Folio."
+      },
+      "folio-display": {
+        "displayName": "Folio display",
+        "purpose": "Welcome and Knowledge headings in Folio."
+      },
+      "folio-message": {
+        "displayName": "Folio message",
+        "purpose": "Spacious message copy and reading text in Folio."
+      },
+      "pixel-work-title": {
+        "displayName": "Pixel Work title",
+        "purpose": "Current Work heading in Pixel."
+      },
+      "pixel-directory-title": {
+        "displayName": "Pixel directory title",
+        "purpose": "Work identity heading in the Pixel inspector."
+      },
+      "pixel-reading-heading": {
+        "displayName": "Pixel reading heading",
+        "purpose": "Assistant Markdown section heading in Pixel."
+      },
+      "pixel-knowledge-title": {
+        "displayName": "Pixel Knowledge title",
+        "purpose": "Knowledge page title in Pixel."
+      },
+      "pixel-message": {
+        "displayName": "Pixel message",
+        "purpose": "Compact conversation message copy in Pixel."
       }
     },
     "shadows": [
@@ -1001,6 +4225,16 @@
         "name": "classic-modal",
         "value": "0 24px 80px rgb(20 20 18 / 16%), 0 2px 12px rgb(20 20 18 / 6%)",
         "purpose": "Retained neutral modal elevation in Classic."
+      },
+      {
+        "name": "folio-modal",
+        "value": "0 18px 64px rgb(27 47 33 / 22%)",
+        "purpose": "Forest-tinted modal elevation in Folio Light and Dark."
+      },
+      {
+        "name": "pixel-modal",
+        "value": "0 16px 60px rgb(28 28 48 / 24%)",
+        "purpose": "Charcoal-violet modal elevation in Pixel Light and Dark."
       }
     ],
     "motion": [
@@ -1074,6 +4308,14 @@
       {
         "name": "companion-short-window",
         "value": "700px max-height"
+      },
+      {
+        "name": "studio-knowledge-three-column",
+        "value": "300px container"
+      },
+      {
+        "name": "studio-companion-hidden",
+        "value": "820px max-height"
       }
     ]
   },
@@ -1122,7 +4364,7 @@
       "name": "Visual scheme choice",
       "kind": "card",
       "refersTo": "theme-choice-selected",
-      "description": "Select Blue or Classic while keeping appearance mode independent.",
+      "description": "Choose Blue, Classic, Folio, or Pixel while keeping Light/Dark appearance independent.",
       "html": "<label class=\"ds-theme-choice\"><input type=\"radio\" name=\"visual-theme\" checked><span><strong>蓝调工作室</strong><small>深蓝导航 · 浅蓝目录 · 明亮阅读面</small></span></label>",
       "css": ".ds-theme-choice{display:flex;align-items:center;gap:10px;min-height:84px;padding:14px;border:1px solid var(--soft-border);border-radius:12px;background:var(--surface-elevated);color:var(--text-primary);font:400 12px/1.7 var(--font-body);transition:background-color var(--motion-fast),border-color var(--motion-fast);}.ds-theme-choice input{width:16px;height:16px;accent-color:var(--accent-cta-bg);}.ds-theme-choice strong{display:block;font-size:14px;font-weight:600;line-height:1.5;}.ds-theme-choice small{display:block;margin-top:4px;color:var(--muted-readable);}.ds-theme-choice:has(input:checked){border-color:var(--focus-ring);background:var(--surface-hover-soft);}.ds-theme-choice:focus-within{outline:2px solid var(--focus-ring);outline-offset:2px;}"
     },
@@ -1133,41 +4375,73 @@
       "description": "Switch among Work context panels without changing the reading hierarchy.",
       "html": "<div class=\"ds-context-tabs\"><button type=\"button\" aria-pressed=\"true\">进展</button><button type=\"button\" aria-pressed=\"false\">资产</button></div>",
       "css": ".ds-context-tabs{display:flex;gap:4px;padding:4px;border-radius:8px;background:var(--sidebar-selection);}.ds-context-tabs button{flex:1;min-width:0;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--muted-readable);font:400 12px/1.5 var(--font-body);white-space:nowrap;transition:background-color var(--motion-fast),color var(--motion-fast);}.ds-context-tabs button:hover{color:var(--text-primary);}.ds-context-tabs button[aria-pressed=true]{background:var(--surface-elevated);color:var(--accent-emphasis);}.ds-context-tabs button:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px;}"
+    },
+    {
+      "name": "Folio vertical navigation",
+      "kind": "nav",
+      "refersTo": "navigation-selected-folio",
+      "description": "Move among destinations in the shared forest sidebar.",
+      "html": "<nav class=\"ds-folio-nav\" role=\"tablist\" aria-label=\"主要功能\"><button type=\"button\" role=\"tab\" aria-selected=\"true\" aria-controls=\"work-panel\">工作台</button><button type=\"button\" role=\"tab\" aria-selected=\"false\" aria-controls=\"knowledge-panel\">知识库</button><button type=\"button\" role=\"tab\" aria-selected=\"false\" aria-controls=\"sessions-panel\">会话</button></nav>",
+      "css": ".ds-folio-nav{display:flex;flex-direction:column;gap:5px;padding:0 0 16px;}.ds-folio-nav button{min-height:40px;padding:9px 12px;border:0;border-radius:6px;background:transparent;color:var(--studio-nav-muted);font:400 13px/1.5 var(--font-body);text-align:left;}.ds-folio-nav button:hover{background:var(--studio-nav-hover);color:var(--studio-nav-ink);}.ds-folio-nav button[aria-selected=true]{background:var(--studio-selection);color:var(--studio-nav-ink);}.ds-folio-nav button:focus-visible{outline:2px solid var(--studio-nav-ink,#f4f1e6);outline-offset:2px;}"
+    },
+    {
+      "name": "Pixel vertical navigation",
+      "kind": "nav",
+      "refersTo": "navigation-selected-pixel",
+      "description": "Move among destinations in the shared charcoal sidebar.",
+      "html": "<nav class=\"ds-pixel-nav\" role=\"tablist\" aria-label=\"主要功能\"><button type=\"button\" role=\"tab\" aria-selected=\"true\" aria-controls=\"work-panel\">工作台</button><button type=\"button\" role=\"tab\" aria-selected=\"false\" aria-controls=\"knowledge-panel\">知识库</button><button type=\"button\" role=\"tab\" aria-selected=\"false\" aria-controls=\"sessions-panel\">会话</button></nav>",
+      "css": ".ds-pixel-nav{display:flex;flex-direction:column;gap:5px;padding:0 0 16px;}.ds-pixel-nav button{min-height:36px;padding:7px 12px;border:0;border-radius:4px;background:transparent;color:var(--studio-nav-muted);font:400 13px/1.5 var(--font-body);text-align:left;}.ds-pixel-nav button:hover{background:var(--studio-nav-hover);color:var(--studio-nav-ink);}.ds-pixel-nav button[aria-selected=true]{background:var(--studio-selection);color:var(--studio-nav-ink);}.ds-pixel-nav button:focus-visible{outline:2px solid var(--studio-nav-ink,#f0f0f8);outline-offset:2px;}"
     }
   ],
   "narrative": {
-    "northStar": "The Blue Local Workbench",
-    "overview": "Lucyna's Blue scheme makes the local work loop legible as four adjacent regions: application navigation, the Work directory, conversation, and contextual tools. Deep navy anchors navigation, pale blue separates the directory, and bright reading planes keep the conversation and knowledge content easy to scan. Existing Cindy controls carry familiar input and button behavior; the silver-haired character and black cat remain the established brand artwork.\n\nThis specification records the renderer as built. The appearance selector currently offers two distinct visual schemes, Blue and Classic. Each scheme has its own Light and Dark appearance. Classic retains the incumbent neutral Cindy palette and compact horizontal navigation; Blue is the new four-region scheme. Light and Dark are appearance variants, not extra visual schemes, and other requested schemes remain deferred.",
+    "northStar": "Four Ways Into the Same Work",
+    "overview": "Lucyna offers four visual schemes for the same local Work loop. Blue keeps application navigation and the Work directory in separate columns, with a cool reading plane and cobalt selection. Classic retains the original compact neutral interface. Folio joins navigation and Work in a forest-green sidebar beside warm paper surfaces, with serif styling confined to reading headings. Pixel uses a charcoal sidebar, periwinkle selection, square controls, and the original geometric wordmark.\n\nLight and Dark are independent appearances within Blue, Classic, Folio, and Pixel. Theme changes affect presentation while the current Work, session, transcript, and mounted draft stay in place. The silver-haired character and black cat remain the existing illustration assets; Pixel adds only the original 5×7 geometric SVG wordmark.",
     "keyCharacteristics": [
-      "Four clear work areas with the conversation as the primary reading plane.",
-      "Navy application navigation, a cool-blue Work directory, cobalt active states, and bright reading surfaces in Blue.",
-      "The original neutral Classic scheme remains available and keeps its compact layout.",
-      "Existing silver-haired character and black cat artwork stays intact."
+      "Blue keeps its separate application navigation and Work directory.",
+      "Classic keeps the original compact neutral palette and horizontal navigation.",
+      "Folio pairs a forest sidebar and sage accents with warm paper and spacious reading.",
+      "Pixel pairs a charcoal sidebar with periwinkle selection, compact sans text, and four-pixel controls.",
+      "Every scheme has independent Light and Dark palettes.",
+      "Existing character and cat artwork remain shared brand assets."
     ],
     "rules": [
       {
-        "name": "The Four-Surface Rule",
-        "body": "Keep navigation, the Work directory, reading, and contextual tools visually distinct. Reserve saturated cobalt for actions and selection; do not turn the reading plane into another navigation surface.",
+        "name": "The Four-Scheme Rule",
+        "body": "Keep Blue, Classic, Folio, and Pixel as distinct visual schemes. Each scheme has independent Light and Dark appearances; appearance mode is not another scheme.",
         "section": "colors"
       },
       {
-        "name": "The Two-Scheme Rule",
-        "body": "The shipped selector exposes Blue and Classic as the two visual schemes. Light and Dark are independent appearance variants. Do not describe them as four distinct visual schemes or invent unseen palette variants.",
+        "name": "The Sidebar Role Mapping Rule",
+        "body": "In Folio and Pixel, primary and body-strong sidebar text map to navigation ink; muted-readable, secondary, and placeholder text map to navigation muted. The sidebar surface uses studio-nav; elevated surfaces, chips, and hover use studio-nav-hover; selection uses studio-selection; borders and input outlines use studio-nav-border; focus uses studio-nav-ink.",
         "section": "colors"
+      },
+      {
+        "name": "The Folio Reading Stack Rule",
+        "body": "Keep the declared Source Han Serif SC, Noto Serif CJK SC, Songti SC, SimSun, serif fallback stack to the Folio brand and reading headings. Body text remains Source Han Sans; the repository does not bundle a serif face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Pixel Wordmark Rule",
+        "body": "Keep the original 5×7 geometric SVG lettering in the Pixel wordmark only. Chinese interface copy remains normal Source Han Sans text.",
+        "section": "typography"
       }
     ],
     "dos": [
-      "Do keep the Blue navigation, Work directory, conversation, and inspector recognizable as separate regions.",
-      "Do use the frontmatter palette and type roles as the normative Blue and Classic values.",
-      "Do keep Light/Dark independent from the Blue/Classic visual-scheme choice.",
-      "Do preserve the existing silver-haired character and black cat artwork.",
-      "Do keep actual Work, session, and knowledge states legible as application content."
+      "Do keep all four visual schemes and their independent Light/Dark appearances.",
+      "Do retain Blue’s separate application navigation and Work directory; Folio and Pixel share the resizable 248px Work sidebar.",
+      "Do keep Source Han Sans for interface and body text. Folio’s serif fallback stack is scoped to the brand and reading headings.",
+      "Do keep Pixel’s original 5×7 geometric SVG lettering in the wordmark only; Chinese interface copy stays typographic.",
+      "Do preserve the existing silver-haired character and black cat assets and their theme-specific placement.",
+      "Do preserve Work, session, draft, and transcript state while switching schemes.",
+      "Do use the runtime and action footer in the compact Folio/Pixel sidebar."
     ],
     "donts": [
-      "Don't claim that four distinct visual schemes are implemented; only Blue and Classic are present.",
-      "Don't collapse Classic into Blue's four-region shell.",
-      "Don't turn the conversation or knowledge reader into another saturated navigation surface.",
-      "Don't invent runtime statuses, document counts, or illustration assets."
+      "Don’t describe Blue, Classic, Folio, and Pixel as Light/Dark appearance modes.",
+      "Don’t merge Blue’s separate navigation and Work directory into the Folio/Pixel sidebar layout.",
+      "Don’t make Folio body copy serif or Pixel Chinese copy bitmap-style.",
+      "Don’t add new illustration assets or replace the existing character and cat.",
+      "Don’t add a redundant informational profile row to the Folio/Pixel sidebar.",
+      "Don’t invent runtime statuses, Work counts, knowledge records, or session facts."
     ]
   }
 }

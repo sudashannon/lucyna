@@ -22,3 +22,16 @@ export function BrandCompanions() {
   const [failed,setFailed]=useState(false);
   return failed?<Cat className="cindy-companions" size={144} aria-hidden="true"/>:<img className="cindy-companions" src={companions} width={144} height={144} alt="" aria-hidden="true" draggable={false} decoding="async" onError={()=>setFailed(true)}/>;
 }
+
+// Original 5×7 lettering; the rest of the interface keeps its reading font.
+const wordmark = [
+  ['10000','10000','10000','10000','10000','10000','11111'],
+  ['10001','10001','10001','10001','10001','10001','01110'],
+  ['01111','10000','10000','10000','10000','10000','01111'],
+  ['10001','10001','01010','00100','00100','00100','00100'],
+  ['10001','11001','11001','10101','10011','10011','10001'],
+  ['01110','10001','10001','11111','10001','10001','10001'],
+];
+export function PixelWordmark() {
+  return <svg className="pixel-wordmark" viewBox="0 0 35 7" aria-hidden="true" focusable="false" shapeRendering="crispEdges">{wordmark.flatMap((letter,index)=>letter.flatMap((row,y)=>Array.from(row,(cell,x)=>cell==='1'?<rect key={`${index}-${x}-${y}`} x={index*6+x} y={y} width={1} height={1} fill="currentColor"/>:null)))}</svg>;
+}
