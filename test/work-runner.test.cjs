@@ -17,6 +17,20 @@ test('runner admits only known Work and narrow operations before spawning',async
  await assert.rejects(runner.call('create',{root:'/works/a',env:{TOKEN:'never-send'}}),/参数/);
  await assert.rejects(runner.call('resume',{runId:'a',executable:'/evil'}),/参数/);
 });
+
+test('invalid registered Work reports its diagnosis before background service access',async()=>{
+ const issue={severity:'error',member:'nvidia-build',message:'baseSha 必须是完整的 40 位提交哈希'};
+ const work={root:'/works/a',kind:'invalid',error:'nvidia-build：'+issue.message,issues:[issue]};
+ const runner=new WorkRunner({listWorks:async()=>[work],execute:()=>assert.fail('invalid Work must not spawn')});
+ for(const op of ['list','create','automatic-status','automatic-configure']){
+  await assert.rejects(runner.call(op,{root:work.root}),/此 Work 的登记信息需要修复：nvidia-build：baseSha 必须是完整的 40 位提交哈希/);
+ }
+ delete work.error;
+ await assert.rejects(runner.call('list',{root:work.root}),/nvidia-build：baseSha/);
+ work.issues=[];
+ await assert.rejects(runner.call('list',{root:work.root}),/仓库与 Worktree/);
+ await assert.rejects(runner.call('list',{root:'/unknown'}),/^Error: 请选择有效 Work$/);
+});
 test('background and interactive Work admission are mutually exclusive, including in-flight startup',async()=>{
  const runner=make([{root:'/works/a',id:'native'}]);runner.ensure=async()=>{throw Error('must not start');};
  await assert.rejects(runner.call('create',{root:'/works/a'}),/普通会话/);

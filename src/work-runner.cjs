@@ -112,7 +112,12 @@ class WorkRunner {
     const allowed={status:[],list:['root'],get:['runId','after'],create:['root','requestKey','objective','acceptance','verification','model','tokenBudget','wallSeconds','mode','evolution'],pause:['runId'],cancel:['runId'],resume:['runId'],answer:['runId','answerKey','answer'],accept:['runId'],adopt:['runId'],rollback:['runId'],'automatic-status':['root'],'automatic-configure':['root','enabled','profile']}[op];
     if(Object.keys(data).some(k=>!allowed.includes(k)))throw Error('不支持的后台任务参数');
     if(op==='list'||op==='create'||op.startsWith('automatic-')){
-      if(typeof data.root!=='string'||!(await this.listWorks()).some(w=>w.root===data.root&&w.kind!=='invalid'))throw Error('请选择有效 Work');
+      const work=typeof data.root==='string'&&(await this.listWorks()).find(w=>w.root===data.root);
+      if(!work)throw Error('请选择有效 Work');
+      if(work.kind==='invalid'){
+        const details=work.error||work.issues?.filter(issue=>issue.severity==='error').map(issue=>(issue.member?issue.member+'：':'')+issue.message).join('；');
+        throw Error('此 Work 的登记信息需要修复：'+(details||'请在「仓库与 Worktree」查看工作区诊断'));
+      }
     }
     if(op.startsWith('automatic-')){
       await this.syncAutomatic();return this.request({...data,op});
