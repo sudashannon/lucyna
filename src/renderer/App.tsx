@@ -43,6 +43,8 @@ import {ConversationTimeline} from './components/ConversationTimeline';
 import {historyLabel} from './history-entry';
 import {useFeedback} from './useFeedback';
 import {CopyPlus} from 'lucide-react';
+import {Palette} from 'lucide-react';
+import {readVisualTheme, visualThemeKey, visualThemes, type VisualTheme} from './appearance';
 import {buildTimeline,messageDomId,type TimelineEntry} from './conversation-timeline';
 
 type Tab = 'work' | 'history' | 'preview' | 'memory' | 'events';
@@ -71,6 +73,8 @@ export function App() {
   const toolsPanel = useRef<HTMLElement>(null);
   const toolsOpener = useRef<HTMLElement|null>(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('omp.theme') === 'dark' ? 'dark' : 'light');
+  const [visualTheme, setVisualTheme] = useState<VisualTheme>(readVisualTheme);
+  const blue = visualTheme === 'blue';
   const {draft, setDraft,setDraftForKey, error: draftError,values:allDrafts,loaded:draftsLoaded,retry:retryDrafts} = useDrafts(w.draftKey);
   const {value:images,set:setImages,setForKey:setImagesForKey,error:imageError,values:allImages,loaded:imagesLoaded,retry:retryImages}=useStoredDrafts<DraftImage[]>('images',w.draftKey,()=>({}),noImages);
   const {value:textAttachments,set:setTextAttachments,error:textAttachmentError,values:allTextAttachments,loaded:textAttachmentsLoaded,retry:retryTextAttachments}=useStoredDrafts<DraftTextAttachment[]>('textAttachments',w.draftKey,()=>({}),noTextAttachments);
@@ -120,9 +124,10 @@ export function App() {
   // Keep a usable chat column when both sidebars are open; preserve the user's
   // preferred width so enlarging the window restores it automatically.
   const activeSidebarMin=knowledgeOpen?280:sidebarMinWidth;
+  const navigationWidth=blue && sidebar && viewportWidth>760 ? (viewportWidth>1100?184:72) : 0;
   const sideBySide=panel&&section==='workbench'&&viewportWidth>1280;
-  const visiblePanelWidth=sideBySide?Math.min(panelWidth,Math.max(320,viewportWidth-(sidebar?activeSidebarMin:64)-640)):panelWidth;
-  const sidebarLimit = Math.max(activeSidebarMin, Math.min(knowledgeOpen?480:sidebarMaxWidth, viewportWidth - (sideBySide ? visiblePanelWidth : 0) - (sideBySide?640:480)));
+  const visiblePanelWidth=sideBySide?Math.min(panelWidth,Math.max(320,viewportWidth-navigationWidth-(sidebar?activeSidebarMin:64)-640)):panelWidth;
+  const sidebarLimit = Math.max(activeSidebarMin, Math.min(knowledgeOpen?480:sidebarMaxWidth, viewportWidth - navigationWidth - (sideBySide ? visiblePanelWidth : 0) - (sideBySide?640:480)));
   const visibleSidebarWidth = Math.min(knowledgeOpen?knowledgeSidebarWidth:sidebarWidth, sidebarLimit);
   const resizeSidebar = (width: number) => (knowledgeOpen?setKnowledgeSidebarWidth:setSidebarWidth)(Math.max(activeSidebarMin, Math.min(sidebarLimit, Math.round(width))));
   const endSidebarDrag = () => {sidebarDrag.current = null; setSidebarResizing(false);};
@@ -142,7 +147,8 @@ export function App() {
   const earlier=()=>{const element=transcript.current;if(!element)return;follow.current=false;prepend.current={id:w.id,height:element.scrollHeight,top:element.scrollTop};setHistoryAnchor(w.messages[Math.max(0,startIndex-historyBatch)].id);};
   const workValid = !!w.work && w.work.kind !== 'invalid';
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('omp.theme', theme); }, [theme]);
-  useEffect(()=>{if(customChrome)void api.windowChrome!.theme(theme).catch(w.report);},[customChrome,theme,w.report]);
+  useLayoutEffect(() => {document.documentElement.dataset.visualTheme=visualTheme;localStorage.setItem(visualThemeKey,visualTheme);},[visualTheme]);
+  useEffect(()=>{if(customChrome)void api.windowChrome!.theme(theme,visualTheme).catch(w.report);},[customChrome,theme,visualTheme,w.report]);
   useEffect(() => { localStorage.setItem('omp.panelWidth', String(panelWidth)); }, [panelWidth]);
   useEffect(() => { localStorage.setItem('omp.sidebarWidth', String(sidebarWidth)); }, [sidebarWidth]);
   useEffect(()=>{localStorage.setItem('omp.knowledgeSidebarWidth',String(knowledgeSidebarWidth));},[knowledgeSidebarWidth]);
@@ -270,11 +276,12 @@ export function App() {
     if(restoredImages.length)setImagesForKey(target.draftKey,previous=>[...previous,...restoredImages]);
   };
   const importFile = async () => {if (importBusy) return;setImportBusy(true);let source:string|null=null;try{source=await api.chooseSession();}catch(e){w.report(e);}finally{setImportBusy(false);}if(source)await w.resume({path:source},{copy:true});};
-  const applyClientSettings=async(next:ClientSettings,nextTheme:string,changed:boolean)=>{
+  const applyClientSettings=async(next:ClientSettings,nextTheme:string,changed:boolean,nextVisualTheme?:VisualTheme)=>{
     if(changed){
       const saved=await api.saveSettings(next);setClientSettings(saved);await w.refreshHistory();w.log('默认设置已保存，已有连接继续运行','success',saved.runtime==='wsl'?'新连接使用 WSL 原生 OMP':'新连接使用 Windows 原生 OMP');
     }
     setTheme(nextTheme);
+    if(nextVisualTheme)setVisualTheme(nextVisualTheme);
   };
   const resume = async (entry: HistoryEntry,copy=false) => {follow.current = true; setAwayFromLatest(false);await w.resume(entry,{copy});};
   const restoreHistory=async(key:string)=>{if(!w.work||trashBusy)return;const root=w.work.root;setTrashBusy(true);setTrashError('');try{await api.restoreHistory(root,key);await w.refreshHistory(root);}catch(e){setTrashError(errorText(e));}finally{setTrashBusy(false);}};
@@ -302,8 +309,8 @@ export function App() {
     if(action==='about')setAbout(true);
   };
   useEffect(()=>customChrome?api.windowChrome!.onAction(action=>onWindowAction.current(action)):undefined,[customChrome]);
-  return <Tooltip.Provider><div className={`desktop-window ${customChrome?'with-window-chrome':''} ${demoMode?'demo-window':''}`}>{customChrome&&<WindowTitlebar onError={w.report}/>} {demoMode&&<div className="demo-banner" role="note">演示数据 · 此窗口不连接真实 OMP、WSL 或 Stele</div>}<div data-session-id={w.id} className={`app-shell ${sidebar ? '' : 'rail-mode'} ${section!=='workbench'?'utility-open':''} ${knowledgeOpen ? 'knowledge-open' : section==='workbench'&&panelVisible ? 'with-panel' : ''} ${sidebarResizing ? 'resizing-sidebar' : ''} ${toolsOverlayOpen ? 'tools-overlay-open' : ''}`} style={{'--panel-width': `${visiblePanelWidth}px`, '--sidebar-width': `${visibleSidebarWidth}px`} as CSSProperties}>
-    <aside className="sidebar" id="workspace-navigation" aria-label={knowledgeOpen?'知识库导航':'工作区导航'}>
+  return <Tooltip.Provider><div className={`desktop-window ${customChrome?'with-window-chrome':''} ${demoMode?'demo-window':''}`}>{customChrome&&<WindowTitlebar onError={w.report}/>} {demoMode&&<div className="demo-banner" role="note">演示数据 · 此窗口不连接真实 OMP、WSL 或 Stele</div>}<div data-session-id={w.id} className={`app-shell ${sidebar ? '' : 'rail-mode'} ${section!=='workbench'?'utility-open':''} ${knowledgeOpen ? 'knowledge-open' : section==='workbench'&&panelVisible ? 'with-panel' : ''} ${sidebarResizing ? 'resizing-sidebar' : ''} ${toolsOverlayOpen ? 'tools-overlay-open' : ''}`} style={{'--panel-width': `${visiblePanelWidth}px`, '--sidebar-width': `${visibleSidebarWidth}px`, '--navigation-width': `${navigationWidth}px`} as CSSProperties}>
+    <aside className="sidebar" id="workspace-navigation" aria-label={knowledgeOpen?'知识库导航':'工作区导航'} style={{'--navigation-width':`${navigationWidth}px`} as CSSProperties}>
       {sidebar && <div className="sidebar-resizer" role="separator" aria-label="调整左侧栏宽度" aria-controls="workspace-navigation" aria-orientation="vertical" aria-valuemin={activeSidebarMin} aria-valuemax={sidebarLimit} aria-valuenow={visibleSidebarWidth} aria-valuetext={`${visibleSidebarWidth} 像素`} tabIndex={0} title="拖动调整侧栏宽度；双击恢复默认宽度"
         onDoubleClick={() => (knowledgeOpen?setKnowledgeSidebarWidth:setSidebarWidth)(knowledgeOpen?340:sidebarDefaultWidth)}
         onKeyDown={e => {
@@ -314,9 +321,15 @@ export function App() {
         onPointerMove={e => {const drag = sidebarDrag.current; if (drag && e.currentTarget.hasPointerCapture(e.pointerId)) resizeSidebar(drag.startWidth + e.clientX - drag.startX);}}
         onPointerUp={e => {if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); endSidebarDrag();}}
         onPointerCancel={endSidebarDrag} onLostPointerCapture={endSidebarDrag}/>} 
-      <div className="brand-row"><button className="brand" onClick={() => setAbout(true)} aria-label="关于 Lucyna"><span className="brand-symbol"><BrandLogo size={32}/></span>{sidebar && <span>Lucyna<span className="brand-caption">{knowledgeOpen?'知识库':'工作台'}</span></span>}</button>{sidebar && <SidebarIconButton icon={PanelLeftClose} label="收起侧栏 · Ctrl B" onClick={() => setSidebar(false)}/>}</div>
+      <div className="application-navigation">
+      <div className="brand-row"><button className="brand" onClick={() => setAbout(true)} aria-label="关于 Lucyna"><span className="brand-symbol"><BrandLogo size={32}/></span>{sidebar && <span>Lucyna<span className="brand-caption">{blue?'本地 AI 工作伙伴':knowledgeOpen?'知识库':'工作台'}</span></span>}</button>{sidebar && <SidebarIconButton icon={PanelLeftClose} label="收起侧栏 · Ctrl B" onClick={() => setSidebar(false)}/>}</div>
       {!sidebar && <SidebarIconButton icon={PanelLeftOpen} label="展开侧栏 · Ctrl B" onClick={() => setSidebar(true)}/>}
-      <PrimaryNavigation section={section} expanded={sidebar&&viewportWidth>760} count={w.sessions.filter(s=>s.connection!=='idle').length} onChange={next=>{if(next==='knowledge')setKnowledgeVisited(true);setSection(next);}}/>
+      <PrimaryNavigation section={section} expanded={sidebar&&viewportWidth>(blue?1100:760)} vertical={blue} count={w.sessions.filter(s=>s.connection!=='idle').length} onChange={next=>{if(next==='knowledge')setKnowledgeVisited(true);setSection(next);}}/>
+      {blue&&(!sidebar||viewportWidth<=760)&&<div className="knowledge-sidebar-slot navigation-knowledge" ref={setKnowledgeSidebarTarget} hidden={!knowledgeOpen}/>}
+      {blue&&<><div className="application-actions">{(!sidebar||viewportWidth<=760)&&!knowledgeOpen&&<><button className="application-action" aria-label="新会话" disabled={!workValid} onClick={()=>void newConversation()}><Plus size={18}/><span>新会话</span></button><button className="application-action" aria-label="搜索工作区" onClick={()=>{setPalette(true);setFilter('');}}><Search size={18}/><span>工作区</span></button></>}<button className="application-action" aria-label="设置" onClick={()=>setSettingsOpen(true)}><SlidersHorizontal size={18}/><span>设置</span></button><button className="application-action" aria-label={theme==='light'?'切换深色外观':'切换浅色外观'} onClick={()=>setTheme(theme==='light'?'dark':'light')}>{theme==='light'?<Moon size={18}/>:<Sun size={18}/>}<span>{theme==='light'?'深色外观':'浅色外观'}</span></button></div><div className="sidebar-companion" aria-hidden="true"><BrandCompanions/><div><strong>Lucyna</strong><span>银发搭档与黑猫</span></div></div><div className="navigation-runtime"><TerminalSquare size={13}/><span>{runtimeLabel}</span></div></>}
+      </div>
+      <div className="work-directory">
+      {blue&&sidebar&&<div className="directory-heading"><h2>{knowledgeOpen?'知识目录':'我的工作'}</h2><SidebarIconButton icon={Search} label="搜索工作目录" onClick={()=>{setPalette(true);setFilter('');}}/></div>}
       <div className="work-sidebar-content" hidden={knowledgeOpen}>
       {sidebar ? <><button className="nav-action new-chat" onClick={() => void newConversation()} disabled={!workValid}><Plus size={17}/><span>新会话</span></button><button className="nav-action" onClick={() => {setPalette(true); setFilter('');}}><Search size={16}/><span>搜索工作区</span><kbd>Ctrl K</kbd></button></> : <><SidebarIconButton icon={Plus} label="新会话" disabled={!workValid} onClick={() => void newConversation()}/><SidebarIconButton icon={Search} label="搜索工作区" onClick={() => setPalette(true)}/></>}
       {!sidebar && <SidebarIconButton icon={ClipboardCheck} label="查看工作区检查" onClick={() => setWorkChecksOpen(true)}/>}
@@ -332,11 +345,13 @@ export function App() {
       </div>
       {sidebar && w.work && <button className="nav-action history-shortcut" onClick={() => openPanel('history')}><HistoryIcon size={16}/><span>历史会话</span>{entries.length > 0 && <span className="count">{entries.length}</span>}</button>}
       </div>
-      <div className="knowledge-sidebar-slot" ref={setKnowledgeSidebarTarget} hidden={!knowledgeOpen}/>
+      <div className="knowledge-sidebar-slot" ref={blue&&(!sidebar||viewportWidth<=760)?undefined:setKnowledgeSidebarTarget} hidden={!knowledgeOpen}/>
       <div className="sidebar-bottom"><div className="sidebar-footer-actions"><SidebarIconButton icon={SlidersHorizontal} label="设置" onClick={()=>setSettingsOpen(true)}/><SidebarIconButton icon={theme === 'light' ? Moon : Sun} label={theme === 'light' ? '切换深色外观' : '切换浅色外观'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}/>{sidebar && <><span className="footer-host">{runtimeLabel}</span><SidebarIconButton icon={CircleHelp} label="关于与快捷键" onClick={() => setAbout(true)}/></>}</div>{sidebar && <div className="profile-row"><span className="profile-avatar">L</span><span>本地工作空间<small>{previewMode ? '浏览器界面预览' : runtimeLabel+' · 原生运行时'}</small></span><Check size={13}/></div>}</div>
+      </div>
     </aside>
     <main id="primary-panel-workbench" role="tabpanel" aria-labelledby="primary-tab-workbench" className="workspace-main" hidden={section!=='workbench'}>
-      <header className="workspace-header"><div className="breadcrumb"><FolderOpen size={16}/><button onClick={() => setPalette(true)}>{selectedName}<ChevronDown size={13}/></button><span className="breadcrumb-divider">/</span><button className="session-title" title={w.title} onClick={() => openPanel('history')}>{w.title}</button></div><div className="header-actions">
+      <header className="workspace-header" key={w.work?.root||'no-work'}><div className="breadcrumb"><FolderOpen size={16}/><button onClick={() => setPalette(true)}>{selectedName}<ChevronDown size={13}/></button><span className="breadcrumb-divider">/</span><button className="session-title" title={w.title} onClick={() => openPanel('history')}>{w.title}</button></div><div className="header-actions">
+        <label className="visual-theme-switch"><Palette size={15}/><select aria-label="视觉主题" value={visualTheme} onChange={event=>setVisualTheme(event.target.value as VisualTheme)}>{visualThemes.map(option=><option key={option.id} value={option.id}>{option.name}</option>)}</select></label>
         <SidebarIconButton icon={TerminalSquare} label="WSL 终端" active={terminalVisible} disabled={!workValid} onClick={toggleTerminal}/>
         <SidebarIconButton icon={Globe2} label="在默认浏览器打开网页" onClick={() => {setWeb(true); setWebError('');}}/>
         <SidebarIconButton icon={FileImage} label="预览 Markdown 或图片" disabled={!workValid} onClick={() => void chooseFile()}/>
@@ -421,7 +436,7 @@ export function App() {
     {w.questions[0] && <NativeQuestion key={w.id+w.questions[0].id} question={w.questions[0]} onAnswer={w.answer} open={section==='workbench'&&deferredQuestion!==w.questions[0].id} onLater={()=>setDeferredQuestion(w.questions[0].id)}/>}
     {modelsOpen && <ModelPicker key={w.id} start={w.start} request={w.request} choose={w.changeModel} onClose={() => setModelsOpen(false)}/>}
     <WorkDiagnostics works={w.works} open={workChecksOpen} onClose={() => setWorkChecksOpen(false)} loading={w.loading} onRefresh={() => void w.loadWorks()}/>
-    {settingsOpen && <SettingsDialog onClose={()=>setSettingsOpen(false)} onApply={applyClientSettings} locked={false} theme={theme}/>}
+    {settingsOpen && <SettingsDialog onClose={()=>setSettingsOpen(false)} onApply={applyClientSettings} locked={false} theme={theme} visualTheme={visualTheme}/>}
   </div></div></Tooltip.Provider>;
 }
 function Empty({icon: Icon, title, description}: {icon: typeof Folder; title: string; description: string}) {return <div className="panel-empty"><Icon size={24} strokeWidth={1.3}/><h3>{title}</h3><p>{description}</p></div>;}

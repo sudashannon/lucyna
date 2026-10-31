@@ -8,7 +8,7 @@ const markdown='# 一次工作，留下可复用的知识\n\nLucyna 把 **原生
 const docs=['工作上下文与长期知识','原生会话的生命周期','Markdown 与图表阅读','桌面伙伴的状态设计'].map((title,i)=>({id:'demo-'+i,title,path:'knowledge/'+['context.md','sessions.md','reading.md','companion.md'][i],workspace:'lucyna',type:'knowledge',updatedAt:date,frontmatter:{tags:i?['设计','工作台']:['架构','记忆']}}));
 const settings={version:1,runtime:'wsl',windowsExecutable:'omp',wslExecutable:'/usr/local/bin/omp',wslAgentDir:'/home/demo/.omp/agent',model:'',thinking:'medium'};
 contextBridge.exposeInMainWorld('desktop',{mode:'demo',
-  windowChrome:{enabled:process.argv.includes('--lucyna-titlebar'),menu:(id,position)=>ipcRenderer.invoke('window:menu',id,position),theme:theme=>ipcRenderer.invoke('window:theme',theme),onAction:fn=>{const listener=(_,action)=>fn(action);ipcRenderer.on('window:action',listener);return()=>ipcRenderer.removeListener('window:action',listener);}},
+  windowChrome:{enabled:process.argv.includes('--lucyna-titlebar'),menu:(id,position)=>ipcRenderer.invoke('window:menu',id,position),theme:(theme,visualTheme)=>ipcRenderer.invoke('window:theme',theme,visualTheme),onAction:fn=>{const listener=(_,action)=>fn(action);ipcRenderer.on('window:action',listener);return()=>ipcRenderer.removeListener('window:action',listener);}},
   listWorks:async()=>works,readWork:async()=>session,
   workDetails:async()=>({root,name:'lucyna',kind:'gitless',content:session,modifiedAt:date,fetchedAt:date,members:[],assets:[{name:'architecture.md',path:'architecture.md',kind:'note',indexed:true,modifiedAt:date}],issues:[],warnings:[]}),
   workRun:async()=>[],

@@ -94,3 +94,8 @@ src/pet/assets/companions-atlas-v2.png
 
 # Impeccable rendered review captures are local verification artifacts.
 **/.impeccable/review/
+
+# Persist the selected visual system and its focused acceptance test.
+!DESIGN.md
+!test/blue-theme-desktop.cjs
+!test/pet-topmost-desktop.cjs

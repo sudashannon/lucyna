@@ -7,6 +7,10 @@ const atlases=require('./animation-data.js');
 const {applicationIcon,trayIcon}=require('../app-icon.cjs');
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const bubbleSize={width:350,height:300};
+// Windows can demote the floating level while placing it behind a taskbar
+// that is not itself topmost (for example in a remote desktop session).
+// Keep the companion topmost; its bounds still stay inside the work area.
+const topmostLevel=process.platform==='win32'?'pop-up-menu':'floating';
 function place(area,size,position){return {x:Math.round(clamp(area.x+area.width-size.width-(position?.right??24),area.x,area.x+area.width-size.width)),y:Math.round(clamp(area.y+area.height-size.height-(position?.bottom??24),area.y,area.y+area.height-size.height)),...size};}
 class PetController{
  constructor({directory,getMain,getSessions,onQuit,onState=()=>{}}){this.getMain=getMain;this.getSessions=getSessions;this.onQuit=onQuit;this.onState=onState;this.preferences=new Preferences(directory);this.model=new PetState();this.hidden=false;this.locked=false;this.manual=false;this.theme='light';this.listeners=[];this.handlers=[];this.disposed=false;this.serial=Promise.resolve();this.recoveryAttempts=[];this.diagnostics=[];this.diagnosticFile=path.join(directory,'desktop-pet-window.json');this.diagnosticWrite=Promise.resolve();}
@@ -26,7 +30,7 @@ class PetController{
  save(patch){const next=this.serial.then(async()=>{const value=await this.preferences.save(patch);if(patch.enabled===true)this.hidden=false;await this.apply();return value;});this.serial=next.catch(()=>{});return next;}
  recordWindowState(reason,detail={}){
   const win=this.pet&&!this.pet.isDestroyed()?this.pet:null;
-  this.diagnostics.push({at:new Date().toISOString(),reason,...detail,enabled:this.settings.enabled,hidden:this.hidden,locked:this.locked,visible:win?.isVisible()??false,bounds:win?.getBounds()??null,shapeCount:this.shapeCount||0});
+  this.diagnostics.push({at:new Date().toISOString(),reason,...detail,enabled:this.settings.enabled,hidden:this.hidden,locked:this.locked,visible:win?.isVisible()??false,requestedAlwaysOnTop:this.settings.alwaysOnTop,actualAlwaysOnTop:win?.isAlwaysOnTop()??false,bounds:win?.getBounds()??null,shapeCount:this.shapeCount||0});
   if(this.diagnostics.length>30)this.diagnostics.shift();const data=JSON.stringify(this.diagnostics,null,2);
   // Only window lifecycle metadata; never conversation text or credentials.
   this.diagnosticWrite=this.diagnosticWrite.then(async()=>{await fs.mkdir(path.dirname(this.diagnosticFile),{recursive:true});await fs.writeFile(this.diagnosticFile,data);}).catch(()=>{});
@@ -83,7 +87,7 @@ class PetController{
   if(!this.tray){this.trayKey='';const icon=nativeImage.createFromPath(trayIcon).resize({width:20,height:20});this.tray=new Tray(icon);this.tray.on('click',()=>{this.manual=false;void this.recover({reveal:true}).catch(e=>this.fail(e));});this.tray.on('double-click',()=>this.showMain());}
   try{if(!this.pet||this.pet.isDestroyed())await this.createWindow('sprite');if(!this.bubble||this.bubble.isDestroyed())await this.createWindow('bubble');}
   catch(e){this.hidden=true;this.destroyWindows();this.preferences.warning='桌宠窗口打开失败：'+e.message;this.updateTray();throw e;}
-  for(const win of [this.pet,this.bubble])win.setAlwaysOnTop(this.settings.alwaysOnTop,'floating');
+  for(const win of [this.pet,this.bubble])win.setAlwaysOnTop(this.settings.alwaysOnTop,topmostLevel);
   this.reposition();this.publish();this.recordWindowState('applied');
  }
  reposition(){if(!this.pet||this.pet.isDestroyed())return;this.pet.setBounds(place(this.display().workArea,this.size(),this.settings.position));if(!this.hidden&&!this.locked){this.pet.showInactive();this.refreshSprite();}this.positionBubble();}

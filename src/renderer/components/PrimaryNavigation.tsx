@@ -8,13 +8,14 @@ const sections = [
   {id: 'sessions', label: '活跃会话', icon: Activity},
 ] as const;
 
-export function PrimaryNavigation({section, expanded, count, onChange}: {
+export function PrimaryNavigation({section, expanded, vertical = false, count, onChange}: {
   section: Section;
   expanded: boolean;
+  vertical?: boolean;
   count: number;
   onChange: (section: Section) => void;
 }) {
-  return <nav className={`primary-switcher ${expanded ? '' : 'is-compact'}`} role="tablist" aria-label="主要功能" aria-orientation={expanded ? 'horizontal' : 'vertical'}>
+  return <nav className={`primary-switcher ${expanded ? '' : 'is-compact'} ${vertical ? 'is-vertical' : ''}`} role="tablist" aria-label="主要功能" aria-orientation={expanded && !vertical ? 'horizontal' : 'vertical'}>
     {sections.map(({id, label, icon: Icon}, index) => {
       const description = id === 'sessions' && count > 0 ? `${count} 个连接` : undefined;
       return <button key={id} id={`primary-tab-${id}`} role="tab" aria-controls={`primary-panel-${id}`} tabIndex={section === id ? 0 : -1}
@@ -29,7 +30,7 @@ export function PrimaryNavigation({section, expanded, count, onChange}: {
           onChange(sections[next].id);
           (event.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();
         }}>
-        {expanded ? label : <><Icon size={18}/><span className="primary-compact-label">{id === 'sessions' ? '会话' : label}</span></>}
+        {expanded ? <>{vertical && <Icon size={19}/>}<span>{label}</span></> : <><Icon size={18}/><span className="primary-compact-label">{id === 'sessions' ? '会话' : label}</span></>}
         {id === 'sessions' && count > 0 && <span className="primary-count" aria-hidden="true">{count > 99 ? '99+' : count}</span>}
       </button>;
     })}

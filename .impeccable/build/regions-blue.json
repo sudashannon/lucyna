@@ -1,0 +1,767 @@
+{
+  "regions": [
+    {
+      "id": "nav-ground",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 0,
+        "y": 0,
+        "w": 235,
+        "h": 992
+      },
+      "note": "Undivided deep navy navigation background",
+      "container": true
+    },
+    {
+      "id": "directory-ground",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 235,
+        "y": 0,
+        "w": 294,
+        "h": 992
+      },
+      "note": "Undivided pale blue Work directory background",
+      "container": true
+    },
+    {
+      "id": "brand",
+      "kind": "text",
+      "pixelBox": {
+        "x": 65,
+        "y": 22,
+        "w": 138,
+        "h": 32
+      },
+      "note": "Lucyna brand name in white sans serif"
+    },
+    {
+      "id": "tagline",
+      "kind": "text",
+      "pixelBox": {
+        "x": 65,
+        "y": 56,
+        "w": 156,
+        "h": 22
+      },
+      "note": "Short local AI work companion description"
+    },
+    {
+      "id": "workbench",
+      "kind": "control",
+      "pixelBox": {
+        "x": 10,
+        "y": 96,
+        "w": 215,
+        "h": 56
+      },
+      "note": "Selected blue workbench navigation button"
+    },
+    {
+      "id": "knowledge",
+      "kind": "control",
+      "pixelBox": {
+        "x": 10,
+        "y": 158,
+        "w": 215,
+        "h": 56
+      },
+      "note": "Knowledge navigation button"
+    },
+    {
+      "id": "sessions",
+      "kind": "control",
+      "pixelBox": {
+        "x": 10,
+        "y": 218,
+        "w": 215,
+        "h": 56
+      },
+      "note": "Sessions navigation button"
+    },
+    {
+      "id": "settings",
+      "kind": "control",
+      "pixelBox": {
+        "x": 10,
+        "y": 320,
+        "w": 215,
+        "h": 56
+      },
+      "note": "Settings navigation button"
+    },
+    {
+      "id": "companion",
+      "kind": "plate",
+      "pixelBox": {
+        "x": 0,
+        "y": 465,
+        "w": 235,
+        "h": 423
+      },
+      "note": "Existing silver-haired Lucyna girl holding black cat cutout in lower navigation",
+      "bleed": true
+    },
+    {
+      "id": "companion-caption",
+      "kind": "text",
+      "pixelBox": {
+        "x": 29,
+        "y": 887,
+        "w": 180,
+        "h": 78
+      },
+      "note": "Short companion caption and Lucyna name"
+    },
+    {
+      "id": "directory-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 252,
+        "y": 23,
+        "w": 86,
+        "h": 24
+      },
+      "note": "Search Work directory heading"
+    },
+    {
+      "id": "search",
+      "kind": "control",
+      "pixelBox": {
+        "x": 248,
+        "y": 51,
+        "w": 141,
+        "h": 43
+      },
+      "note": "Search Work input with magnifier"
+    },
+    {
+      "id": "new-session",
+      "kind": "control",
+      "pixelBox": {
+        "x": 399,
+        "y": 51,
+        "w": 116,
+        "h": 43
+      },
+      "note": "Blue new conversation action"
+    },
+    {
+      "id": "work-0",
+      "kind": "control",
+      "pixelBox": {
+        "x": 245,
+        "y": 110,
+        "w": 275,
+        "h": 86
+      },
+      "note": "Work folder selector with name and session summary"
+    },
+    {
+      "id": "work-1",
+      "kind": "control",
+      "pixelBox": {
+        "x": 245,
+        "y": 208,
+        "w": 275,
+        "h": 86
+      },
+      "note": "Work folder selector with name and session summary"
+    },
+    {
+      "id": "work-2",
+      "kind": "control",
+      "pixelBox": {
+        "x": 245,
+        "y": 301,
+        "w": 275,
+        "h": 86
+      },
+      "note": "Work folder selector with name and session summary"
+    },
+    {
+      "id": "recent-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 253,
+        "y": 435,
+        "w": 100,
+        "h": 26
+      },
+      "note": "Recent conversations heading"
+    },
+    {
+      "id": "recent-0",
+      "kind": "control",
+      "pixelBox": {
+        "x": 246,
+        "y": 473,
+        "w": 270,
+        "h": 55
+      },
+      "note": "Recent conversation selector with title and timestamp"
+    },
+    {
+      "id": "recent-1",
+      "kind": "control",
+      "pixelBox": {
+        "x": 246,
+        "y": 540,
+        "w": 270,
+        "h": 55
+      },
+      "note": "Recent conversation selector with title and timestamp"
+    },
+    {
+      "id": "recent-2",
+      "kind": "control",
+      "pixelBox": {
+        "x": 246,
+        "y": 597,
+        "w": 270,
+        "h": 55
+      },
+      "note": "Recent conversation selector with title and timestamp"
+    },
+    {
+      "id": "recent-3",
+      "kind": "control",
+      "pixelBox": {
+        "x": 246,
+        "y": 653,
+        "w": 270,
+        "h": 55
+      },
+      "note": "Recent conversation selector with title and timestamp"
+    },
+    {
+      "id": "recent-4",
+      "kind": "control",
+      "pixelBox": {
+        "x": 246,
+        "y": 712,
+        "w": 270,
+        "h": 55
+      },
+      "note": "Recent conversation selector with title and timestamp"
+    },
+    {
+      "id": "work-header",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 529,
+        "y": 0,
+        "w": 645,
+        "h": 90
+      },
+      "note": "Current Work context header",
+      "container": true
+    },
+    {
+      "id": "work-context",
+      "kind": "control",
+      "pixelBox": {
+        "x": 548,
+        "y": 14,
+        "w": 610,
+        "h": 62
+      },
+      "note": "Current Work folder, title and truthful description"
+    },
+    {
+      "id": "session-tabs",
+      "kind": "control",
+      "pixelBox": {
+        "x": 544,
+        "y": 92,
+        "w": 615,
+        "h": 46
+      },
+      "note": "Active conversation tab and new conversation control"
+    },
+    {
+      "id": "user-author",
+      "kind": "text",
+      "pixelBox": {
+        "x": 617,
+        "y": 165,
+        "w": 145,
+        "h": 28
+      },
+      "note": "User author and time metadata"
+    },
+    {
+      "id": "user-avatar",
+      "kind": "control",
+      "pixelBox": {
+        "x": 551,
+        "y": 165,
+        "w": 53,
+        "h": 53
+      },
+      "note": "Circular user avatar glyph"
+    },
+    {
+      "id": "user-message",
+      "kind": "text",
+      "pixelBox": {
+        "x": 633,
+        "y": 205,
+        "w": 498,
+        "h": 33
+      },
+      "note": "User request to continue the Work and inspect knowledge reading"
+    },
+    {
+      "id": "assistant-avatar",
+      "kind": "image",
+      "pixelBox": {
+        "x": 548,
+        "y": 272,
+        "w": 56,
+        "h": 58
+      },
+      "note": "Small existing Lucyna girl avatar"
+    },
+    {
+      "id": "assistant-author",
+      "kind": "text",
+      "pixelBox": {
+        "x": 617,
+        "y": 276,
+        "w": 159,
+        "h": 25
+      },
+      "note": "Lucyna author and time metadata"
+    },
+    {
+      "id": "reply-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 634,
+        "y": 329,
+        "w": 475,
+        "h": 37
+      },
+      "note": "Bold Chinese answer heading about recovered Work context"
+    },
+    {
+      "id": "reply-intro",
+      "kind": "text",
+      "pixelBox": {
+        "x": 633,
+        "y": 373,
+        "w": 511,
+        "h": 55
+      },
+      "note": "Two-line answer introduction"
+    },
+    {
+      "id": "work-content",
+      "kind": "text",
+      "pixelBox": {
+        "x": 668,
+        "y": 445,
+        "w": 468,
+        "h": 98
+      },
+      "note": "Current Work section heading and factual context bullets"
+    },
+    {
+      "id": "knowledge-content",
+      "kind": "text",
+      "pixelBox": {
+        "x": 668,
+        "y": 579,
+        "w": 468,
+        "h": 119
+      },
+      "note": "Knowledge reading section heading and bullets"
+    },
+    {
+      "id": "sessions-content",
+      "kind": "text",
+      "pixelBox": {
+        "x": 668,
+        "y": 733,
+        "w": 468,
+        "h": 97
+      },
+      "note": "Retained OMP sessions heading and bullets"
+    },
+    {
+      "id": "reply-ending",
+      "kind": "text",
+      "pixelBox": {
+        "x": 634,
+        "y": 851,
+        "w": 507,
+        "h": 61
+      },
+      "note": "Short continuation paragraph"
+    },
+    {
+      "id": "composer",
+      "kind": "control",
+      "pixelBox": {
+        "x": 541,
+        "y": 916,
+        "w": 625,
+        "h": 66
+      },
+      "note": "Message input with attachments and blue Send button"
+    },
+    {
+      "id": "inspector-tabs",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1184,
+        "y": 38,
+        "w": 390,
+        "h": 51
+      },
+      "note": "Work files terminal memory inspector tabs"
+    },
+    {
+      "id": "inspector-work",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1190,
+        "y": 98,
+        "w": 380,
+        "h": 108
+      },
+      "note": "Current Work summary with folder and description"
+    },
+    {
+      "id": "goal-heading",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1250,
+        "y": 242,
+        "w": 133,
+        "h": 27
+      },
+      "note": "Current goal heading"
+    },
+    {
+      "id": "goal-edit",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1487,
+        "y": 238,
+        "w": 72,
+        "h": 38
+      },
+      "note": "Edit current goal action"
+    },
+    {
+      "id": "goal-body",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1208,
+        "y": 295,
+        "w": 339,
+        "h": 52
+      },
+      "note": "Current Work goal in readable body text"
+    },
+    {
+      "id": "next-heading",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1250,
+        "y": 407,
+        "w": 130,
+        "h": 27
+      },
+      "note": "Next steps heading"
+    },
+    {
+      "id": "next-body",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1210,
+        "y": 448,
+        "w": 346,
+        "h": 126
+      },
+      "note": "Next steps checkbox list"
+    },
+    {
+      "id": "sources-heading",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1250,
+        "y": 610,
+        "w": 180,
+        "h": 27
+      },
+      "note": "Context sources heading"
+    },
+    {
+      "id": "sources-body",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1210,
+        "y": 654,
+        "w": 345,
+        "h": 115
+      },
+      "note": "Context sources list"
+    },
+    {
+      "id": "health-heading",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1247,
+        "y": 818,
+        "w": 156,
+        "h": 27
+      },
+      "note": "Runtime environment status heading"
+    },
+    {
+      "id": "health-body",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1204,
+        "y": 859,
+        "w": 354,
+        "h": 96
+      },
+      "note": "Runtime connection state rows"
+    },
+    {
+      "id": "directory-rule",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 528,
+        "y": 0,
+        "w": 1,
+        "h": 992
+      },
+      "note": "Hairline separating Work directory from the conversation"
+    },
+    {
+      "id": "inspector-rule",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1173,
+        "y": 0,
+        "w": 1,
+        "h": 992
+      },
+      "note": "Hairline separating conversation from inspector"
+    },
+    {
+      "id": "tabs-rule",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 529,
+        "y": 137,
+        "w": 645,
+        "h": 1
+      },
+      "note": "Horizontal rule below conversation tabs"
+    },
+    {
+      "id": "user-bubble",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 617,
+        "y": 196,
+        "w": 537,
+        "h": 54
+      },
+      "note": "Pale blue user message background",
+      "container": true
+    },
+    {
+      "id": "assistant-answer",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 617,
+        "y": 310,
+        "w": 537,
+        "h": 601
+      },
+      "note": "White rounded assistant answer container",
+      "container": true
+    },
+    {
+      "id": "work-surface",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 633,
+        "y": 432,
+        "w": 506,
+        "h": 123
+      },
+      "note": "Soft blue current Work text section background",
+      "container": true
+    },
+    {
+      "id": "knowledge-surface",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 633,
+        "y": 562,
+        "w": 506,
+        "h": 147
+      },
+      "note": "Soft blue knowledge text section background",
+      "container": true
+    },
+    {
+      "id": "sessions-surface",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 633,
+        "y": 719,
+        "w": 506,
+        "h": 123
+      },
+      "note": "Soft blue retained sessions text section background",
+      "container": true
+    },
+    {
+      "id": "goal-surface",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1190,
+        "y": 228,
+        "w": 380,
+        "h": 139
+      },
+      "note": "White current goal card and standard target icon",
+      "container": true
+    },
+    {
+      "id": "next-surface",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1190,
+        "y": 383,
+        "w": 380,
+        "h": 206
+      },
+      "note": "White next steps card and list icon",
+      "container": true
+    },
+    {
+      "id": "sources-surface",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1190,
+        "y": 604,
+        "w": 380,
+        "h": 185
+      },
+      "note": "White context sources card and database icon",
+      "container": true
+    },
+    {
+      "id": "health-surface",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1190,
+        "y": 803,
+        "w": 380,
+        "h": 166
+      },
+      "note": "White runtime status card",
+      "container": true
+    },
+    {
+      "id": "goal-icon",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1204,
+        "y": 237,
+        "w": 40,
+        "h": 40
+      },
+      "note": "Standard UI icon or selected control edge visible in the comp"
+    },
+    {
+      "id": "next-icon",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1204,
+        "y": 393,
+        "w": 40,
+        "h": 42
+      },
+      "note": "Standard UI icon or selected control edge visible in the comp"
+    },
+    {
+      "id": "sources-icon",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1204,
+        "y": 604,
+        "w": 40,
+        "h": 42
+      },
+      "note": "Standard UI icon or selected control edge visible in the comp"
+    },
+    {
+      "id": "health-icon",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1204,
+        "y": 810,
+        "w": 40,
+        "h": 40
+      },
+      "note": "Standard UI icon or selected control edge visible in the comp"
+    },
+    {
+      "id": "tabs-bottom",
+      "kind": "control",
+      "pixelBox": {
+        "x": 529,
+        "y": 134,
+        "w": 645,
+        "h": 7
+      },
+      "note": "Standard UI icon or selected control edge visible in the comp"
+    },
+    {
+      "id": "work-selection-edge",
+      "kind": "control",
+      "pixelBox": {
+        "x": 237,
+        "y": 109,
+        "w": 10,
+        "h": 84
+      },
+      "note": "Standard UI icon or selected control edge visible in the comp"
+    },
+    {
+      "id": "work-row-arrow",
+      "kind": "control",
+      "pixelBox": {
+        "x": 496,
+        "y": 131,
+        "w": 25,
+        "h": 38
+      },
+      "note": "Standard UI icon or selected control edge visible in the comp"
+    },
+    {
+      "id": "composer-edge",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1138,
+        "y": 913,
+        "w": 36,
+        "h": 76
+      },
+      "note": "Standard UI icon or selected control edge visible in the comp"
+    }
+  ],
+  "allowUncovered": true,
+  "coverageReview": "Inspected the numbered overlay: all visible content and controls are named. Remaining heuristic cells straddle already named UI, tinted ground, rules and card edges; no additional standalone content is present."
+}

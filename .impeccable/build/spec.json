@@ -1,0 +1,3940 @@
+{
+  "tool": "comp-spec",
+  "version": 1,
+  "createdAt": "2026-10-30T10:40:23.656Z",
+  "comp": ".impeccable/mocks/decision/current-round/modular.png",
+  "warnings": [
+    "region nav-ground: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region directory-ground: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region companion: \"bleed\": true set in the regions file (the clipped-artwork refusal is overridden: the page crops it there)",
+    "region work-header: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region user-bubble: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region assistant-answer: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region work-surface: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region knowledge-surface: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region sessions-surface: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region goal-surface: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region next-surface: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region sources-surface: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region health-surface: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)"
+  ],
+  "uncoveredInkCells": [
+    "D1",
+    "E1",
+    "H3",
+    "H4",
+    "H6",
+    "H7",
+    "H8",
+    "H9"
+  ],
+  "compSize": {
+    "width": 1586,
+    "height": 992
+  },
+  "aspect": 1.5988,
+  "orientation": "landscape",
+  "palette": [
+    {
+      "hex": "#f4f7f8",
+      "coverage": 0.8674
+    },
+    {
+      "hex": "#0a193b",
+      "coverage": 0.0832
+    },
+    {
+      "hex": "#b4b9cb",
+      "coverage": 0.0218
+    },
+    {
+      "hex": "#1769e9",
+      "coverage": 0.014
+    },
+    {
+      "hex": "#7e869e",
+      "coverage": 0.0135
+    }
+  ],
+  "bands": [
+    {
+      "y": 0.05,
+      "strength": 0.251
+    },
+    {
+      "y": 0.1,
+      "strength": 0.2315
+    },
+    {
+      "y": 0.6625,
+      "strength": 0.2275
+    },
+    {
+      "y": 0.7375,
+      "strength": 0.2002
+    },
+    {
+      "y": 0.8625,
+      "strength": 0.2816
+    },
+    {
+      "y": 0.9375,
+      "strength": 0.23
+    }
+  ],
+  "regions": [
+    {
+      "id": "nav-ground",
+      "kind": "chrome",
+      "note": "Undivided deep navy navigation background",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0.1482,
+        "h": 1
+      },
+      "px": {
+        "x": 0,
+        "y": 0,
+        "w": 235,
+        "h": 992
+      },
+      "aspect": 0.2369,
+      "palette": [
+        {
+          "hex": "#0a193b",
+          "coverage": 0.5869
+        },
+        {
+          "hex": "#f3f0ef",
+          "coverage": 0.2117
+        },
+        {
+          "hex": "#2c2d38",
+          "coverage": 0.0909
+        },
+        {
+          "hex": "#186ae9",
+          "coverage": 0.0568
+        },
+        {
+          "hex": "#1a385a",
+          "coverage": 0.0536
+        }
+      ],
+      "detail": {
+        "energy": 23.4798
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "directory-ground",
+      "kind": "chrome",
+      "note": "Undivided pale blue Work directory background",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.1482,
+        "y": 0,
+        "w": 0.1854,
+        "h": 1
+      },
+      "px": {
+        "x": 235,
+        "y": 0,
+        "w": 294,
+        "h": 992
+      },
+      "aspect": 0.2964,
+      "palette": [
+        {
+          "hex": "#ebf6f8",
+          "coverage": 0.9503
+        },
+        {
+          "hex": "#a9b1c3",
+          "coverage": 0.0188
+        },
+        {
+          "hex": "#76819c",
+          "coverage": 0.0132
+        },
+        {
+          "hex": "#1666e9",
+          "coverage": 0.0129
+        },
+        {
+          "hex": "#434d6e",
+          "coverage": 0.0047
+        }
+      ],
+      "detail": {
+        "energy": 14.6196
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": true
+      }
+    },
+    {
+      "id": "brand",
+      "kind": "text",
+      "note": "Lucyna brand name in white sans serif",
+      "grid": null,
+      "box": {
+        "x": 0.041,
+        "y": 0.0222,
+        "w": 0.087,
+        "h": 0.0323
+      },
+      "px": {
+        "x": 65,
+        "y": 22,
+        "w": 138,
+        "h": 32
+      },
+      "aspect": 4.3125,
+      "palette": [
+        {
+          "hex": "#09193a",
+          "coverage": 0.8427
+        },
+        {
+          "hex": "#f6f6f7",
+          "coverage": 0.0907
+        },
+        {
+          "hex": "#999bac",
+          "coverage": 0.0323
+        },
+        {
+          "hex": "#556179",
+          "coverage": 0.0242
+        },
+        {
+          "hex": "#182b3b",
+          "coverage": 0.0101
+        }
+      ],
+      "detail": {
+        "energy": 26.2717
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 19,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6062,
+          "advTall": 0.6062,
+          "advX": 0.6325,
+          "gap": 0.1054,
+          "xRatio": 0.7291,
+          "stemW": 0.1996,
+          "contrast": 1.2047,
+          "serif": null,
+          "densTall": 0.4271,
+          "densX": 0.6405,
+          "weight": 0.4271
+        },
+        "widthClass": "normal",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "tagline",
+      "kind": "text",
+      "note": "Short local AI work companion description",
+      "grid": null,
+      "box": {
+        "x": 0.041,
+        "y": 0.0565,
+        "w": 0.0984,
+        "h": 0.0222
+      },
+      "px": {
+        "x": 65,
+        "y": 56,
+        "w": 156,
+        "h": 22
+      },
+      "aspect": 7.0909,
+      "palette": [
+        {
+          "hex": "#0a183a",
+          "coverage": 0.7694
+        },
+        {
+          "hex": "#41516e",
+          "coverage": 0.1092
+        },
+        {
+          "hex": "#b1c1d7",
+          "coverage": 0.051
+        },
+        {
+          "hex": "#090e1e",
+          "coverage": 0.0364
+        },
+        {
+          "hex": "#7987a6",
+          "coverage": 0.034
+        }
+      ],
+      "detail": {
+        "energy": 44.5276
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 14,
+          "capHeightPx": 13.9,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.683,
+          "advTall": 0.683,
+          "advX": null,
+          "gap": 0.0719,
+          "xRatio": 0.7998,
+          "stemW": 0.1359,
+          "contrast": 0.9889,
+          "serif": 0.5152,
+          "densTall": 0.4718,
+          "densX": null,
+          "weight": 0.4718
+        },
+        "widthClass": "normal",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "workbench",
+      "kind": "control",
+      "note": "Selected blue workbench navigation button",
+      "grid": null,
+      "box": {
+        "x": 0.0063,
+        "y": 0.0968,
+        "w": 0.1356,
+        "h": 0.0565
+      },
+      "px": {
+        "x": 10,
+        "y": 96,
+        "w": 215,
+        "h": 56
+      },
+      "aspect": 3.8393,
+      "palette": [
+        {
+          "hex": "#1869e9",
+          "coverage": 0.8651
+        },
+        {
+          "hex": "#081847",
+          "coverage": 0.059
+        },
+        {
+          "hex": "#f6f7f8",
+          "coverage": 0.0575
+        },
+        {
+          "hex": "#2d7be1",
+          "coverage": 0.0111
+        },
+        {
+          "hex": "#a6cbf6",
+          "coverage": 0.0074
+        }
+      ],
+      "detail": {
+        "energy": 11.9591
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "knowledge",
+      "kind": "control",
+      "note": "Knowledge navigation button",
+      "grid": null,
+      "box": {
+        "x": 0.0063,
+        "y": 0.1593,
+        "w": 0.1356,
+        "h": 0.0565
+      },
+      "px": {
+        "x": 10,
+        "y": 158,
+        "w": 215,
+        "h": 56
+      },
+      "aspect": 3.8393,
+      "palette": [
+        {
+          "hex": "#081839",
+          "coverage": 0.9332
+        },
+        {
+          "hex": "#96a6c9",
+          "coverage": 0.0227
+        },
+        {
+          "hex": "#c9d6f1",
+          "coverage": 0.0198
+        },
+        {
+          "hex": "#576589",
+          "coverage": 0.0183
+        },
+        {
+          "hex": "#324066",
+          "coverage": 0.0059
+        }
+      ],
+      "detail": {
+        "energy": 14.2341
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "sessions",
+      "kind": "control",
+      "note": "Sessions navigation button",
+      "grid": null,
+      "box": {
+        "x": 0.0063,
+        "y": 0.2198,
+        "w": 0.1356,
+        "h": 0.0565
+      },
+      "px": {
+        "x": 10,
+        "y": 218,
+        "w": 215,
+        "h": 56
+      },
+      "aspect": 3.8393,
+      "palette": [
+        {
+          "hex": "#081838",
+          "coverage": 0.9478
+        },
+        {
+          "hex": "#bdcdea",
+          "coverage": 0.0287
+        },
+        {
+          "hex": "#485a7a",
+          "coverage": 0.0147
+        },
+        {
+          "hex": "#6d7f9f",
+          "coverage": 0.0051
+        },
+        {
+          "hex": "#2b3262",
+          "coverage": 0.0037
+        }
+      ],
+      "detail": {
+        "energy": 11.0602
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "settings",
+      "kind": "control",
+      "note": "Settings navigation button",
+      "grid": null,
+      "box": {
+        "x": 0.0063,
+        "y": 0.3226,
+        "w": 0.1356,
+        "h": 0.0565
+      },
+      "px": {
+        "x": 10,
+        "y": 320,
+        "w": 215,
+        "h": 56
+      },
+      "aspect": 3.8393,
+      "palette": [
+        {
+          "hex": "#081838",
+          "coverage": 0.9446
+        },
+        {
+          "hex": "#afbddd",
+          "coverage": 0.0281
+        },
+        {
+          "hex": "#7685a7",
+          "coverage": 0.0126
+        },
+        {
+          "hex": "#d5e5f4",
+          "coverage": 0.0081
+        },
+        {
+          "hex": "#4c5a83",
+          "coverage": 0.0067
+        }
+      ],
+      "detail": {
+        "energy": 12.2069
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "companion",
+      "kind": "plate",
+      "note": "Existing silver-haired Lucyna girl holding black cat cutout in lower navigation",
+      "grid": null,
+      "bleed": true,
+      "box": {
+        "x": 0,
+        "y": 0.4688,
+        "w": 0.1482,
+        "h": 0.4264
+      },
+      "px": {
+        "x": 0,
+        "y": 465,
+        "w": 235,
+        "h": 423
+      },
+      "aspect": 0.5556,
+      "palette": [
+        {
+          "hex": "#f3f0ef",
+          "coverage": 0.4901
+        },
+        {
+          "hex": "#2c2d38",
+          "coverage": 0.2177
+        },
+        {
+          "hex": "#0b1a3d",
+          "coverage": 0.1492
+        },
+        {
+          "hex": "#bcc0d6",
+          "coverage": 0.0763
+        },
+        {
+          "hex": "#0e0e13",
+          "coverage": 0.0667
+        }
+      ],
+      "detail": {
+        "energy": 37.1095
+      },
+      "medium": "raster",
+      "plate": "src/renderer/assets/brand/cindy-omp-companions-v1.png",
+      "text": null
+    },
+    {
+      "id": "companion-caption",
+      "kind": "text",
+      "note": "Short companion caption and Lucyna name",
+      "grid": null,
+      "box": {
+        "x": 0.0183,
+        "y": 0.8942,
+        "w": 0.1135,
+        "h": 0.0786
+      },
+      "px": {
+        "x": 29,
+        "y": 887,
+        "w": 180,
+        "h": 78
+      },
+      "aspect": 2.3077,
+      "palette": [
+        {
+          "hex": "#172959",
+          "coverage": 0.5221
+        },
+        {
+          "hex": "#183858",
+          "coverage": 0.3333
+        },
+        {
+          "hex": "#c2cfe3",
+          "coverage": 0.0586
+        },
+        {
+          "hex": "#7f92b0",
+          "coverage": 0.0482
+        },
+        {
+          "hex": "#485b85",
+          "coverage": 0.0378
+        }
+      ],
+      "detail": {
+        "energy": 29.9962
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 2,
+          "glyphs": 17,
+          "capHeightPx": 14.2,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.9696,
+          "advTall": 0.9696,
+          "advX": null,
+          "gap": 0.0718,
+          "xRatio": 0.7048,
+          "stemW": 0.1462,
+          "contrast": 1.0909,
+          "serif": 1.2756,
+          "densTall": 0.5642,
+          "densX": null,
+          "weight": 0.5642
+        },
+        "widthClass": "wide",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "directory-title",
+      "kind": "text",
+      "note": "Search Work directory heading",
+      "grid": null,
+      "box": {
+        "x": 0.1589,
+        "y": 0.0232,
+        "w": 0.0542,
+        "h": 0.0242
+      },
+      "px": {
+        "x": 252,
+        "y": 23,
+        "w": 86,
+        "h": 24
+      },
+      "aspect": 3.5833,
+      "palette": [
+        {
+          "hex": "#f1f7f8",
+          "coverage": 0.7546
+        },
+        {
+          "hex": "#0a0c17",
+          "coverage": 0.0833
+        },
+        {
+          "hex": "#636481",
+          "coverage": 0.0556
+        },
+        {
+          "hex": "#151537",
+          "coverage": 0.0556
+        },
+        {
+          "hex": "#2f3144",
+          "coverage": 0.0509
+        }
+      ],
+      "detail": {
+        "energy": 31.2798
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 4,
+          "capHeightPx": 14.1,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 1.0121,
+          "advTall": 1.0121,
+          "advX": 1.0299,
+          "gap": 0.071,
+          "xRatio": 0.8438,
+          "stemW": 0.1829,
+          "contrast": 1.1753,
+          "serif": null,
+          "densTall": 0.5969,
+          "densX": 0.4522,
+          "weight": 0.5969
+        },
+        "widthClass": "wide",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "search",
+      "kind": "control",
+      "note": "Search Work input with magnifier",
+      "grid": null,
+      "box": {
+        "x": 0.1564,
+        "y": 0.0514,
+        "w": 0.0889,
+        "h": 0.0433
+      },
+      "px": {
+        "x": 248,
+        "y": 51,
+        "w": 141,
+        "h": 43
+      },
+      "aspect": 3.2791,
+      "palette": [
+        {
+          "hex": "#f5f6f8",
+          "coverage": 0.922
+        },
+        {
+          "hex": "#7c85a5",
+          "coverage": 0.0355
+        },
+        {
+          "hex": "#c5c9d9",
+          "coverage": 0.0199
+        },
+        {
+          "hex": "#9da6b8",
+          "coverage": 0.0142
+        },
+        {
+          "hex": "#4b587d",
+          "coverage": 0.0085
+        }
+      ],
+      "detail": {
+        "energy": 12.2323
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "new-session",
+      "kind": "control",
+      "note": "Blue new conversation action",
+      "grid": null,
+      "box": {
+        "x": 0.2516,
+        "y": 0.0514,
+        "w": 0.0731,
+        "h": 0.0433
+      },
+      "px": {
+        "x": 399,
+        "y": 51,
+        "w": 116,
+        "h": 43
+      },
+      "aspect": 2.6977,
+      "palette": [
+        {
+          "hex": "#196ae9",
+          "coverage": 0.8042
+        },
+        {
+          "hex": "#f2f7f8",
+          "coverage": 0.1206
+        },
+        {
+          "hex": "#b5d2f6",
+          "coverage": 0.028
+        },
+        {
+          "hex": "#679bef",
+          "coverage": 0.0245
+        },
+        {
+          "hex": "#88b2ef",
+          "coverage": 0.0227
+        }
+      ],
+      "detail": {
+        "energy": 18.7482
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "work-0",
+      "kind": "control",
+      "note": "Work folder selector with name and session summary",
+      "grid": null,
+      "box": {
+        "x": 0.1545,
+        "y": 0.1109,
+        "w": 0.1734,
+        "h": 0.0867
+      },
+      "px": {
+        "x": 245,
+        "y": 110,
+        "w": 275,
+        "h": 86
+      },
+      "aspect": 3.1977,
+      "palette": [
+        {
+          "hex": "#dae9f8",
+          "coverage": 0.9632
+        },
+        {
+          "hex": "#8392b1",
+          "coverage": 0.0157
+        },
+        {
+          "hex": "#b3c5e0",
+          "coverage": 0.0119
+        },
+        {
+          "hex": "#4083f0",
+          "coverage": 0.0046
+        },
+        {
+          "hex": "#93bdf8",
+          "coverage": 0.0046
+        }
+      ],
+      "detail": {
+        "energy": 15.7924
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "work-1",
+      "kind": "control",
+      "note": "Work folder selector with name and session summary",
+      "grid": null,
+      "box": {
+        "x": 0.1545,
+        "y": 0.2097,
+        "w": 0.1734,
+        "h": 0.0867
+      },
+      "px": {
+        "x": 245,
+        "y": 208,
+        "w": 275,
+        "h": 86
+      },
+      "aspect": 3.1977,
+      "palette": [
+        {
+          "hex": "#eff7f8",
+          "coverage": 0.9441
+        },
+        {
+          "hex": "#bcc3d5",
+          "coverage": 0.0257
+        },
+        {
+          "hex": "#606d8e",
+          "coverage": 0.017
+        },
+        {
+          "hex": "#8c97b0",
+          "coverage": 0.0094
+        },
+        {
+          "hex": "#080812",
+          "coverage": 0.0038
+        }
+      ],
+      "detail": {
+        "energy": 18.3412
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "work-2",
+      "kind": "control",
+      "note": "Work folder selector with name and session summary",
+      "grid": null,
+      "box": {
+        "x": 0.1545,
+        "y": 0.3034,
+        "w": 0.1734,
+        "h": 0.0867
+      },
+      "px": {
+        "x": 245,
+        "y": 301,
+        "w": 275,
+        "h": 86
+      },
+      "aspect": 3.1977,
+      "palette": [
+        {
+          "hex": "#eff8f8",
+          "coverage": 0.9314
+        },
+        {
+          "hex": "#c8cfe1",
+          "coverage": 0.0276
+        },
+        {
+          "hex": "#7884a2",
+          "coverage": 0.0238
+        },
+        {
+          "hex": "#a1abbe",
+          "coverage": 0.0111
+        },
+        {
+          "hex": "#080812",
+          "coverage": 0.0061
+        }
+      ],
+      "detail": {
+        "energy": 22.7271
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "recent-title",
+      "kind": "text",
+      "note": "Recent conversations heading",
+      "grid": null,
+      "box": {
+        "x": 0.1595,
+        "y": 0.4385,
+        "w": 0.0631,
+        "h": 0.0262
+      },
+      "px": {
+        "x": 253,
+        "y": 435,
+        "w": 100,
+        "h": 26
+      },
+      "aspect": 3.8462,
+      "palette": [
+        {
+          "hex": "#f1f8f8",
+          "coverage": 0.7891
+        },
+        {
+          "hex": "#0b0d23",
+          "coverage": 0.0578
+        },
+        {
+          "hex": "#2b3246",
+          "coverage": 0.0578
+        },
+        {
+          "hex": "#7d8799",
+          "coverage": 0.051
+        },
+        {
+          "hex": "#4c5366",
+          "coverage": 0.0442
+        }
+      ],
+      "detail": {
+        "energy": 29.7318
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 4,
+          "capHeightPx": 14.1,
+          "inkIsDark": true,
+          "allCaps": true,
+          "advance": 1.0117,
+          "advTall": 1.0117,
+          "advX": null,
+          "gap": 0.1065,
+          "xRatio": null,
+          "stemW": 0.2042,
+          "contrast": 1.2976,
+          "serif": null,
+          "densTall": 0.6169,
+          "densX": null,
+          "weight": 0.6169
+        },
+        "widthClass": "wide",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "recent-0",
+      "kind": "control",
+      "note": "Recent conversation selector with title and timestamp",
+      "grid": null,
+      "box": {
+        "x": 0.1551,
+        "y": 0.4768,
+        "w": 0.1702,
+        "h": 0.0554
+      },
+      "px": {
+        "x": 246,
+        "y": 473,
+        "w": 270,
+        "h": 55
+      },
+      "aspect": 4.9091,
+      "palette": [
+        {
+          "hex": "#dae9f8",
+          "coverage": 0.8877
+        },
+        {
+          "hex": "#1860ea",
+          "coverage": 0.0352
+        },
+        {
+          "hex": "#99a8c7",
+          "coverage": 0.0315
+        },
+        {
+          "hex": "#6e7c9e",
+          "coverage": 0.0228
+        },
+        {
+          "hex": "#b2cdf4",
+          "coverage": 0.0228
+        }
+      ],
+      "detail": {
+        "energy": 35.0001
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "recent-1",
+      "kind": "control",
+      "note": "Recent conversation selector with title and timestamp",
+      "grid": null,
+      "box": {
+        "x": 0.1551,
+        "y": 0.5444,
+        "w": 0.1702,
+        "h": 0.0554
+      },
+      "px": {
+        "x": 246,
+        "y": 540,
+        "w": 270,
+        "h": 55
+      },
+      "aspect": 4.9091,
+      "palette": [
+        {
+          "hex": "#eff8f8",
+          "coverage": 0.9245
+        },
+        {
+          "hex": "#919bae",
+          "coverage": 0.022
+        },
+        {
+          "hex": "#555e82",
+          "coverage": 0.0208
+        },
+        {
+          "hex": "#bdc5d5",
+          "coverage": 0.0166
+        },
+        {
+          "hex": "#2a2c49",
+          "coverage": 0.016
+        }
+      ],
+      "detail": {
+        "energy": 27.3336
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "recent-2",
+      "kind": "control",
+      "note": "Recent conversation selector with title and timestamp",
+      "grid": null,
+      "box": {
+        "x": 0.1551,
+        "y": 0.6018,
+        "w": 0.1702,
+        "h": 0.0554
+      },
+      "px": {
+        "x": 246,
+        "y": 597,
+        "w": 270,
+        "h": 55
+      },
+      "aspect": 4.9091,
+      "palette": [
+        {
+          "hex": "#eff8f8",
+          "coverage": 0.931
+        },
+        {
+          "hex": "#b8bfce",
+          "coverage": 0.0265
+        },
+        {
+          "hex": "#4e5771",
+          "coverage": 0.0259
+        },
+        {
+          "hex": "#7f8aa2",
+          "coverage": 0.0118
+        },
+        {
+          "hex": "#505c8c",
+          "coverage": 0.0047
+        }
+      ],
+      "detail": {
+        "energy": 25.1635
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "recent-3",
+      "kind": "control",
+      "note": "Recent conversation selector with title and timestamp",
+      "grid": null,
+      "box": {
+        "x": 0.1551,
+        "y": 0.6583,
+        "w": 0.1702,
+        "h": 0.0554
+      },
+      "px": {
+        "x": 246,
+        "y": 653,
+        "w": 270,
+        "h": 55
+      },
+      "aspect": 4.9091,
+      "palette": [
+        {
+          "hex": "#eff8f8",
+          "coverage": 0.9413
+        },
+        {
+          "hex": "#b3bbce",
+          "coverage": 0.0247
+        },
+        {
+          "hex": "#818fa8",
+          "coverage": 0.0159
+        },
+        {
+          "hex": "#4f5a73",
+          "coverage": 0.0153
+        },
+        {
+          "hex": "#323b55",
+          "coverage": 0.0029
+        }
+      ],
+      "detail": {
+        "energy": 21.0099
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "recent-4",
+      "kind": "control",
+      "note": "Recent conversation selector with title and timestamp",
+      "grid": null,
+      "box": {
+        "x": 0.1551,
+        "y": 0.7177,
+        "w": 0.1702,
+        "h": 0.0554
+      },
+      "px": {
+        "x": 246,
+        "y": 712,
+        "w": 270,
+        "h": 55
+      },
+      "aspect": 4.9091,
+      "palette": [
+        {
+          "hex": "#eef8f8",
+          "coverage": 0.919
+        },
+        {
+          "hex": "#9099b3",
+          "coverage": 0.0242
+        },
+        {
+          "hex": "#475170",
+          "coverage": 0.0236
+        },
+        {
+          "hex": "#bcc2d1",
+          "coverage": 0.0219
+        },
+        {
+          "hex": "#272c4c",
+          "coverage": 0.0112
+        }
+      ],
+      "detail": {
+        "energy": 25.2328
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "work-header",
+      "kind": "chrome",
+      "note": "Current Work context header",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.3335,
+        "y": 0,
+        "w": 0.4067,
+        "h": 0.0907
+      },
+      "px": {
+        "x": 529,
+        "y": 0,
+        "w": 645,
+        "h": 90
+      },
+      "aspect": 7.1667,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.9668
+        },
+        {
+          "hex": "#4f556e",
+          "coverage": 0.0124
+        },
+        {
+          "hex": "#7e8495",
+          "coverage": 0.0106
+        },
+        {
+          "hex": "#b1b3c3",
+          "coverage": 0.0057
+        },
+        {
+          "hex": "#08082e",
+          "coverage": 0.0046
+        }
+      ],
+      "detail": {
+        "energy": 16.398
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": false
+      }
+    },
+    {
+      "id": "work-context",
+      "kind": "control",
+      "note": "Current Work folder, title and truthful description",
+      "grid": null,
+      "box": {
+        "x": 0.3455,
+        "y": 0.0141,
+        "w": 0.3846,
+        "h": 0.0625
+      },
+      "px": {
+        "x": 548,
+        "y": 14,
+        "w": 610,
+        "h": 62
+      },
+      "aspect": 9.8387,
+      "palette": [
+        {
+          "hex": "#f6f7f8",
+          "coverage": 0.9475
+        },
+        {
+          "hex": "#82889a",
+          "coverage": 0.0164
+        },
+        {
+          "hex": "#b7bbc6",
+          "coverage": 0.0164
+        },
+        {
+          "hex": "#0f1135",
+          "coverage": 0.01
+        },
+        {
+          "hex": "#565c74",
+          "coverage": 0.0097
+        }
+      ],
+      "detail": {
+        "energy": 26.4554
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "session-tabs",
+      "kind": "control",
+      "note": "Active conversation tab and new conversation control",
+      "grid": null,
+      "box": {
+        "x": 0.343,
+        "y": 0.0927,
+        "w": 0.3878,
+        "h": 0.0464
+      },
+      "px": {
+        "x": 544,
+        "y": 92,
+        "w": 615,
+        "h": 46
+      },
+      "aspect": 13.3696,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.9158
+        },
+        {
+          "hex": "#1262ea",
+          "coverage": 0.0341
+        },
+        {
+          "hex": "#4388e9",
+          "coverage": 0.031
+        },
+        {
+          "hex": "#aecdf6",
+          "coverage": 0.0128
+        },
+        {
+          "hex": "#88aef3",
+          "coverage": 0.0063
+        }
+      ],
+      "detail": {
+        "energy": 21.105
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "user-author",
+      "kind": "text",
+      "note": "User author and time metadata",
+      "grid": null,
+      "box": {
+        "x": 0.389,
+        "y": 0.1663,
+        "w": 0.0914,
+        "h": 0.0282
+      },
+      "px": {
+        "x": 617,
+        "y": 165,
+        "w": 145,
+        "h": 28
+      },
+      "aspect": 5.1786,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.922
+        },
+        {
+          "hex": "#c0c7d6",
+          "coverage": 0.0534
+        },
+        {
+          "hex": "#28324b",
+          "coverage": 0.0103
+        },
+        {
+          "hex": "#707088",
+          "coverage": 0.0082
+        },
+        {
+          "hex": "#a3adb3",
+          "coverage": 0.0062
+        }
+      ],
+      "detail": {
+        "energy": 12.0567
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": null,
+        "measuredAt": "2026-10-30T10:40:59.048Z",
+        "note": "no separable lettering in the crop; size by the region box"
+      }
+    },
+    {
+      "id": "user-avatar",
+      "kind": "control",
+      "note": "Circular user avatar glyph",
+      "grid": null,
+      "box": {
+        "x": 0.3474,
+        "y": 0.1663,
+        "w": 0.0334,
+        "h": 0.0534
+      },
+      "px": {
+        "x": 551,
+        "y": 165,
+        "w": 53,
+        "h": 53
+      },
+      "aspect": 1,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.5994
+        },
+        {
+          "hex": "#1667ea",
+          "coverage": 0.3168
+        },
+        {
+          "hex": "#2e7de8",
+          "coverage": 0.0528
+        },
+        {
+          "hex": "#b2cef8",
+          "coverage": 0.0155
+        },
+        {
+          "hex": "#689ee8",
+          "coverage": 0.0155
+        }
+      ],
+      "detail": {
+        "energy": 7.408
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "user-message",
+      "kind": "text",
+      "note": "User request to continue the Work and inspect knowledge reading",
+      "grid": null,
+      "box": {
+        "x": 0.3991,
+        "y": 0.2067,
+        "w": 0.314,
+        "h": 0.0333
+      },
+      "px": {
+        "x": 633,
+        "y": 205,
+        "w": 498,
+        "h": 33
+      },
+      "aspect": 15.0909,
+      "palette": [
+        {
+          "hex": "#e6eaf7",
+          "coverage": 0.8571
+        },
+        {
+          "hex": "#717c9c",
+          "coverage": 0.0443
+        },
+        {
+          "hex": "#a8b1c9",
+          "coverage": 0.0403
+        },
+        {
+          "hex": "#293655",
+          "coverage": 0.0359
+        },
+        {
+          "hex": "#4b5571",
+          "coverage": 0.0224
+        }
+      ],
+      "detail": {
+        "energy": 50.6944
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 25,
+          "capHeightPx": 15.1,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 1.0233,
+          "advTall": 1.0233,
+          "advX": null,
+          "gap": 0.132,
+          "xRatio": 0.817,
+          "stemW": 0.1338,
+          "contrast": 1.0714,
+          "serif": 1.356,
+          "densTall": 0.5056,
+          "densX": null,
+          "weight": 0.5056
+        },
+        "widthClass": "wide",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "assistant-avatar",
+      "kind": "image",
+      "note": "Small existing Lucyna girl avatar",
+      "grid": null,
+      "box": {
+        "x": 0.3455,
+        "y": 0.2742,
+        "w": 0.0353,
+        "h": 0.0585
+      },
+      "px": {
+        "x": 548,
+        "y": 272,
+        "w": 56,
+        "h": 58
+      },
+      "aspect": 0.9655,
+      "palette": [
+        {
+          "hex": "#f2f2f4",
+          "coverage": 0.8174
+        },
+        {
+          "hex": "#1e1e29",
+          "coverage": 0.0778
+        },
+        {
+          "hex": "#cbcacd",
+          "coverage": 0.0449
+        },
+        {
+          "hex": "#8ca8b9",
+          "coverage": 0.0359
+        },
+        {
+          "hex": "#3c3e48",
+          "coverage": 0.024
+        }
+      ],
+      "detail": {
+        "energy": 13.2403
+      },
+      "medium": "raster",
+      "plate": "src/renderer/assets/brand/cindy-omp-girl-v1.png",
+      "text": null
+    },
+    {
+      "id": "assistant-author",
+      "kind": "text",
+      "note": "Lucyna author and time metadata",
+      "grid": null,
+      "box": {
+        "x": 0.389,
+        "y": 0.2782,
+        "w": 0.1003,
+        "h": 0.0252
+      },
+      "px": {
+        "x": 617,
+        "y": 276,
+        "w": 159,
+        "h": 25
+      },
+      "aspect": 6.36,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.9038
+        },
+        {
+          "hex": "#080820",
+          "coverage": 0.0363
+        },
+        {
+          "hex": "#bfc5d4",
+          "coverage": 0.0363
+        },
+        {
+          "hex": "#232548",
+          "coverage": 0.0128
+        },
+        {
+          "hex": "#5b5b7b",
+          "coverage": 0.0107
+        }
+      ],
+      "detail": {
+        "energy": 26.6076
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 13.5,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.6293,
+          "advTall": 0.6293,
+          "advX": 0.6293,
+          "gap": 0.1111,
+          "xRatio": 0.7629,
+          "stemW": 0.2128,
+          "contrast": 1.158,
+          "serif": null,
+          "densTall": 0.4523,
+          "densX": 0.6733,
+          "weight": 0.4523
+        },
+        "widthClass": "normal",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "reply-title",
+      "kind": "text",
+      "note": "Bold Chinese answer heading about recovered Work context",
+      "grid": null,
+      "box": {
+        "x": 0.3997,
+        "y": 0.3317,
+        "w": 0.2995,
+        "h": 0.0373
+      },
+      "px": {
+        "x": 634,
+        "y": 329,
+        "w": 475,
+        "h": 37
+      },
+      "aspect": 12.8378,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.8729
+        },
+        {
+          "hex": "#0b0e2b",
+          "coverage": 0.0846
+        },
+        {
+          "hex": "#b0b3c1",
+          "coverage": 0.0153
+        },
+        {
+          "hex": "#0a0a3a",
+          "coverage": 0.0138
+        },
+        {
+          "hex": "#404363",
+          "coverage": 0.0134
+        }
+      ],
+      "detail": {
+        "energy": 63.3314
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 12,
+          "capHeightPx": 20.4,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 1.0423,
+          "advTall": 1.0546,
+          "advX": null,
+          "gap": 0.0736,
+          "xRatio": 0.8405,
+          "stemW": 0.1764,
+          "contrast": 1.1656,
+          "serif": 1.6695,
+          "densTall": 0.5055,
+          "densX": null,
+          "weight": 0.5055
+        },
+        "widthClass": "wide",
+        "weightClass": "medium",
+        "chosen": {
+          "family": "Michroma",
+          "weight": 400,
+          "fontSizePx": 29,
+          "source": "catalog",
+          "estimatedSize": true,
+          "stamp": "a64fa9fc6590"
+        }
+      }
+    },
+    {
+      "id": "reply-intro",
+      "kind": "text",
+      "note": "Two-line answer introduction",
+      "grid": null,
+      "box": {
+        "x": 0.3991,
+        "y": 0.376,
+        "w": 0.3222,
+        "h": 0.0554
+      },
+      "px": {
+        "x": 633,
+        "y": 373,
+        "w": 511,
+        "h": 55
+      },
+      "aspect": 9.2909,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.8649
+        },
+        {
+          "hex": "#c7cbd4",
+          "coverage": 0.0413
+        },
+        {
+          "hex": "#3c405e",
+          "coverage": 0.0356
+        },
+        {
+          "hex": "#525c6f",
+          "coverage": 0.0296
+        },
+        {
+          "hex": "#979aaa",
+          "coverage": 0.0287
+        }
+      ],
+      "detail": {
+        "energy": 37.5505
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 2,
+          "glyphs": 38,
+          "capHeightPx": 14.9,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.8886,
+          "advTall": 0.8886,
+          "advX": 0.8886,
+          "gap": 0.0919,
+          "xRatio": 0.8354,
+          "stemW": 0.1316,
+          "contrast": 1.0953,
+          "serif": 0.6146,
+          "densTall": 0.51,
+          "densX": 0.3609,
+          "weight": 0.51
+        },
+        "widthClass": "wide",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "work-content",
+      "kind": "text",
+      "note": "Current Work section heading and factual context bullets",
+      "grid": null,
+      "box": {
+        "x": 0.4212,
+        "y": 0.4486,
+        "w": 0.2951,
+        "h": 0.0988
+      },
+      "px": {
+        "x": 668,
+        "y": 445,
+        "w": 468,
+        "h": 98
+      },
+      "aspect": 4.7755,
+      "palette": [
+        {
+          "hex": "#f6f7f8",
+          "coverage": 0.8821
+        },
+        {
+          "hex": "#454b64",
+          "coverage": 0.0356
+        },
+        {
+          "hex": "#9297a8",
+          "coverage": 0.0328
+        },
+        {
+          "hex": "#6b7185",
+          "coverage": 0.0249
+        },
+        {
+          "hex": "#bfc5cf",
+          "coverage": 0.0247
+        }
+      ],
+      "detail": {
+        "energy": 36.5699
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 3,
+          "glyphs": 66,
+          "capHeightPx": 13.3,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.9827,
+          "advTall": 0.9827,
+          "advX": 0.458,
+          "gap": 0.1154,
+          "xRatio": 0.784,
+          "stemW": 0.1612,
+          "contrast": 1.1626,
+          "serif": 0.9385,
+          "densTall": 0.5296,
+          "densX": 0.6099,
+          "weight": 0.5296
+        },
+        "widthClass": "condensed",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "knowledge-content",
+      "kind": "text",
+      "note": "Knowledge reading section heading and bullets",
+      "grid": null,
+      "box": {
+        "x": 0.4212,
+        "y": 0.5837,
+        "w": 0.2951,
+        "h": 0.12
+      },
+      "px": {
+        "x": 668,
+        "y": 579,
+        "w": 468,
+        "h": 119
+      },
+      "aspect": 3.9328,
+      "palette": [
+        {
+          "hex": "#f6f7f8",
+          "coverage": 0.8573
+        },
+        {
+          "hex": "#61687c",
+          "coverage": 0.0439
+        },
+        {
+          "hex": "#c0c6d1",
+          "coverage": 0.0401
+        },
+        {
+          "hex": "#9298a9",
+          "coverage": 0.0372
+        },
+        {
+          "hex": "#393e55",
+          "coverage": 0.0215
+        }
+      ],
+      "detail": {
+        "energy": 38.5572
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 4,
+          "glyphs": 90,
+          "capHeightPx": 14,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.9603,
+          "advTall": 0.9892,
+          "advX": 0.8868,
+          "gap": 0.1141,
+          "xRatio": 0.8395,
+          "stemW": 0.1557,
+          "contrast": 1.1509,
+          "serif": 0.7774,
+          "densTall": 0.5598,
+          "densX": 0.64,
+          "weight": 0.5598
+        },
+        "widthClass": "wide",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "sessions-content",
+      "kind": "text",
+      "note": "Retained OMP sessions heading and bullets",
+      "grid": null,
+      "box": {
+        "x": 0.4212,
+        "y": 0.7389,
+        "w": 0.2951,
+        "h": 0.0978
+      },
+      "px": {
+        "x": 668,
+        "y": 733,
+        "w": 468,
+        "h": 97
+      },
+      "aspect": 4.8247,
+      "palette": [
+        {
+          "hex": "#f5f7f7",
+          "coverage": 0.8249
+        },
+        {
+          "hex": "#afb4c2",
+          "coverage": 0.0659
+        },
+        {
+          "hex": "#61677c",
+          "coverage": 0.0639
+        },
+        {
+          "hex": "#858e9f",
+          "coverage": 0.024
+        },
+        {
+          "hex": "#3e445d",
+          "coverage": 0.0212
+        }
+      ],
+      "detail": {
+        "energy": 47.7634
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 3,
+          "glyphs": 66,
+          "capHeightPx": 14,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.9652,
+          "advTall": 0.9652,
+          "advX": null,
+          "gap": 0.0804,
+          "xRatio": 0.8208,
+          "stemW": 0.1642,
+          "contrast": 1.1634,
+          "serif": 0.946,
+          "densTall": 0.5748,
+          "densX": null,
+          "weight": 0.5748
+        },
+        "widthClass": "wide",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "reply-ending",
+      "kind": "text",
+      "note": "Short continuation paragraph",
+      "grid": null,
+      "box": {
+        "x": 0.3997,
+        "y": 0.8579,
+        "w": 0.3197,
+        "h": 0.0615
+      },
+      "px": {
+        "x": 634,
+        "y": 851,
+        "w": 507,
+        "h": 61
+      },
+      "aspect": 8.3115,
+      "palette": [
+        {
+          "hex": "#f6f7f7",
+          "coverage": 0.8256
+        },
+        {
+          "hex": "#a6a8b8",
+          "coverage": 0.0693
+        },
+        {
+          "hex": "#4b5069",
+          "coverage": 0.0581
+        },
+        {
+          "hex": "#6f778a",
+          "coverage": 0.0348
+        },
+        {
+          "hex": "#b6bfc0",
+          "coverage": 0.0123
+        }
+      ],
+      "detail": {
+        "energy": 47.6625
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 2,
+          "glyphs": 69,
+          "capHeightPx": 14.2,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.9095,
+          "advTall": 0.9233,
+          "advX": null,
+          "gap": 0.0739,
+          "xRatio": 0.8252,
+          "stemW": 0.1463,
+          "contrast": 1.1459,
+          "serif": 0.7141,
+          "densTall": 0.5424,
+          "densX": null,
+          "weight": 0.5424
+        },
+        "widthClass": "wide",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "composer",
+      "kind": "control",
+      "note": "Message input with attachments and blue Send button",
+      "grid": null,
+      "box": {
+        "x": 0.3411,
+        "y": 0.9234,
+        "w": 0.3941,
+        "h": 0.0665
+      },
+      "px": {
+        "x": 541,
+        "y": 916,
+        "w": 625,
+        "h": 66
+      },
+      "aspect": 9.4697,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.8663
+        },
+        {
+          "hex": "#1868e9",
+          "coverage": 0.0963
+        },
+        {
+          "hex": "#bac3d4",
+          "coverage": 0.0175
+        },
+        {
+          "hex": "#8e95b0",
+          "coverage": 0.015
+        },
+        {
+          "hex": "#3f4f6f",
+          "coverage": 0.0049
+        }
+      ],
+      "detail": {
+        "energy": 21.0626
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "inspector-tabs",
+      "kind": "control",
+      "note": "Work files terminal memory inspector tabs",
+      "grid": null,
+      "box": {
+        "x": 0.7465,
+        "y": 0.0383,
+        "w": 0.2459,
+        "h": 0.0514
+      },
+      "px": {
+        "x": 1184,
+        "y": 38,
+        "w": 390,
+        "h": 51
+      },
+      "aspect": 7.6471,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.9317
+        },
+        {
+          "hex": "#bbc5d4",
+          "coverage": 0.0223
+        },
+        {
+          "hex": "#a8caf3",
+          "coverage": 0.018
+        },
+        {
+          "hex": "#2072e9",
+          "coverage": 0.0171
+        },
+        {
+          "hex": "#2e3b68",
+          "coverage": 0.0109
+        }
+      ],
+      "detail": {
+        "energy": 29.2873
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "inspector-work",
+      "kind": "control",
+      "note": "Current Work summary with folder and description",
+      "grid": null,
+      "box": {
+        "x": 0.7503,
+        "y": 0.0988,
+        "w": 0.2396,
+        "h": 0.1089
+      },
+      "px": {
+        "x": 1190,
+        "y": 98,
+        "w": 380,
+        "h": 108
+      },
+      "aspect": 3.5185,
+      "palette": [
+        {
+          "hex": "#f6f7f8",
+          "coverage": 0.9529
+        },
+        {
+          "hex": "#757e99",
+          "coverage": 0.0231
+        },
+        {
+          "hex": "#b2b7c7",
+          "coverage": 0.0165
+        },
+        {
+          "hex": "#0c0c26",
+          "coverage": 0.0047
+        },
+        {
+          "hex": "#0858ed",
+          "coverage": 0.0029
+        }
+      ],
+      "detail": {
+        "energy": 18.2195
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "goal-heading",
+      "kind": "text",
+      "note": "Current goal heading",
+      "grid": null,
+      "box": {
+        "x": 0.7881,
+        "y": 0.244,
+        "w": 0.0839,
+        "h": 0.0272
+      },
+      "px": {
+        "x": 1250,
+        "y": 242,
+        "w": 133,
+        "h": 27
+      },
+      "aspect": 4.9259,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.8321
+        },
+        {
+          "hex": "#080821",
+          "coverage": 0.056
+        },
+        {
+          "hex": "#343651",
+          "coverage": 0.0458
+        },
+        {
+          "hex": "#868b9d",
+          "coverage": 0.0356
+        },
+        {
+          "hex": "#c7c8d7",
+          "coverage": 0.0305
+        }
+      ],
+      "detail": {
+        "energy": 33.9776
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 4,
+          "capHeightPx": 15.6,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": null,
+          "advTall": null,
+          "advX": null,
+          "gap": 0.1603,
+          "xRatio": 0.8289,
+          "stemW": 0.1707,
+          "contrast": 1.0856,
+          "serif": null,
+          "densTall": null,
+          "densX": null,
+          "weight": null
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "goal-edit",
+      "kind": "control",
+      "note": "Edit current goal action",
+      "grid": null,
+      "box": {
+        "x": 0.9376,
+        "y": 0.2399,
+        "w": 0.0454,
+        "h": 0.0383
+      },
+      "px": {
+        "x": 1487,
+        "y": 238,
+        "w": 72,
+        "h": 38
+      },
+      "aspect": 1.8947,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.8939
+        },
+        {
+          "hex": "#aab2c3",
+          "coverage": 0.0418
+        },
+        {
+          "hex": "#4b5874",
+          "coverage": 0.0354
+        },
+        {
+          "hex": "#787d95",
+          "coverage": 0.0193
+        },
+        {
+          "hex": "#283863",
+          "coverage": 0.0096
+        }
+      ],
+      "detail": {
+        "energy": 11.5764
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "goal-body",
+      "kind": "text",
+      "note": "Current Work goal in readable body text",
+      "grid": null,
+      "box": {
+        "x": 0.7617,
+        "y": 0.2974,
+        "w": 0.2137,
+        "h": 0.0524
+      },
+      "px": {
+        "x": 1208,
+        "y": 295,
+        "w": 339,
+        "h": 52
+      },
+      "aspect": 6.5192,
+      "palette": [
+        {
+          "hex": "#f7f7f7",
+          "coverage": 0.8441
+        },
+        {
+          "hex": "#484f68",
+          "coverage": 0.05
+        },
+        {
+          "hex": "#bdc1cd",
+          "coverage": 0.0495
+        },
+        {
+          "hex": "#7f8498",
+          "coverage": 0.0421
+        },
+        {
+          "hex": "#1e2644",
+          "coverage": 0.0143
+        }
+      ],
+      "detail": {
+        "energy": 55.302
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 2,
+          "glyphs": 28,
+          "capHeightPx": 15,
+          "inkIsDark": true,
+          "allCaps": true,
+          "advance": 0.984,
+          "advTall": 0.9994,
+          "advX": null,
+          "gap": 0.0999,
+          "xRatio": null,
+          "stemW": 0.1509,
+          "contrast": 1.1355,
+          "serif": 0.538,
+          "densTall": 0.5388,
+          "densX": null,
+          "weight": 0.5388
+        },
+        "widthClass": "wide",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "next-heading",
+      "kind": "text",
+      "note": "Next steps heading",
+      "grid": null,
+      "box": {
+        "x": 0.7881,
+        "y": 0.4103,
+        "w": 0.082,
+        "h": 0.0272
+      },
+      "px": {
+        "x": 1250,
+        "y": 407,
+        "w": 130,
+        "h": 27
+      },
+      "aspect": 4.8148,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.9235
+        },
+        {
+          "hex": "#121235",
+          "coverage": 0.0255
+        },
+        {
+          "hex": "#cacad8",
+          "coverage": 0.023
+        },
+        {
+          "hex": "#767f8f",
+          "coverage": 0.0179
+        },
+        {
+          "hex": "#4c5068",
+          "coverage": 0.0102
+        }
+      ],
+      "detail": {
+        "energy": 12.6337
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 3,
+          "capHeightPx": 6.1,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 2.5855,
+          "advTall": null,
+          "advX": 2.5855,
+          "gap": 0.3078,
+          "xRatio": 0.3618,
+          "stemW": 0.3369,
+          "contrast": 2.2772,
+          "serif": null,
+          "densTall": null,
+          "densX": 0.9963,
+          "weight": 0.9963
+        },
+        "widthClass": "wide",
+        "weightClass": "black"
+      }
+    },
+    {
+      "id": "next-body",
+      "kind": "control",
+      "note": "Next steps checkbox list",
+      "grid": null,
+      "box": {
+        "x": 0.7629,
+        "y": 0.4516,
+        "w": 0.2182,
+        "h": 0.127
+      },
+      "px": {
+        "x": 1210,
+        "y": 448,
+        "w": 346,
+        "h": 126
+      },
+      "aspect": 2.746,
+      "palette": [
+        {
+          "hex": "#f7f7f7",
+          "coverage": 0.8783
+        },
+        {
+          "hex": "#afb3c2",
+          "coverage": 0.043
+        },
+        {
+          "hex": "#4e546d",
+          "coverage": 0.0395
+        },
+        {
+          "hex": "#7e859b",
+          "coverage": 0.0312
+        },
+        {
+          "hex": "#232a4a",
+          "coverage": 0.0081
+        }
+      ],
+      "detail": {
+        "energy": 38.3429
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "sources-heading",
+      "kind": "text",
+      "note": "Context sources heading",
+      "grid": null,
+      "box": {
+        "x": 0.7881,
+        "y": 0.6149,
+        "w": 0.1135,
+        "h": 0.0272
+      },
+      "px": {
+        "x": 1250,
+        "y": 610,
+        "w": 180,
+        "h": 27
+      },
+      "aspect": 6.6667,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.9254
+        },
+        {
+          "hex": "#9398a8",
+          "coverage": 0.0229
+        },
+        {
+          "hex": "#080c23",
+          "coverage": 0.0172
+        },
+        {
+          "hex": "#d4d4e4",
+          "coverage": 0.0172
+        },
+        {
+          "hex": "#24284a",
+          "coverage": 0.0172
+        }
+      ],
+      "detail": {
+        "energy": 20.7048
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 10.8,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 1.2518,
+          "advTall": 1.0509,
+          "advX": null,
+          "gap": 0.1236,
+          "xRatio": 0.7377,
+          "stemW": 0.2638,
+          "contrast": 1.2053,
+          "serif": null,
+          "densTall": 0.4659,
+          "densX": null,
+          "weight": 0.4659
+        },
+        "widthClass": "wide",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "sources-body",
+      "kind": "text",
+      "note": "Context sources list",
+      "grid": null,
+      "box": {
+        "x": 0.7629,
+        "y": 0.6593,
+        "w": 0.2175,
+        "h": 0.1159
+      },
+      "px": {
+        "x": 1210,
+        "y": 654,
+        "w": 345,
+        "h": 115
+      },
+      "aspect": 3,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.8821
+        },
+        {
+          "hex": "#b9bcca",
+          "coverage": 0.0512
+        },
+        {
+          "hex": "#4b506d",
+          "coverage": 0.0288
+        },
+        {
+          "hex": "#778093",
+          "coverage": 0.0272
+        },
+        {
+          "hex": "#232747",
+          "coverage": 0.0108
+        }
+      ],
+      "detail": {
+        "energy": 36.9548
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 4,
+          "glyphs": 45,
+          "capHeightPx": 14.7,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.9741,
+          "advTall": 0.9741,
+          "advX": 0.4977,
+          "gap": 0.1008,
+          "xRatio": 0.824,
+          "stemW": 0.1522,
+          "contrast": 1.1309,
+          "serif": 1.1017,
+          "densTall": 0.5336,
+          "densX": 0.4698,
+          "weight": 0.5336
+        },
+        "widthClass": "condensed",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "health-heading",
+      "kind": "text",
+      "note": "Runtime environment status heading",
+      "grid": null,
+      "box": {
+        "x": 0.7863,
+        "y": 0.8246,
+        "w": 0.0984,
+        "h": 0.0272
+      },
+      "px": {
+        "x": 1247,
+        "y": 818,
+        "w": 156,
+        "h": 27
+      },
+      "aspect": 5.7778,
+      "palette": [
+        {
+          "hex": "#f7f7f7",
+          "coverage": 0.8817
+        },
+        {
+          "hex": "#111739",
+          "coverage": 0.043
+        },
+        {
+          "hex": "#a4a8b7",
+          "coverage": 0.0409
+        },
+        {
+          "hex": "#70788e",
+          "coverage": 0.0172
+        },
+        {
+          "hex": "#4a4c6c",
+          "coverage": 0.0172
+        }
+      ],
+      "detail": {
+        "energy": 28.6278
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      },
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 4,
+          "capHeightPx": 15,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.9844,
+          "advTall": 0.9844,
+          "advX": null,
+          "gap": 0.1001,
+          "xRatio": 0.7254,
+          "stemW": 0.1786,
+          "contrast": 1.2122,
+          "serif": null,
+          "densTall": 0.6024,
+          "densX": null,
+          "weight": 0.6024
+        },
+        "widthClass": "wide",
+        "weightClass": "bold"
+      }
+    },
+    {
+      "id": "health-body",
+      "kind": "control",
+      "note": "Runtime connection state rows",
+      "grid": null,
+      "box": {
+        "x": 0.7591,
+        "y": 0.8659,
+        "w": 0.2232,
+        "h": 0.0968
+      },
+      "px": {
+        "x": 1204,
+        "y": 859,
+        "w": 354,
+        "h": 96
+      },
+      "aspect": 3.6875,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.9205
+        },
+        {
+          "hex": "#b3bbca",
+          "coverage": 0.0265
+        },
+        {
+          "hex": "#616b8c",
+          "coverage": 0.0249
+        },
+        {
+          "hex": "#8b93ac",
+          "coverage": 0.0195
+        },
+        {
+          "hex": "#3e4c75",
+          "coverage": 0.0086
+        }
+      ],
+      "detail": {
+        "energy": 24.7359
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "directory-rule",
+      "kind": "chrome",
+      "note": "Hairline separating Work directory from the conversation",
+      "grid": null,
+      "box": {
+        "x": 0.3329,
+        "y": 0,
+        "w": 0.0006,
+        "h": 1
+      },
+      "px": {
+        "x": 528,
+        "y": 0,
+        "w": 1,
+        "h": 992
+      },
+      "aspect": 0.001,
+      "palette": [
+        {
+          "hex": "#f4f8f8",
+          "coverage": 1
+        }
+      ],
+      "detail": {
+        "energy": 0.0017
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": true
+      }
+    },
+    {
+      "id": "inspector-rule",
+      "kind": "chrome",
+      "note": "Hairline separating conversation from inspector",
+      "grid": null,
+      "box": {
+        "x": 0.7396,
+        "y": 0,
+        "w": 0.0006,
+        "h": 1
+      },
+      "px": {
+        "x": 1173,
+        "y": 0,
+        "w": 1,
+        "h": 992
+      },
+      "aspect": 0.001,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 1
+        }
+      ],
+      "detail": {
+        "energy": 0.0003
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": true
+      }
+    },
+    {
+      "id": "tabs-rule",
+      "kind": "chrome",
+      "note": "Horizontal rule below conversation tabs",
+      "grid": null,
+      "box": {
+        "x": 0.3335,
+        "y": 0.1381,
+        "w": 0.4067,
+        "h": 0.001
+      },
+      "px": {
+        "x": 529,
+        "y": 137,
+        "w": 645,
+        "h": 1
+      },
+      "aspect": 645,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.6744
+        },
+        {
+          "hex": "#3e87e7",
+          "coverage": 0.3209
+        },
+        {
+          "hex": "#88b8e8",
+          "coverage": 0.0047
+        }
+      ],
+      "detail": {
+        "energy": 1.5363
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": true
+      }
+    },
+    {
+      "id": "user-bubble",
+      "kind": "chrome",
+      "note": "Pale blue user message background",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.389,
+        "y": 0.1976,
+        "w": 0.3386,
+        "h": 0.0544
+      },
+      "px": {
+        "x": 617,
+        "y": 196,
+        "w": 537,
+        "h": 54
+      },
+      "aspect": 9.9444,
+      "palette": [
+        {
+          "hex": "#e7eaf8",
+          "coverage": 0.9093
+        },
+        {
+          "hex": "#272f4f",
+          "coverage": 0.032
+        },
+        {
+          "hex": "#66728f",
+          "coverage": 0.0304
+        },
+        {
+          "hex": "#a5b0c9",
+          "coverage": 0.0251
+        },
+        {
+          "hex": "#3b4b5b",
+          "coverage": 0.0031
+        }
+      ],
+      "detail": {
+        "energy": 26.6111
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "assistant-answer",
+      "kind": "chrome",
+      "note": "White rounded assistant answer container",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.389,
+        "y": 0.3125,
+        "w": 0.3386,
+        "h": 0.6058
+      },
+      "px": {
+        "x": 617,
+        "y": 310,
+        "w": 537,
+        "h": 601
+      },
+      "aspect": 0.8935,
+      "palette": [
+        {
+          "hex": "#f6f7f8",
+          "coverage": 0.896
+        },
+        {
+          "hex": "#acb1be",
+          "coverage": 0.0377
+        },
+        {
+          "hex": "#4c516a",
+          "coverage": 0.0294
+        },
+        {
+          "hex": "#72798b",
+          "coverage": 0.0269
+        },
+        {
+          "hex": "#0f102f",
+          "coverage": 0.01
+        }
+      ],
+      "detail": {
+        "energy": 30.2957
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": true
+      }
+    },
+    {
+      "id": "work-surface",
+      "kind": "chrome",
+      "note": "Soft blue current Work text section background",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.3991,
+        "y": 0.4355,
+        "w": 0.319,
+        "h": 0.124
+      },
+      "px": {
+        "x": 633,
+        "y": 432,
+        "w": 506,
+        "h": 123
+      },
+      "aspect": 4.1138,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.9085
+        },
+        {
+          "hex": "#c0c4d1",
+          "coverage": 0.0338
+        },
+        {
+          "hex": "#62677c",
+          "coverage": 0.0296
+        },
+        {
+          "hex": "#8c94a6",
+          "coverage": 0.0176
+        },
+        {
+          "hex": "#3f415b",
+          "coverage": 0.0105
+        }
+      ],
+      "detail": {
+        "energy": 27.4887
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": false
+      }
+    },
+    {
+      "id": "knowledge-surface",
+      "kind": "chrome",
+      "note": "Soft blue knowledge text section background",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.3991,
+        "y": 0.5665,
+        "w": 0.319,
+        "h": 0.1482
+      },
+      "px": {
+        "x": 633,
+        "y": 562,
+        "w": 506,
+        "h": 147
+      },
+      "aspect": 3.4422,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.8813
+        },
+        {
+          "hex": "#8a8fa1",
+          "coverage": 0.0379
+        },
+        {
+          "hex": "#c3c8d4",
+          "coverage": 0.035
+        },
+        {
+          "hex": "#51576d",
+          "coverage": 0.035
+        },
+        {
+          "hex": "#2a304b",
+          "coverage": 0.0109
+        }
+      ],
+      "detail": {
+        "energy": 29.2428
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": false
+      }
+    },
+    {
+      "id": "sessions-surface",
+      "kind": "chrome",
+      "note": "Soft blue retained sessions text section background",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.3991,
+        "y": 0.7248,
+        "w": 0.319,
+        "h": 0.124
+      },
+      "px": {
+        "x": 633,
+        "y": 719,
+        "w": 506,
+        "h": 123
+      },
+      "aspect": 4.1138,
+      "palette": [
+        {
+          "hex": "#f6f7f7",
+          "coverage": 0.8659
+        },
+        {
+          "hex": "#6a7184",
+          "coverage": 0.0552
+        },
+        {
+          "hex": "#acb2c0",
+          "coverage": 0.0498
+        },
+        {
+          "hex": "#444864",
+          "coverage": 0.0228
+        },
+        {
+          "hex": "#080922",
+          "coverage": 0.0063
+        }
+      ],
+      "detail": {
+        "energy": 35.3393
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": false
+      }
+    },
+    {
+      "id": "goal-surface",
+      "kind": "chrome",
+      "note": "White current goal card and standard target icon",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.7503,
+        "y": 0.2298,
+        "w": 0.2396,
+        "h": 0.1401
+      },
+      "px": {
+        "x": 1190,
+        "y": 228,
+        "w": 380,
+        "h": 139
+      },
+      "aspect": 2.7338,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.9339
+        },
+        {
+          "hex": "#9297a8",
+          "coverage": 0.0183
+        },
+        {
+          "hex": "#5f687f",
+          "coverage": 0.0176
+        },
+        {
+          "hex": "#333956",
+          "coverage": 0.0171
+        },
+        {
+          "hex": "#c3c6ce",
+          "coverage": 0.0131
+        }
+      ],
+      "detail": {
+        "energy": 24.6877
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": false
+      }
+    },
+    {
+      "id": "next-surface",
+      "kind": "chrome",
+      "note": "White next steps card and list icon",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.7503,
+        "y": 0.3861,
+        "w": 0.2396,
+        "h": 0.2077
+      },
+      "px": {
+        "x": 1190,
+        "y": 383,
+        "w": 380,
+        "h": 206
+      },
+      "aspect": 1.8447,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.9337
+        },
+        {
+          "hex": "#494f69",
+          "coverage": 0.0219
+        },
+        {
+          "hex": "#7a8193",
+          "coverage": 0.0202
+        },
+        {
+          "hex": "#b7bcc9",
+          "coverage": 0.02
+        },
+        {
+          "hex": "#252c4c",
+          "coverage": 0.0042
+        }
+      ],
+      "detail": {
+        "energy": 23.3224
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": false
+      }
+    },
+    {
+      "id": "sources-surface",
+      "kind": "chrome",
+      "note": "White context sources card and database icon",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.7503,
+        "y": 0.6089,
+        "w": 0.2396,
+        "h": 0.1865
+      },
+      "px": {
+        "x": 1190,
+        "y": 604,
+        "w": 380,
+        "h": 185
+      },
+      "aspect": 2.0541,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.9311
+        },
+        {
+          "hex": "#b0b3c1",
+          "coverage": 0.0235
+        },
+        {
+          "hex": "#525872",
+          "coverage": 0.0221
+        },
+        {
+          "hex": "#7e8599",
+          "coverage": 0.0159
+        },
+        {
+          "hex": "#2a314e",
+          "coverage": 0.0075
+        }
+      ],
+      "detail": {
+        "energy": 26.2635
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": false
+      }
+    },
+    {
+      "id": "health-surface",
+      "kind": "chrome",
+      "note": "White runtime status card",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.7503,
+        "y": 0.8095,
+        "w": 0.2396,
+        "h": 0.1673
+      },
+      "px": {
+        "x": 1190,
+        "y": 803,
+        "w": 380,
+        "h": 166
+      },
+      "aspect": 2.2892,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.9417
+        },
+        {
+          "hex": "#9098af",
+          "coverage": 0.0167
+        },
+        {
+          "hex": "#606988",
+          "coverage": 0.0151
+        },
+        {
+          "hex": "#c5c9d6",
+          "coverage": 0.015
+        },
+        {
+          "hex": "#35416d",
+          "coverage": 0.0114
+        }
+      ],
+      "detail": {
+        "energy": 18.3452
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": true,
+        "rules": false
+      }
+    },
+    {
+      "id": "goal-icon",
+      "kind": "control",
+      "note": "Standard UI icon or selected control edge visible in the comp",
+      "grid": null,
+      "box": {
+        "x": 0.7591,
+        "y": 0.2389,
+        "w": 0.0252,
+        "h": 0.0403
+      },
+      "px": {
+        "x": 1204,
+        "y": 237,
+        "w": 40,
+        "h": 40
+      },
+      "aspect": 1,
+      "palette": [
+        {
+          "hex": "#eef3f8",
+          "coverage": 0.7876
+        },
+        {
+          "hex": "#145fea",
+          "coverage": 0.114
+        },
+        {
+          "hex": "#2a78ee",
+          "coverage": 0.0415
+        },
+        {
+          "hex": "#9abff6",
+          "coverage": 0.0363
+        },
+        {
+          "hex": "#4c94ec",
+          "coverage": 0.0207
+        }
+      ],
+      "detail": {
+        "energy": 8.7123
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "next-icon",
+      "kind": "control",
+      "note": "Standard UI icon or selected control edge visible in the comp",
+      "grid": null,
+      "box": {
+        "x": 0.7591,
+        "y": 0.3962,
+        "w": 0.0252,
+        "h": 0.0423
+      },
+      "px": {
+        "x": 1204,
+        "y": 393,
+        "w": 40,
+        "h": 42
+      },
+      "aspect": 0.9524,
+      "palette": [
+        {
+          "hex": "#f7f8f8",
+          "coverage": 0.8673
+        },
+        {
+          "hex": "#2471ed",
+          "coverage": 0.0765
+        },
+        {
+          "hex": "#b8d1f6",
+          "coverage": 0.0357
+        },
+        {
+          "hex": "#0c50f0",
+          "coverage": 0.0204
+        }
+      ],
+      "detail": {
+        "energy": 5.3253
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "sources-icon",
+      "kind": "control",
+      "note": "Standard UI icon or selected control edge visible in the comp",
+      "grid": null,
+      "box": {
+        "x": 0.7591,
+        "y": 0.6089,
+        "w": 0.0252,
+        "h": 0.0423
+      },
+      "px": {
+        "x": 1204,
+        "y": 604,
+        "w": 40,
+        "h": 42
+      },
+      "aspect": 0.9524,
+      "palette": [
+        {
+          "hex": "#f6f8f8",
+          "coverage": 0.7949
+        },
+        {
+          "hex": "#2772e8",
+          "coverage": 0.0718
+        },
+        {
+          "hex": "#0c60f5",
+          "coverage": 0.0615
+        },
+        {
+          "hex": "#a8cef6",
+          "coverage": 0.041
+        },
+        {
+          "hex": "#488be8",
+          "coverage": 0.0308
+        }
+      ],
+      "detail": {
+        "energy": 6.9903
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "health-icon",
+      "kind": "control",
+      "note": "Standard UI icon or selected control edge visible in the comp",
+      "grid": null,
+      "box": {
+        "x": 0.7591,
+        "y": 0.8165,
+        "w": 0.0252,
+        "h": 0.0403
+      },
+      "px": {
+        "x": 1204,
+        "y": 810,
+        "w": 40,
+        "h": 40
+      },
+      "aspect": 1,
+      "palette": [
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.898
+        },
+        {
+          "hex": "#324474",
+          "coverage": 0.0408
+        },
+        {
+          "hex": "#505d80",
+          "coverage": 0.0306
+        },
+        {
+          "hex": "#7d8da3",
+          "coverage": 0.0153
+        },
+        {
+          "hex": "#b8b8d8",
+          "coverage": 0.0153
+        }
+      ],
+      "detail": {
+        "energy": 6.5367
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "tabs-bottom",
+      "kind": "control",
+      "note": "Standard UI icon or selected control edge visible in the comp",
+      "grid": null,
+      "box": {
+        "x": 0.3335,
+        "y": 0.1351,
+        "w": 0.4067,
+        "h": 0.0071
+      },
+      "px": {
+        "x": 529,
+        "y": 134,
+        "w": 645,
+        "h": 7
+      },
+      "aspect": 92.1429,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.7798
+        },
+        {
+          "hex": "#095fe8",
+          "coverage": 0.1085
+        },
+        {
+          "hex": "#3e87e7",
+          "coverage": 0.107
+        },
+        {
+          "hex": "#0850f0",
+          "coverage": 0.0031
+        },
+        {
+          "hex": "#88b8e8",
+          "coverage": 0.0016
+        }
+      ],
+      "detail": {
+        "energy": 23.4277
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": true
+      }
+    },
+    {
+      "id": "work-selection-edge",
+      "kind": "control",
+      "note": "Standard UI icon or selected control edge visible in the comp",
+      "grid": null,
+      "box": {
+        "x": 0.1494,
+        "y": 0.1099,
+        "w": 0.0063,
+        "h": 0.0847
+      },
+      "px": {
+        "x": 237,
+        "y": 109,
+        "w": 10,
+        "h": 84
+      },
+      "aspect": 0.119,
+      "palette": [
+        {
+          "hex": "#ecf6f8",
+          "coverage": 0.7857
+        },
+        {
+          "hex": "#2369f1",
+          "coverage": 0.1964
+        },
+        {
+          "hex": "#5898f8",
+          "coverage": 0.0089
+        },
+        {
+          "hex": "#98c8f8",
+          "coverage": 0.0089
+        }
+      ],
+      "detail": {
+        "energy": 1.2463
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": true
+      }
+    },
+    {
+      "id": "work-row-arrow",
+      "kind": "control",
+      "note": "Standard UI icon or selected control edge visible in the comp",
+      "grid": null,
+      "box": {
+        "x": 0.3127,
+        "y": 0.1321,
+        "w": 0.0158,
+        "h": 0.0383
+      },
+      "px": {
+        "x": 496,
+        "y": 131,
+        "w": 25,
+        "h": 38
+      },
+      "aspect": 0.6579,
+      "palette": [
+        {
+          "hex": "#dceaf8",
+          "coverage": 0.9658
+        },
+        {
+          "hex": "#0840f8",
+          "coverage": 0.0171
+        },
+        {
+          "hex": "#5088f8",
+          "coverage": 0.0171
+        }
+      ],
+      "detail": {
+        "energy": 1.6252
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    },
+    {
+      "id": "composer-edge",
+      "kind": "control",
+      "note": "Standard UI icon or selected control edge visible in the comp",
+      "grid": null,
+      "box": {
+        "x": 0.7175,
+        "y": 0.9204,
+        "w": 0.0227,
+        "h": 0.0766
+      },
+      "px": {
+        "x": 1138,
+        "y": 913,
+        "w": 36,
+        "h": 76
+      },
+      "aspect": 0.4737,
+      "palette": [
+        {
+          "hex": "#f6f8f8",
+          "coverage": 0.734
+        },
+        {
+          "hex": "#1868e8",
+          "coverage": 0.2276
+        },
+        {
+          "hex": "#76a8e8",
+          "coverage": 0.0288
+        },
+        {
+          "hex": "#c0d8f8",
+          "coverage": 0.0064
+        },
+        {
+          "hex": "#5898f8",
+          "coverage": 0.0032
+        }
+      ],
+      "detail": {
+        "energy": 1.9644
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "surface": {
+        "flat": false,
+        "rules": false
+      }
+    }
+  ],
+  "compSha256": "47cd4a0834565a48f5583cb0fbc0ae21ac795aa2bd66a9ef264e5dfa04a5f358",
+  "regionsSource": {
+    "path": ".impeccable/build/regions-blue.json",
+    "sha256": "0bf8e6f04cea9550a262719f87ff389f59f9083b609056c6a4ab9b0d35da91a1"
+  }
+}

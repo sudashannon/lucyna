@@ -1,6 +1,7 @@
 const {Menu,ipcMain,nativeTheme,shell}=require('electron');
 const height=36;
 const palette={light:{color:'#f8f6f0',symbolColor:'#38383d'},dark:{color:'#262727',symbolColor:'#e8e8eb'}};
+const bluePalette={light:{color:'#112341',symbolColor:'#edf3ff'},dark:{color:'#0b192f',symbolColor:'#edf3ff'}};
 function enabled(){return process.platform==='win32'&&process.env.OMP_CINDY_NATIVE_TITLEBAR!=='1'&&process.env.OMP_CINDY_LEGACY_UI!=='1';}
 function windowOptions(){return enabled()?{titleBarStyle:'hidden',titleBarOverlay:{...palette.light,height},autoHideMenuBar:false}:{};}
 function installWindowChrome(window){
@@ -24,9 +25,10 @@ function installWindowChrome(window){
   const x=Math.round(Math.max(0,Math.min(width,position.x*zoom))),y=Math.round(Math.max(0,Math.min(height,position.y*zoom)));
   return new Promise(resolve=>item.submenu.popup({window,x,y,callback:()=>resolve(true)}));
  });
- ipcMain.handle('window:theme',(event,theme)=>{
+ ipcMain.handle('window:theme',(event,theme,visualTheme)=>{
   authorize(event);if(!Object.hasOwn(palette,theme))throw Error('无效窗口主题');
-  window.setTitleBarOverlay({...palette[theme],height});nativeTheme.themeSource=theme;
+  if(visualTheme!==undefined&&!['classic','blue'].includes(visualTheme))throw Error('无效视觉主题');
+  window.setTitleBarOverlay({...((visualTheme==='blue'?bluePalette:palette)[theme]),height});nativeTheme.themeSource=theme;
  });
  const altMenus={f:'file',e:'edit',v:'view',w:'window',h:'help'};
  window.webContents.on('before-input-event',(event,input)=>{

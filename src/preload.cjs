@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('desktop', {
   windowChrome:{
     enabled:process.argv.includes('--lucyna-titlebar'),
     menu:(id,position)=>ipcRenderer.invoke('window:menu',id,position),
-    theme:theme=>ipcRenderer.invoke('window:theme',theme),
+    theme:(theme,visualTheme)=>ipcRenderer.invoke('window:theme',theme,visualTheme),
     onAction:fn=>{const listener=(_event,action)=>fn(action);ipcRenderer.on('window:action',listener);return()=>ipcRenderer.removeListener('window:action',listener);},
   },
   getPet:()=>ipcRenderer.invoke('pet:get'),
