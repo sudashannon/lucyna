@@ -8,18 +8,19 @@ import {api} from '../api';
 import {errorText} from '../errors';
 import {FeedbackSettings} from './FeedbackSettings';
 import {AuxiliarySettings} from './AuxiliarySettings';
+import {HostSettings} from './HostSettings';
 import type {ClientSettings, EnvironmentCheck, SettingsInfo,PetSettings,FeedbackSettings as FeedbackPreferences,AuxiliaryInput} from '../types';
 import '../settings-navigation.css';
 import {visualThemes, type VisualTheme} from '../appearance';
 
 const settingsGroups=[
-  {id:'runtime',label:'运行与模型',sections:[{id:'runtime',label:'运行环境'},{id:'model',label:'模型与速度'},{id:'auxiliary',label:'辅助模型'}]},
+  {id:'runtime',label:'运行与模型',sections:[{id:'runtime',label:'运行环境'},{id:'ssh',label:'SSH 主机'},{id:'model',label:'模型与速度'},{id:'auxiliary',label:'辅助模型'}]},
   {id:'experience',label:'外观与体验',sections:[{id:'appearance',label:'外观'},{id:'feedback',label:'声音与动效'},{id:'pet',label:'桌面伙伴'}]},
   {id:'storage',label:'数据与回退',sections:[{id:'storage',label:'数据与回退'}]},
 ] as const;
 type SettingsGroupId=(typeof settingsGroups)[number]['id'];
 type SettingsSectionId=(typeof settingsGroups)[number]['sections'][number]['id'];
-const settingsSectionLabels:Record<SettingsSectionId,string>={runtime:'运行环境',model:'模型与速度',auxiliary:'辅助模型',appearance:'外观',feedback:'声音与动效',pet:'桌面伙伴',storage:'数据与回退'};
+const settingsSectionLabels:Record<SettingsSectionId,string>={runtime:'运行环境',ssh:'SSH 主机',model:'模型与速度',auxiliary:'辅助模型',appearance:'外观',feedback:'声音与动效',pet:'桌面伙伴',storage:'数据与回退'};
 const settingsSectionLabel=(id:SettingsSectionId)=>settingsSectionLabels[id];
 
 export function SettingsDialog({onClose,onApply,locked,theme,visualTheme}: {onClose:()=>void; onApply:(settings:ClientSettings,theme:string,changed:boolean,visualTheme:VisualTheme)=>Promise<void>; locked:boolean; theme:string; visualTheme:VisualTheme}) {
@@ -95,6 +96,7 @@ export function SettingsDialog({onClose,onApply,locked,theme,visualTheme}: {onCl
           <Button variant="secondary" disabled={disabled} onClick={()=>void test()}>{checking?<Spinner size={13}/>:<RefreshCw size={13}/>}检测环境</Button>
           {check&&<div className="environment-result" role="status"><strong><Check size={14}/>{check.version} · 检测完成</strong>{check.configFiles.length>0&&<p>发现：{check.configFiles.join('、')}</p>}<small>{check.note}</small></div>}
         </section>
+        <HostSettings/>
         <section data-settings-section="model" aria-labelledby="settings-model-title"><h3 id="settings-model-title">模型与速度</h3><p className="settings-effect">保存后用于新连接；当前会话可在输入框旁切换模型。</p><label className="settings-field">默认模型<Input aria-label="默认模型" placeholder="留空，跟随 OMP 默认模型" value={draft.model} disabled={disabled} onChange={v=>update({model:v})}/><small>可填写 provider/model。临时切换模型仍使用会话输入框旁的模型菜单。</small></label><label className="settings-field">思考强度<select aria-label="默认思考强度" value={draft.thinking} disabled={disabled} onChange={e=>update({thinking:e.target.value})}>{[['inherit','跟随 OMP 配置'],['off','关闭'],['minimal','最低'],['low','低'],['medium','中'],['high','高'],['xhigh','很高'],['max','最高'],['auto','自动']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><small>较低强度通常适合简单任务；支持情况和实际耗时取决于模型。仅对新连接生效。</small></label></section>
         <section data-settings-section="auxiliary" aria-labelledby="settings-auxiliary-title"><h3 id="settings-auxiliary-title">辅助模型</h3>{auxiliaryError&&<p role="alert" className="error-text">{auxiliaryError}</p>}{auxiliary?<AuxiliarySettings value={auxiliary} onChange={setAuxiliary} disabled={disabled} onChecking={setAuxiliaryChecking}/>:!auxiliaryError&&<p className="settings-caption">正在读取辅助模型设置…</p>}</section>
         <section data-settings-section="appearance" aria-labelledby="settings-appearance-title"><h3 id="settings-appearance-title">外观</h3><p className="settings-effect">保存后立即生效，保留当前会话和草稿。</p><div className="visual-theme-options" role="radiogroup" aria-label="视觉风格">{visualThemes.map(option=><label key={option.id} className={`visual-theme-option ${visualAppearance===option.id?'selected':''}`}><input type="radio" name="visual-theme" value={option.id} checked={visualAppearance===option.id} disabled={disabled} onChange={()=>setVisualAppearance(option.id)}/><span className={`theme-swatch theme-swatch-${option.id}`} aria-hidden="true"><i/><i/><i/></span><span><strong>{option.name}</strong><small>{option.description}</small></span></label>)}</div><label className="settings-field">明暗外观<select aria-label="外观主题" value={appearance} disabled={disabled} onChange={e=>setAppearance(e.target.value)}><option value="light">浅色</option><option value="dark">深色</option></select></label></section>
@@ -112,7 +114,7 @@ export function SettingsDialog({onClose,onApply,locked,theme,visualTheme}: {onCl
         </>}</section>
         <section data-settings-section="storage" className="settings-storage" aria-labelledby="settings-storage-title"><h3 id="settings-storage-title">数据与回退</h3><p>{draft.runtime==='wsl'?`新会话保存在 ${draft.wslAgentDir}/sessions 下，由 OMP 根据当前 work 路径选择子目录；客户端不覆盖此路径。`:'Windows 会话使用客户端独立历史库。'}设置、草稿和旧版会话副本保存在下方 Windows 目录。已有会话继续使用原路径；跨模式继续时创建副本。</p><code>{info?.storage}</code><small>保存运行时设置会保留上一份 client-settings.json 备份。WSL 原生 OMP 仍自行管理其配置目录中的缓存和运行数据。</small></section>
       </div>
-      <div className="settings-bottom">{error&&<p role="alert" className="error-text">{error}</p>}<div className="modal-actions"><span>{changed?'用于下一次新连接；已连接的会话继续运行。':'运行环境不变。'}</span><Button variant="secondary" disabled={disabled} onClick={onClose}>取消</Button><Button variant="cta" loading={saving} disabled={disabled} onClick={()=>void save()}>{changed?'保存默认设置':'保存'}</Button></div></div>
+      <div className="settings-bottom">{error&&<p role="alert" className="error-text">{error}</p>}{activeSection==='ssh'?<div className="modal-actions"><span>主机配置使用上方的“保存并连接”单独保存。</span><Button variant="secondary" disabled={disabled} onClick={onClose}>关闭设置</Button></div>:<div className="modal-actions"><span>{changed?'用于下一次新连接；已连接的会话继续运行。':'运行环境不变。'}</span><Button variant="secondary" disabled={disabled} onClick={onClose}>取消</Button><Button variant="cta" loading={saving} disabled={disabled} onClick={()=>void save()}>{changed?'保存默认设置':'保存'}</Button></div>}</div>
     </>}
   </Modal>;
 }

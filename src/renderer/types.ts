@@ -1,8 +1,9 @@
 import type {KnowledgeCatalog, KnowledgeDetail, KnowledgeCandidate, KnowledgeReview} from './knowledge-types';
 import type {WorkDetail, GitInspection} from './work-detail-data';
 export interface WorkIssue {code: string; severity: 'error' | 'warning' | 'info'; message: string; member?: string; actual?: string; expected?: string}
-export interface Work { name: string; root: string; kind: string; state?: string; error?: string; health?: 'ok' | 'warning' | 'error'; issues?: WorkIssue[] }
-export interface HistoryEntry { title?: string; id?: string; path?: string; cwd?: string; sessionFile?: string; agentDir?: string; modified?: string; modifiedAt?: string; importedAt?: string; sourceKind?: string; runtime?: 'windows' | 'wsl' }
+export interface Work { name: string; root: string; kind: string; hostId?:string;hostName?:string;hostStatus?:string;state?: string; error?: string; health?: 'ok' | 'warning' | 'error'; issues?: WorkIssue[] }
+export interface HistoryEntry { title?: string; id?: string; path?: string; cwd?: string; sessionFile?: string; agentDir?: string; modified?: string; modifiedAt?: string; importedAt?: string; sourceKind?: string; runtime?: 'windows' | 'wsl' | 'ssh';hostId?:string;remoteSessionId?:string;status?:string }
+export interface SshHost {id:string;name:string;root:string;omp:string;agentDir:string;ssh:{destination:string;port?:number;user?:string;configFile?:string;identityFile?:string;executor:{kind:'windows-openssh'|'wsl-openssh';distro?:string;user?:string}};phase?:string;installed?:boolean;error?:string}
 export interface ClientSettings {version:1; runtime:'windows'|'wsl'; windowsExecutable:string; wslExecutable:string; wslAgentDir:string; model:string; thinking:string}
 export interface FeedbackSettings {version:1;mode:'silent'|'focus'|'companion';style:'soft'|'pixel';volume:number;completed:boolean;attention:boolean;error:boolean;reducedMotion:boolean}
 export interface FeedbackInfo {settings:FeedbackSettings;warning:string}
@@ -49,12 +50,16 @@ export interface Desktop {
   saveAuxiliary?(input:AuxiliaryInput):Promise<AuxiliarySettings>;
   checkAuxiliary?(input:AuxiliaryInput):Promise<AuxiliaryCheck>;
   copyText(text: string): Promise<void>;
-  listWorks(): Promise<Work[]>; readWork(root: string): Promise<string>;
+  listWorks(): Promise<Work[]>; readWork(root: string,hostId?:string): Promise<string>;
+  listHosts?():Promise<SshHost[]>;saveHost?(input:Partial<SshHost>):Promise<SshHost>;connectHost?(id:string):Promise<SshHost[]>;
+  cancelHost?(id:string):Promise<void>;disconnectHost?(id:string):Promise<void>;removeHost?(id:string):Promise<void>;
+  onHosts?(fn:(event:OmpEvent)=>void):()=>void;reconnectRemote?(id:string):Promise<void>;detachRemote?(id:string):Promise<void>;
+  remoteOperation?(id:string,clear?:boolean):Promise<{status:string;operationId?:string}>;
   context(query: string): Promise<OmpEvent>; start(options: OmpEvent): Promise<unknown>;
   prepareTextAttachments(id:string,files:{id:string;text:string}[]):Promise<import('./text-attachments').PreparedTextAttachment[]>;
   request(type: string, data?: OmpEvent, id?: string): Promise<OmpEvent>; respond(data: OmpEvent,id?:string): Promise<unknown>; close(id?:string): Promise<unknown>;
   listConnections?(): Promise<OmpEvent[]>;
-  chooseSession(): Promise<string | null>; listHistory(root: string): Promise<History>;
+  chooseSession(): Promise<string | null>; listHistory(root: string,hostId?:string): Promise<History>;
   previewHistoryDeletion(source:string,root:string):Promise<HistoryDeletionPlan>;
   deleteHistory(source:string,root:string,token:string):Promise<string>;
   restoreHistory(root:string,key:string):Promise<void>;

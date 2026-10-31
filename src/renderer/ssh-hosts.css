@@ -1,0 +1,25 @@
+.ssh-section-heading,.ssh-host-identity,.ssh-host-actions,.remote-connection-actions { display:flex; align-items:center; gap:var(--space-sm,12px); }
+.ssh-section-heading { justify-content:space-between; }
+.ssh-section-heading h3 { margin:0; }
+.ssh-host-list { list-style:none; padding:0; margin:var(--space-md,16px) 0; }
+.ssh-host-list>li { padding:var(--space-md,16px) 0; border-bottom:1px solid var(--border-default); }
+.ssh-host-identity>div { flex:1; min-width:0; }
+.ssh-host-identity strong,.ssh-host-identity>div>span { display:block; overflow-wrap:anywhere; }
+.ssh-host-identity>div>span,.ssh-host-state,.ssh-empty,.ssh-remove p { font-size:var(--text-xs,12px); color:var(--text-secondary); }
+.ssh-host-state { display:flex; align-items:center; flex-shrink:0; }
+.ssh-host-actions { margin-top:var(--space-sm,12px); flex-wrap:wrap; }
+.ssh-host-form { margin-top:var(--space-lg,24px); padding-top:var(--space-md,16px); border-top:1px solid var(--border-default); }
+.ssh-host-form h4 { margin:0 0 var(--space-md,16px); font-size:var(--text-sm,14px); }
+.ssh-host-form>.panel-buttons { position:sticky; bottom:0; background:var(--surface-elevated); padding:var(--space-sm,12px) 0; border-top:1px solid var(--border-default); }
+.ssh-field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-md,16px); }
+.ssh-host-form details { margin:var(--space-md,16px) 0; }
+.ssh-host-form summary { cursor:pointer; margin-bottom:var(--space-md,16px); }
+.ssh-remove { margin-top:var(--space-sm,12px); }
+.ssh-remove button { margin-right:var(--space-xs,8px); }
+.remote-connection { padding:var(--space-sm,12px) var(--space-lg,24px); border-bottom:1px solid var(--border-default); background:var(--surface-elevated); display:flex; justify-content:space-between; align-items:center; gap:var(--space-md,16px); }
+.remote-connection p { margin:0; font-size:var(--text-sm,14px); }
+.remote-connection small { color:var(--text-secondary); display:block; margin-top:var(--space-2xs,4px); overflow-wrap:anywhere; }
+.remote-connection-actions { flex-wrap:wrap; flex-shrink:0; }
+.remote-work-origin { font-size:var(--text-xs,12px); color:var(--text-secondary); display:block; }
+.remote-work-document { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; }
+@media(max-width:760px) { .ssh-field-grid { grid-template-columns:1fr; } .remote-connection { align-items:flex-start; flex-direction:column; } .ssh-host-identity { flex-wrap:wrap; } }

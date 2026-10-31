@@ -13,6 +13,7 @@
     "prestart": "node tools/build-renderer.cjs",
     "dev": "vite",
     "build": "node tools/build-renderer.cjs",
+    "build:host:linux": "python3 tools/build-host-frozen.py --output resources/remote-host",
     "typecheck": "tsc --noEmit",
     "test": "node --require ./test/setup.cjs --test test/*.test.cjs",
     "test:renderer": "electron test/screenshot-gallery.cjs --check",

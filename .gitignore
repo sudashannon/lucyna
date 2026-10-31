@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .runtime/
+resources/remote-host/*
 *.log
 __pycache__/
 work/
@@ -35,6 +36,10 @@ docs/*
 !docs/README.md
 !docs/getting-started.md
 !docs/architecture.md
+!docs/ssh-host-design.md
+!docs/ssh-host-implementation-plan.md
+!docs/ssh-host-review.md
+!docs/ssh-host-reuse-review.md
 !docs/features.md
 !docs/development.md
 !docs/screenshots/
@@ -57,6 +62,11 @@ test/*
 !test/work_runner_test.py
 !test/work_evolution_test.py
 !test/work_automatic_test.py
+!test/ssh_host_test.py
+!test/ssh_host_native.py
+!test/ssh_host_sandbox.py
+!test/ssh_sessions_test.py
+!test/ssh-host-desktop.cjs
 !test/work-details-ui.cjs
 !test/fixtures/
 !test/fixtures/**

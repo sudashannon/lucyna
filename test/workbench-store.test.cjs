@@ -4,6 +4,29 @@ const {Workbench}=require('../src/renderer/workbench-store.ts');
 const {isCompletedUnread}=require('../src/renderer/session-monitor.ts');
 const tick=()=>new Promise(r=>setImmediate(r));
 
+test('same remote root on two hosts keeps drafts, documents and session selection separate',async()=>{
+ const f=setup();await tick();f.works[0].hostId='host-a';f.works[1].hostId='host-b';f.works[1].root=f.works[0].root;
+ const reads=[];f.api.readWork=async(root,hostId)=>{reads.push([root,hostId]);return hostId||'local';};
+ await f.store.selectWork(f.works[0]);const a=f.store.active;await tick();
+ await f.store.selectWork(f.works[1]);const b=f.store.active;await tick();
+ assert.notEqual(a.id,b.id);assert.notEqual(a.draftKey,b.draftKey);assert.equal(f.store.view().document,'host-b');
+ await f.store.selectWork(f.works[0]);assert.equal(f.store.active.id,a.id);assert.equal(f.store.view().document,'host-a');
+ assert.ok(reads.some(([,hostId])=>hostId==='host-a'));assert.ok(reads.some(([,hostId])=>hostId==='host-b'));
+ await f.store.refreshDocument(f.works[0].root);assert.equal(reads.at(-1)[1],undefined);assert.equal(f.store.view().document,'host-a');
+ const saved=JSON.parse(localStorage.getItem('omp.openSessions.v1'));assert.deepEqual(saved.sessions.map(s=>s.hostId),['host-a','host-b']);f.store.dispose();
+});
+
+test('remote transport loss preserves active work and blocks a new send until reconnect and acknowledgement review',async()=>{
+ const f=setup();await tick();f.works[0].hostId='remote';await f.store.selectWork(f.works[0]);const s=f.store.active;await s.start();
+ f.emit({type:'agent_start',clientSessionId:s.id});f.emit({type:'remote_disconnected',clientSessionId:s.id});
+ assert.equal(s.connection,'reconnecting');assert.equal(s.busy,true);assert.equal(await s.send('keep draft'),false);
+ assert.equal(f.calls.filter(c=>c.type==='prompt').length,0);
+ s.connection='ready';f.emit({type:'remote_operation_uncertain',clientSessionId:s.id,operationId:'lost'});
+ assert.equal(await s.send('same draft'),false);assert.equal(f.calls.filter(c=>c.type==='prompt').length,0);
+ f.api.remoteOperation=async()=>({status:'succeeded'});await s.checkOperation();assert.equal(s.pendingOperation,'lost');
+ await s.checkOperation(true);assert.equal(s.pendingOperation,'');f.store.dispose();
+});
+
 test('native title updates reach their own tab and survive an older in-flight state reply',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;await a.start();await f.store.selectWork(f.works[1]);const b=f.store.active;
  let release;const original=f.api.request;f.api.request=async(type,data,id)=>type==='get_state'&&id===a.id?new Promise(r=>release=r):original(type,data,id);

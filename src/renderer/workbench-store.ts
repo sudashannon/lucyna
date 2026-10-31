@@ -6,6 +6,7 @@ import {resultExcerpt} from '../result-excerpt.cjs';
 import {historyFileKey as fileKey,copiesHistory} from './history-entry';
 import {composeTextPrompt,validateTextAttachments,type DraftTextAttachment} from './text-attachments';
 import {validateInput,type PromptImage} from './composer-input';
+import {workKey,sameWork} from './work-identity';
 const uid = () => crypto.randomUUID();
 const label = (s: OmpEvent) => typeof s.model === 'string' ? s.model : s.model?.name || s.model?.id || 'OMP 默认模型';
 const savedRun=(run:any):Run|null=>run&&!run.active&&['completed','aborted','error'].includes(run.outcome)&&[run.startedAt,run.endedAt,run.tools].every(Number.isFinite)?{active:false,phase:run.outcome,outcome:run.outcome,startedAt:run.startedAt,endedAt:run.endedAt,updatedAt:run.endedAt,tools:run.tools}:null;
@@ -15,7 +16,8 @@ const blankWork = (): WorkData => ({history:null,historyError:'',document:'',doc
 // A controller stays bound to its work and ID across all asynchronous operations.
 // OMP alone owns generation, tools, message queues and cancellation.
 class Conversation {
-  connection: 'idle'|'starting'|'ready'|'closing' = 'idle';
+  connection: 'idle'|'starting'|'ready'|'closing'|'disconnected'|'reconnecting' = 'idle';
+  remoteSessionId='';pendingOperation='';operationStatus='';resumeExplicit=false;
   view: SessionView = emptyView();
   sessionName=''; sessionFile=''; agentDir=''; runtime=''; error=''; unread=false;summary='';
   titleRevision=0;
@@ -33,7 +35,7 @@ class Conversation {
   historyDeleted=false;
   reconnectOnLaunch=false;
   entry?:HistoryEntry;
-  constructor(public owner:Workbench,public work:Work,public id:string=uid(),public draftKey=work.root) {}
+  constructor(public owner:Workbench,public work:Work,public id:string=uid(),public draftKey=workKey(work)) {}
   get title(){return this.sessionName||textContent(this.view.messages.find(m=>m.role==='user')?.content).slice(0,240).replace(/\s+/g,' ').slice(0,60)||(this.sessionFile?'已恢复的会话':'新会话');}
   get busy(){return !!this.view.run?.active;}
   changed=()=>this.owner.changed();
@@ -80,13 +82,21 @@ class Conversation {
       this.timelineRevision++;
       this.summary='';for(let i=this.view.messages.length-1;i>=0;i--){const message=this.view.messages[i];if(message.role==='assistant'){this.summary=resultExcerpt(message.content);if(this.summary)break;}}
       this.syncState(state);this.connection='ready';this.waiting?.resolve();this.waiting=null;
-      this.log(this.view.messages.length?'OMP 已连接，历史记录已恢复':'OMP 已连接');void this.owner.refreshHistory(this.work.root);
-    }catch(e){if(generation!==this.generation)return;if(reattaching){this.historyPending=true;this.connection='ready';this.log('历史暂时未载入，后台任务保持运行','warning',errorText(e));return;}this.report(e);this.waiting?.reject(e instanceof Error?e:new Error(String(e)));this.waiting=null;void this.owner.api.close(this.id).catch(this.report);}
+      this.log(this.view.messages.length?'OMP 已连接，历史记录已恢复':'OMP 已连接');void this.owner.refreshHistory(this.work.root,this.work.hostId);
+    }catch(e){if(generation!==this.generation)return;if(this.work.hostId){this.historyPending=true;this.connection='disconnected';this.report(e);this.waiting?.reject(e instanceof Error?e:Error(String(e)));this.waiting=null;return;}if(reattaching){this.historyPending=true;this.connection='ready';this.log('历史暂时未载入，后台任务保持运行','warning',errorText(e));return;}this.report(e);this.waiting?.reject(e instanceof Error?e:new Error(String(e)));this.waiting=null;void this.owner.api.close(this.id).catch(this.report);}
     finally{this.loadingHistory=false;const retry=this.retryHistory;this.retryHistory=false;if(retry&&this.historyPending&&generation===this.generation)void this.ready(true);}
   };
   event=(event:OmpEvent)=>{
     if(event.runtime)this.runtime=event.runtime;
-    if(event.type==='session_info_update'){this.titleRevision++;this.sessionName=typeof event.title==='string'?event.title:'';this.owner.persist();this.changed();void this.owner.refreshHistory(this.work.root);return;}
+    if(event.type==='remote_disconnected'){
+      this.generation++;this.connection=event.paused?'disconnected':'reconnecting';this.questions=[];
+      this.connectionPhase=event.paused?'SSH 已断开，远端任务继续运行':'SSH 已断开，正在接回原会话';this.changed();return;
+    }
+    if(event.type==='remote_reconnected'){this.connection='starting';this.error='';void this.ready(true).then(()=>{this.waiting?.resolve();this.waiting=null;});return;}
+    if(event.type==='remote_interrupted'){this.connection=event.ended?'idle':'disconnected';if(event.ended){this.dispatch({type:'process_exit'});this.reconnectOnLaunch=false;this.owner.persist();}this.error=event.message;this.waiting?.reject(Error(event.message));this.waiting=null;this.changed();return;}
+    if(event.type==='remote_questions'){this.questions=event.questions||[];this.changed();return;}
+    if(event.type==='remote_operation_uncertain'){this.pendingOperation=event.operationId;this.operationStatus='';this.owner.persist();this.changed();return;}
+    if(event.type==='session_info_update'){this.titleRevision++;this.sessionName=typeof event.title==='string'?event.title:'';this.owner.persist();this.changed();void this.owner.refreshHistory(this.work.root,this.work.hostId);return;}
     if(event.type==='auxiliary_title_error'){this.log('自动命名暂未完成','warning',event.message);return;}
     if(event.type==='ready'){if(this.connection==='starting')void this.ready();return;}
     if(event.type==='connection_progress'){if(this.connection==='starting'){this.connectionPhase=event.phase||this.connectionPhase;this.changed();}return;}
@@ -105,7 +115,7 @@ class Conversation {
     }
     if(['stderr','diagnostic'].includes(event.type)){this.log(event.message||event.type);return;}
     if(event.type==='extension_ui_request'){
-      if(['confirm','select','input','editor','ask'].includes(event.method)){this.questions=[...this.questions,event];if(!this.owner.isReading(this.id))this.unread=true;}
+      if(['confirm','select','input','editor','ask'].includes(event.method)){this.questions=[...this.questions.filter(q=>q.id!==event.id),event];if(!this.owner.isReading(this.id))this.unread=true;}
       else if(event.method==='cancel')this.questions=this.questions.filter(q=>q.id!==event.targetId);
       else if(event.method==='notify'){this.log(event.message||'OMP 通知');if(event.notifyType==='error')this.report(event.message);}
       this.changed();return;
@@ -114,7 +124,7 @@ class Conversation {
       if(event.status==='error')this.report(event.error?.message||'模型请求失败');
       else this.log(event.status==='aborted'?'已停止生成':'本轮生成完成',event.status==='aborted'?'warning':'success');
       const generation=this.generation;void this.request('get_state').then(state=>{if(generation===this.generation)this.syncState(state);}).catch(()=>{});
-      void this.owner.refreshHistory(this.work.root);
+      void this.owner.refreshHistory(this.work.root,this.work.hostId);
     }
     if(event.type==='message_end'&&event.message?.stopReason==='error')this.report(event.message.errorMessage||'模型请求失败');
     if(event.type==='tool_execution_start')this.log((event.toolName||'工具')+' · 开始执行');
@@ -126,6 +136,7 @@ class Conversation {
     if(this.historyDeleted)return Promise.reject(new Error('该会话已移入回收站。请恢复后续聊，或新建会话；未发送草稿已保留。'));
     if(this.starting)return this.starting;
     if(this.connection==='ready')return Promise.resolve();
+    if(this.work.hostId&&['disconnected','reconnecting'].includes(this.connection)&&this.remoteSessionId)return this.reconnect();
     if(this.connection==='closing')return Promise.reject(new Error('正在结束当前会话，请稍候'));
     if(this.work.kind==='invalid')return Promise.reject(new Error('请先选择有效工作区'));
     this.reconnectOnLaunch=true;this.owner.persist();
@@ -134,21 +145,24 @@ class Conversation {
       let timer:ReturnType<typeof setTimeout>|undefined,cancelled=false;
       const waiting=new Promise<void>((resolve,reject)=>{this.waiting={resolve,reject};timer=setTimeout(()=>reject(new Error(`会话启动超时：${this.connectionPhase}，请重试`)),75000);});
       try {
-        await Promise.all([this.owner.api.start({root:this.work.root,clientSessionId:this.id,resume:this.entry?.sessionFile,agentDir:this.entry?.agentDir,runtime:this.entry?.runtime}).then(value=>{
-          if(cancelled)return;const result=value as OmpEvent;this.runtime=result.runtime||this.runtime;this.agentDir=result.agentDir||this.agentDir;
+        await Promise.all([this.owner.api.start({root:this.work.root,hostId:this.work.hostId,clientSessionId:this.id,resume:this.entry?.sessionFile,agentDir:this.entry?.agentDir,runtime:this.entry?.runtime,remoteSessionId:this.entry?.remoteSessionId,explicitResume:this.resumeExplicit}).then(value=>{
+          if(cancelled)return;const result=value as OmpEvent;this.runtime=result.runtime||this.runtime;this.agentDir=result.agentDir||this.agentDir;this.remoteSessionId=result.remoteSessionId||this.remoteSessionId;
         }),waiting]);
-        this.rememberEntry();this.owner.persist();
+        this.resumeExplicit=false;this.rememberEntry();this.owner.persist();
       } catch(e){
         cancelled=true;this.waiting=null;this.generation++;this.connection='closing';this.changed();
         let closeTimer:ReturnType<typeof setTimeout>|undefined;
-        try{await Promise.race([this.owner.api.close(this.id).catch(()=>{}),new Promise<void>(resolve=>{closeTimer=setTimeout(resolve,10000);})]);}
+        try{await Promise.race([(this.work.hostId?this.owner.api.detachRemote?.(this.id):this.owner.api.close(this.id))?.catch(()=>{}),new Promise<void>(resolve=>{closeTimer=setTimeout(resolve,10000);})]);}
         finally{clearTimeout(closeTimer);}
         this.connection='idle';this.changed();throw e;
       }
       finally{clearTimeout(timer);this.starting=null;}
     })();return this.starting;
   };
-  rememberEntry=()=>{if(this.sessionFile&&this.agentDir)this.entry={...this.entry,sessionFile:this.sessionFile,agentDir:this.agentDir,runtime:this.runtime as 'wsl'|'windows'};};
+  rememberEntry=()=>{if(this.sessionFile&&(this.agentDir||this.work.hostId))this.entry={...this.entry,sessionFile:this.sessionFile,agentDir:this.agentDir,runtime:this.runtime as HistoryEntry['runtime'],hostId:this.work.hostId,remoteSessionId:this.remoteSessionId};};
+  reconnect=async()=>{if(!this.work.hostId)return;this.reconnectOnLaunch=true;this.owner.persist();this.connection='reconnecting';this.changed();try{await this.owner.api.reconnectRemote?.(this.id);}catch(e){this.connection='disconnected';this.report(e);}};
+  detach=async()=>{if(!this.work.hostId)return;this.reconnectOnLaunch=false;this.owner.persist();await this.owner.api.detachRemote?.(this.id);this.connection='disconnected';this.changed();};
+  checkOperation=async(clear=false)=>{try{const result=await this.owner.api.remoteOperation?.(this.id,clear);this.operationStatus=result?.status||'';if(clear)this.pendingOperation='';this.owner.persist();this.changed();if(result?.status==='succeeded')void this.ready(true);}catch(e){this.report(e);}};
   loadCommands=(force=false):Promise<void>=>{
     if(this.commandTask)return this.commandTask;
     if(!force&&this.commandsStatus==='ready'&&this.connection==='ready')return Promise.resolve();
@@ -156,6 +170,8 @@ class Conversation {
     this.commandTask=(async()=>{try{await this.start();const result=await this.request('get_available_commands');this.nativeCommands=normalizeCommands(result.commands);this.commandsStatus='ready';}catch(e){this.commandsStatus='error';this.commandsError=errorText(e);}finally{this.commandTask=null;this.changed();}})();return this.commandTask;
   };
   send=async(text:string,images:OmpEvent[]=[],attachments:DraftTextAttachment[]=[])=>{
+    if(this.work.hostId&&['disconnected','reconnecting'].includes(this.connection)){this.setError('请先接回远端会话，再发送消息；草稿已保留');return false;}
+    if(this.pendingOperation){this.setError('上一条消息的发送结果尚未核对，请先检查远端状态');return false;}
     if(this.sending||this.connection==='closing'||this.importing||this.view.run?.phase==='stopping')return false;
     this.sending=true;this.error='';const queued=this.busy,id=uid();let optimistic=false;
     if(!queued&&!attachments.length){this.dispatch({type:'local_send',id,text,images,connecting:this.connection!=='ready'});optimistic=true;}
@@ -177,7 +193,7 @@ class Conversation {
     if(this.connection==='idle')return Promise.resolve(true);
     this.connection='closing';this.changed();
     this.closing=(async()=>{
-      try{await this.owner.api.close(this.id);this.connection='idle';this.rememberEntry();this.changed();void this.owner.refreshHistory(this.work.root);return true;}
+      try{await this.owner.api.close(this.id);this.connection='idle';this.rememberEntry();this.changed();void this.owner.refreshHistory(this.work.root,this.work.hostId);return true;}
       catch(e){this.connection='ready';this.reconnectOnLaunch=wanted;this.owner.persist();this.report(e);return false;}
       finally{this.closing=null;}
     })();return this.closing;
@@ -200,7 +216,7 @@ export class Workbench {
   setConversationVisible=(visible:boolean)=>{this.conversationVisible=visible;if(visible&&this.active.unread){this.active.unread=false;this.persist();this.changed();}};
   lastByWork=new Map<string,string>();listeners=new Set<()=>void>();revision=0;off?:()=>void;disposed=false;
   fallback=new Conversation(this,{name:'',root:'',kind:'invalid'},'unselected','');
-  offNavigate?:()=>void;pendingSelection='';
+  offNavigate?:()=>void;offHosts?:()=>void;pendingSelection='';
   initializing=true;
   restoreQueue:Conversation[]=[];restoring=new Set<string>();restoreWorkers=0;
   constructor(public api:Desktop){}
@@ -210,11 +226,11 @@ export class Workbench {
   changed=()=>{clearTimeout(this.notifyTimer);this.notifyTimer=undefined;this.revision++;for(const listener of this.listeners)listener();};
   streamChanged=()=>{if(this.notifyTimer===undefined)this.notifyTimer=setTimeout(()=>this.changed(),32);};
   get active(){return this.sessions.get(this.activeId)||this.fallback;}
-  workData=(root:string)=>{if(!this.data.has(root))this.data.set(root,blankWork());return this.data.get(root)!;};
-  persist=()=>{if(this.initializing)return;try{localStorage.setItem('omp.openSessions.v1',JSON.stringify({activeId:this.activeId,sessions:[...this.sessions.values()].map(s=>({id:s.id,root:s.work.root,draftKey:s.draftKey,title:s.title,sessionFile:s.sessionFile,agentDir:s.agentDir,runtime:s.runtime,source:s.entry?.path,historyDeleted:s.historyDeleted,reconnectOnLaunch:s.reconnectOnLaunch,unread:s.unread,lastRun:savedRun(s.view.run)}))}));}catch{this.active.error='会话列表暂时无法保存，请保留草稿';}};
-  connect=()=>{this.disposed=false;this.off=this.api.onEvent(event=>{if(event.type==='history_deleted'||event.type==='history_restored'){this.historyRemoved(event.source,event.type==='history_deleted');return;}const target=this.sessions.get(event.clientSessionId)||(!event.clientSessionId?this.active:undefined);target?.event(event);});this.offNavigate=this.api.onPetNavigate?.(({id})=>{if(this.sessions.has(id))this.selectSession(id);else this.pendingSelection=id;});void this.initialize();};
-  historyRemoved=(source:string,deleted:boolean)=>{for(const s of this.sessions.values())if(fileKey(s.sessionFile)===fileKey(source)){s.historyDeleted=deleted;if(deleted)s.error='该会话已移入回收站，草稿已保留。恢复后可继续会话。';else if(s.error.includes('该会话已移入回收站'))s.error='';}this.persist();this.changed();};
-  dispose=()=>{this.disposed=true;this.restoreQueue=[];this.off?.();this.offNavigate?.();clearTimeout(this.notifyTimer);this.notifyTimer=undefined;};
+  workData=(root:string,hostId?:string)=>{const key=workKey({root,hostId});if(!this.data.has(key))this.data.set(key,blankWork());return this.data.get(key)!;};
+  persist=()=>{if(this.initializing)return;try{localStorage.setItem('omp.openSessions.v1',JSON.stringify({activeId:this.activeId,sessions:[...this.sessions.values()].map(s=>({id:s.id,root:s.work.root,hostId:s.work.hostId,hostName:s.work.hostName,remoteSessionId:s.remoteSessionId,pendingOperation:s.pendingOperation,draftKey:s.draftKey,title:s.title,sessionFile:s.sessionFile,agentDir:s.agentDir,runtime:s.runtime,source:s.entry?.path,historyDeleted:s.historyDeleted,reconnectOnLaunch:s.reconnectOnLaunch,unread:s.unread,lastRun:savedRun(s.view.run)}))}));}catch{this.active.error='会话列表暂时无法保存，请保留草稿';}};
+  connect=()=>{this.disposed=false;this.offHosts=this.api.onHosts?.(()=>{void this.loadWorks();});this.off=this.api.onEvent(event=>{if(event.type==='history_deleted'||event.type==='history_restored'){this.historyRemoved(event.source,event.type==='history_deleted');return;}const target=this.sessions.get(event.clientSessionId)||(!event.clientSessionId?this.active:undefined);target?.event(event);});this.offNavigate=this.api.onPetNavigate?.(({id})=>{if(this.sessions.has(id))this.selectSession(id);else this.pendingSelection=id;});void this.initialize();};
+  historyRemoved=(source:string,deleted:boolean)=>{for(const s of this.sessions.values())if(!s.work.hostId&&fileKey(s.sessionFile)===fileKey(source)){s.historyDeleted=deleted;if(deleted)s.error='该会话已移入回收站，草稿已保留。恢复后可继续会话。';else if(s.error.includes('该会话已移入回收站'))s.error='';}this.persist();this.changed();};
+  dispose=()=>{this.disposed=true;this.restoreQueue=[];this.off?.();this.offNavigate?.();this.offHosts?.();clearTimeout(this.notifyTimer);this.notifyTimer=undefined;};
   initialize=async()=>{
     let saved:any;try{saved=JSON.parse(localStorage.getItem('omp.openSessions.v1')||'null');}catch{}
     await this.loadWorks();if(this.disposed)return;
@@ -223,20 +239,21 @@ export class Workbench {
     for(const item of Array.isArray(saved?.sessions)?saved.sessions:[]){
       if(typeof item?.id!=='string'||typeof item.root!=='string'||!item.root||this.sessions.has(item.id))continue;
       // A temporarily unavailable WSL work root must not erase its saved tabs.
-      const work=this.works.find(w=>w.root===item.root)||{root:item.root,name:item.root.split('/').filter(Boolean).at(-1)||item.root,kind:'invalid',error:'工作区暂不可用，请刷新工作区列表；会话和草稿已保留。'};
+      const work=this.works.find(w=>sameWork(w,item))||{root:item.root,hostId:item.hostId,hostName:item.hostName,name:item.root.split('/').filter(Boolean).at(-1)||item.root,kind:'invalid',error:'工作区暂不可用，请刷新工作区列表；会话和草稿已保留。'};
       const s=new Conversation(this,work,item.id,item.draftKey||item.id);s.sessionName=item.title||'';s.sessionFile=item.sessionFile||'';s.agentDir=item.agentDir||'';s.runtime=item.runtime||'';s.historyDeleted=item.historyDeleted===true;
       s.unread=item.unread===true;s.view={...s.view,run:savedRun(item.lastRun)};
+      s.remoteSessionId=item.remoteSessionId||'';s.pendingOperation=item.pendingOperation||'';
       if(work.kind==='invalid')s.error=work.error||'工作区暂不可用，请刷新工作区列表；会话和草稿已保留。';
       if(s.historyDeleted)s.error='该会话已移入回收站，草稿已保留。恢复后可继续会话。';
-      if(s.sessionFile&&s.agentDir)s.entry={sessionFile:s.sessionFile,agentDir:s.agentDir,runtime:s.runtime as 'wsl'|'windows',path:item.source};
+      if(s.sessionFile&&(s.agentDir||work.hostId))s.entry={sessionFile:s.sessionFile,agentDir:s.agentDir,runtime:s.runtime as HistoryEntry['runtime'],path:item.source,hostId:work.hostId,remoteSessionId:s.remoteSessionId};
       // Older clients saved open journals without recording connection intent.
       s.reconnectOnLaunch=typeof item.reconnectOnLaunch==='boolean'?item.reconnectOnLaunch:!!s.entry;
-      this.sessions.set(s.id,s);this.lastByWork.set(work.root,s.id);
+      this.sessions.set(s.id,s);this.lastByWork.set(workKey(work),s.id);
     }
-    for(const item of live){const work=this.works.find(w=>w.root===item.root)||this.sessions.get(item.id)?.work;if(!work)continue;const s=this.sessions.get(item.id)||new Conversation(this,work,item.id,item.id);s.agentDir=item.agentDir;s.runtime=item.runtime;s.sessionFile=item.sessionFile;s.connection='starting';s.reconnectOnLaunch=true;s.questions=item.questions||[];this.sessions.set(s.id,s);this.lastByWork.set(work.root,s.id);if(item.busy)s.dispatch({type:'agent_start'});if(item.ready)void s.ready(true);}
+    for(const item of live){const work=this.works.find(w=>sameWork(w,{root:item.root,hostId:item.hostId}))||this.sessions.get(item.id)?.work;if(!work)continue;const s=this.sessions.get(item.id)||new Conversation(this,work,item.id,item.id);s.agentDir=item.agentDir;s.runtime=item.runtime;s.sessionFile=item.sessionFile;s.remoteSessionId=item.remoteSessionId||'';s.connection=item.hostId&&!item.ready?'reconnecting':'starting';s.reconnectOnLaunch=true;s.questions=item.questions||[];this.sessions.set(s.id,s);this.lastByWork.set(workKey(work),s.id);if(item.busy)s.dispatch({type:'agent_start'});if(item.ready)void s.ready(true);}
     this.initializing=false;
     if(!this.activeId&&this.sessions.has(saved?.activeId))this.selectSession(saved.activeId,false);
-    else if(!this.activeId){const work=this.works.find(w=>w.root===localStorage.getItem('omp.work'));if(work)this.selectWork(work);}
+    else if(!this.activeId){const work=this.works.find(w=>workKey(w)===localStorage.getItem('omp.work'));if(work)this.selectWork(work);}
     if(this.pendingSelection){this.selectSession(this.pendingSelection);this.pendingSelection='';}
     this.restoreConnections();this.persist();this.changed();
   };
@@ -262,34 +279,41 @@ export class Workbench {
   loadWorks=async()=>{this.loading=true;this.changed();try{
     this.works=await this.api.listWorks();
     for(const session of this.sessions.values()){
-      const next=this.works.find(work=>work.root===session.work.root);if(!next)continue;
+      const next=this.works.find(work=>sameWork(work,session.work));if(!next)continue;
       const previous=session.work;session.work=next;
       if(previous.kind==='invalid'&&next.kind!=='invalid'){
         if(session.error===(previous.error||'工作区校验失败'))session.error='';
-        if(session===this.active){void this.refreshHistory(next.root);void this.refreshDocument(next.root);}
+        if(session===this.active){void this.refreshHistory(next.root,next.hostId);void this.refreshDocument(next.root,next.hostId);}
       }
     }
     if(!this.initializing)this.restoreConnections();
   }catch(e){this.active.report(e);}finally{this.loading=false;this.changed();}};
-  selectSession=(id:string,connect=true)=>{const s=this.sessions.get(id);if(!s)return;this.activeId=id;if(this.conversationVisible)s.unread=false;this.lastByWork.set(s.work.root,id);this.persist();this.changed();if(s.work.kind==='invalid'){s.setError(s.work.error||'工作区校验失败');return;}void this.refreshHistory(s.work.root);if(!this.workData(s.work.root).document)void this.refreshDocument(s.work.root);if(connect&&s.entry?.sessionFile&&!s.view.messages.length&&s.connection==='idle')void s.start().catch(s.report);};
-  selectWork=async(work:Work)=>{const previous=this.lastByWork.get(work.root);if(previous&&this.sessions.has(previous)){this.selectSession(previous);return;}this.create(work,work.root);};
+  selectSession=(id:string,connect=true)=>{const s=this.sessions.get(id);if(!s)return;this.activeId=id;if(this.conversationVisible)s.unread=false;this.lastByWork.set(workKey(s.work),id);this.persist();this.changed();if(s.work.kind==='invalid'){s.setError(s.work.error||'工作区校验失败');return;}void this.refreshHistory(s.work.root,s.work.hostId);if(!this.workData(s.work.root,s.work.hostId).document)void this.refreshDocument(s.work.root,s.work.hostId);if(connect&&s.entry?.sessionFile&&!s.view.messages.length&&s.connection==='idle')void s.start().catch(s.report);};
+  selectWork=async(work:Work)=>{const previous=this.lastByWork.get(workKey(work));if(previous&&this.sessions.has(previous)){this.selectSession(previous);return;}this.create(work,workKey(work));};
   create=(work:Work,draftKey?:string,select=true)=>{const s=new Conversation(this,work,uid(),draftKey||uid());this.sessions.set(s.id,s);if(select)this.selectSession(s.id);return s;};
   newSession=async()=>{if(!this.active.work.root)return false;this.create(this.active.work);return true;};
   pruneEmpty=(protectedKeys:Set<string>,terminalIds:Set<string>)=>{
     let removed=false;
     for(const s of this.sessions.values()){
       if(s.id===this.activeId||protectedKeys.has(s.draftKey)||terminalIds.has(s.id)||s.connection!=='idle'||s.starting||s.importing||s.sending||s.entry||s.sessionFile||s.view.messages.length||s.error||s.questions.length||s.busy)continue;
-      this.sessions.delete(s.id);if(this.lastByWork.get(s.work.root)===s.id)this.lastByWork.delete(s.work.root);removed=true;
+      this.sessions.delete(s.id);if(this.lastByWork.get(workKey(s.work))===s.id)this.lastByWork.delete(workKey(s.work));removed=true;
     }
     if(removed){this.persist();this.changed();}
   };
-  dismiss=async(id:string)=>{const s=this.sessions.get(id);if(!s||!await s.close())return;this.sessions.delete(id);if(this.activeId===id){const next=[...this.sessions.values()].find(x=>x.work.root===s.work.root);if(next)this.selectSession(next.id);else this.create(s.work);}this.persist();this.changed();};
-  refreshHistory=async(root=this.active.work.root)=>{if(!root)return;const d=this.workData(root),revision=++d.historyRevision;d.historyError='';try{const history=await this.api.listHistory(root);if(revision===d.historyRevision)d.history=history;}catch(e){if(revision===d.historyRevision)d.historyError=errorText(e);}this.changed();};
-  refreshDocument=async(root=this.active.work.root)=>{if(!root)return;const d=this.workData(root),revision=++d.documentRevision;d.documentLoading=true;d.documentError='';this.changed();try{const content=await this.api.readWork(root);if(revision===d.documentRevision){d.document=content;d.documentUpdated=new Date().toLocaleTimeString('zh-CN',{hour12:false});}}catch(e){if(revision===d.documentRevision)d.documentError=errorText(e);}finally{if(revision===d.documentRevision)d.documentLoading=false;this.changed();}};
+  dismiss=async(id:string)=>{const s=this.sessions.get(id);if(!s||!await s.close())return;this.sessions.delete(id);if(this.activeId===id){const next=[...this.sessions.values()].find(x=>sameWork(x.work,s.work));if(next)this.selectSession(next.id);else this.create(s.work);}this.persist();this.changed();};
+  refreshHistory=async(root?:string,hostId?:string)=>{if(root===undefined){root=this.active.work.root;hostId=this.active.work.hostId;}if(!root)return;const d=this.workData(root,hostId),revision=++d.historyRevision;d.historyError='';try{const history=await this.api.listHistory(root,hostId);if(revision===d.historyRevision)d.history=history;}catch(e){if(revision===d.historyRevision)d.historyError=errorText(e);}this.changed();};
+  refreshDocument=async(root?:string,hostId?:string)=>{if(root===undefined){root=this.active.work.root;hostId=this.active.work.hostId;}if(!root)return;const d=this.workData(root,hostId),revision=++d.documentRevision;d.documentLoading=true;d.documentError='';this.changed();try{const content=await this.api.readWork(root,hostId);if(revision===d.documentRevision){d.document=content;d.documentUpdated=new Date().toLocaleTimeString('zh-CN',{hour12:false});}}catch(e){if(revision===d.documentRevision)d.documentError=errorText(e);}finally{if(revision===d.documentRevision)d.documentLoading=false;this.changed();}};
   imports=new Map<string,Promise<void>>();
   resume=async(entry?:HistoryEntry,options:{copy?:boolean}={})=>{
     const origin=this.active,work=origin.work;if(!work.root)return;
     try{
+      if(work.hostId){
+        if(!entry?.remoteSessionId||entry.hostId!==work.hostId||options.copy)throw Error('请从当前 SSH 主机的历史列表打开会话');
+        const existing=[...this.sessions.values()].find(s=>sameWork(s.work,work)&&s.remoteSessionId===entry?.remoteSessionId);
+        if(existing&&['live','starting'].includes(entry.status||'')){this.selectSession(existing.id,false);await existing.start();return;}
+        const s=this.create(work);s.entry=entry;s.sessionFile=entry.sessionFile||'';s.remoteSessionId=entry.remoteSessionId;s.resumeExplicit=true;
+        await s.start();return;
+      }
       if(!entry){const source=await this.api.chooseSession();if(!source)return;entry={path:source};options={copy:true};}
       const runtime=(await this.api.getSettings()).settings.runtime;
       const source=fileKey(entry.sessionFile||entry.path),copy=copiesHistory(entry,runtime,options.copy);
@@ -311,10 +335,10 @@ export class Workbench {
     }catch(e){origin.report(e);}
   };
   view(){
-    const s=this.active,d=this.workData(s.work.root);
+    const s=this.active,d=this.workData(s.work.root,s.work.hostId);
     return {works:this.works,loading:this.loading,work:s.work.root?s.work:null,...d,...s.view,connection:s.connection,busy:s.busy,sending:s.sending,model:s.model,error:s.error,events:s.events,questions:s.questions,title:s.title,sessionFile:s.sessionFile,
-      id:s.id,timelineRevision:s.timelineRevision,draftKey:s.draftKey,runtime:s.runtime,importing:s.importing,connectionPhase:s.connectionPhase,connectionStarted:s.connectionStarted,pruneEmpty:this.pruneEmpty,sessions:[...this.sessions.values()].map(c=>({id:c.id,root:c.work.root,workName:c.work.name,title:c.title,draftKey:c.draftKey,busy:c.busy,connection:c.connection,unread:c.unread,questions:c.questions.length,error:!!c.error,errorText:c.error,summary:c.summary,model:c.model,runtime:c.runtime,run:c.view.run,queued:c.view.queued.length,connectionPhase:c.connectionPhase,outcome:c.view.run?.outcome,report:c.report,stop:c.stop,close:c.close})),
-      report:s.report,setError:s.setError,log:s.log,loadWorks:this.loadWorks,selectWork:this.selectWork,selectSession:this.selectSession,newSession:this.newSession,dismiss:this.dismiss,setConversationVisible:this.setConversationVisible,
+      id:s.id,timelineRevision:s.timelineRevision,draftKey:s.draftKey,runtime:s.runtime,importing:s.importing,connectionPhase:s.connectionPhase,connectionStarted:s.connectionStarted,pruneEmpty:this.pruneEmpty,sessions:[...this.sessions.values()].map(c=>({id:c.id,root:c.work.root,hostId:c.work.hostId,hostName:c.work.hostName,workName:c.work.name,title:c.title,draftKey:c.draftKey,busy:c.busy,connection:c.connection,unread:c.unread,questions:c.questions.length,error:!!c.error,errorText:c.error,summary:c.summary,model:c.model,runtime:c.runtime,run:c.view.run,queued:c.view.queued.length,connectionPhase:c.connectionPhase,outcome:c.view.run?.outcome,report:c.report,stop:c.stop,close:c.close})),
+      pendingOperation:s.pendingOperation,operationStatus:s.operationStatus,checkOperation:s.checkOperation,reconnect:s.reconnect,detach:s.detach,report:s.report,setError:s.setError,log:s.log,loadWorks:this.loadWorks,selectWork:this.selectWork,selectSession:this.selectSession,newSession:this.newSession,dismiss:this.dismiss,setConversationVisible:this.setConversationVisible,
       refreshHistory:this.refreshHistory,refreshDocument:this.refreshDocument,start:s.start,send:s.send,resume:this.resume,close:s.close,stop:s.stop,answer:s.answer,changeModel:s.changeModel,removeQueued:s.removeQueued,request:s.request,
       nativeCommands:s.nativeCommands,commandsStatus:s.commandsStatus,commandsError:s.commandsError,loadCommands:s.loadCommands};
   }

@@ -29,9 +29,11 @@ const {WorkRunner}=require('./work-runner.cjs');
 const {AuxiliarySettings}=require('./auxiliary-settings.cjs');
 const {AuxiliaryAgent}=require('./auxiliary-agent.cjs');
 const {SessionTitles}=require('./session-titles.cjs');
+const {RemoteDesktop}=require('./hosts/desktop.cjs');
 
 let window, sessions, pet, feedback, selectedHistory, listedHistory = new Map(), terminal, runtimeMutation = false;
 let windowsPreparation = Promise.resolve();
+let remote;
 configureAppIdentity(app);
 // Shortcut launches reveal the existing workbench instead of opening its
 // IndexedDB again, including while the companion keeps the client alive.
@@ -63,7 +65,7 @@ async function readBounded(filePath, limit, label) {
   } finally { await handle.close(); }
 }
 app.whenReady().then(async () => {
-  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 960, minHeight: 640, title: 'Lucyna · 工作台', icon: applicationIcon, backgroundColor: '#f9f9f8', ...windowChrome.windowOptions(), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, additionalArguments:windowChrome.enabled()?['--lucyna-titlebar']:[] } });
+  window = new BrowserWindow({ show:!process.argv.includes('--hidden'), width: 1440, height: 900, minWidth: 960, minHeight: 640, title: 'Lucyna · 工作台', icon: applicationIcon, backgroundColor: '#f9f9f8', ...windowChrome.windowOptions(), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, additionalArguments:windowChrome.enabled()?['--lucyna-titlebar']:[] } });
   if(windowChrome.enabled())windowChrome.installWindowChrome(window);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file://')) event.preventDefault(); });
@@ -82,6 +84,18 @@ app.whenReady().then(async () => {
   window.on('close',event=>{if(!quitting&&pet?.shouldKeepAlive()){event.preventDefault();window.hide();}});
   window.on('closed',()=>{if(!quitting)app.quit();});
   const handle = (name, fn) => ipcMain.handle(name, (e, ...args) => { onlyMain(e); return fn(...args); });
+  remote = new RemoteDesktop({directory:app.getPath('userData'),
+    send:event=>{pet?.ingest(event);if(window&&!window.isDestroyed())window.webContents.send('omp:event',event);},
+    notify:event=>{if(window&&!window.isDestroyed())window.webContents.send('host:event',event);}});
+  handle('host:list',()=>remote.list());
+  handle('host:save',input=>remote.save(input));
+  handle('host:connect',id=>remote.reconnect(id).then(()=>remote.list()));
+  handle('host:cancel',id=>remote.cancel(id));
+  handle('host:disconnect',id=>remote.disconnectHost(id));
+  handle('host:remove',id=>remote.remove(id));
+  handle('host:reconnect-session',id=>remote.reconnectSession(id));
+  handle('host:detach-session',id=>remote.detach(id));
+  handle('host:operation',(id,clear)=>remote.operation(id,clear===true));
   handle('pet:get',()=>pet.snapshot());
   handle('pet:settings',patch=>pet.save(patch));
   handle('pet:context',context=>{pet.context(context);feedback.context(context);});
@@ -102,7 +116,12 @@ app.whenReady().then(async () => {
     try {await checkSettings(next);const settings=await settingsStore.save(next);selectedHistory=null;listedHistory.clear();return settings;}
     finally {runtimeMutation=false;}
   });
-  handle('works:list', () => listWorks({refresh: true}));
+  handle('works:list', async () => {
+    const [local,hosts]=await Promise.allSettled([listWorks({refresh:true}),remote.works()]);
+    if(hosts.status==='rejected')throw hosts.reason;
+    if(local.status==='rejected'&&!hosts.value.length)throw local.reason;
+    return [...(local.status==='fulfilled'?local.value:[]),...hosts.value];
+  });
   handle('work:details', root => workDetails(root));
   handle('work:run', (operation,data) => workRunner.call(operation,data));
   handle('work:git', (root, member, action, options) => workDetails(root, member, action, options));
@@ -110,7 +129,7 @@ app.whenReady().then(async () => {
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 4 * 1024 * 1024) throw new Error('复制内容超过 4 MiB，请分段复制');
     await clipboard.writeText(text);
   });
-  handle('work:read', async root => { const works = await listWorks(); if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根'); return (await readBounded(path.join(wslUnc(root), 'SESSION.md'), 512 * 1024, 'SESSION.md')).toString('utf8'); });
+  handle('work:read', async (root,hostId) => { if(hostId)return remote.readWork(root,hostId);const works = await listWorks(); if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根'); return (await readBounded(path.join(wslUnc(root), 'SESSION.md'), 512 * 1024, 'SESSION.md')).toString('utf8'); });
   handle('stele:context', query => { if (typeof query !== 'string' || !query.trim() || query.length > 2000) throw new Error('请输入查询内容'); return steleCall('wiki_context', { query: query.trim() }); });
   handle('stele:knowledge', (kind,args) => knowledge(kind,args,event=>{if(window&&!window.isDestroyed())window.webContents.send('stele:knowledge-event',{requestId:args?.requestId,event});}));
   handle('stele:save-file', async (name,bytes) => {
@@ -121,6 +140,7 @@ app.whenReady().then(async () => {
   });
   handle('omp:start', async options => {
     if (!options || typeof options.root !== 'string') throw new Error('请选择工作根');
+    if(options.hostId)return remote.start(options);
     return sessions.start(options.clientSessionId, (startNative,signal,progress)=>{
     progress('正在检查后台任务');
     return workRunner.interactive(options.root,async()=>{
@@ -179,14 +199,15 @@ app.whenReady().then(async () => {
     },signal);
     },{root:options.root});
   });
-  handle('omp:prepare-text', (id,files) => sessions.prepareTextAttachments(id,files));
-  handle('omp:request', (type, data, id) => { if (!['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command'); return sessions.request(id,type,data); });
-  handle('omp:ui-response', (data,id) => { if (!data || data.type !== 'extension_ui_response' || typeof data.id !== 'string') throw new Error('Invalid UI response'); return sessions.respond(id,data); });
-  handle('omp:close', id => sessions.close(id));
-  handle('omp:list', () => sessions.list());
+  handle('omp:prepare-text', (id,files) => {if(remote.owns(id))throw Error('远端文本文件附件尚未接入，请使用内联文本；草稿已保留');return sessions.prepareTextAttachments(id,files);});
+  handle('omp:request', (type, data, id) => { if (!['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command'); return remote.owns(id)?remote.request(id,type,data):sessions.request(id,type,data); });
+  handle('omp:ui-response', (data,id) => { if (!data || data.type !== 'extension_ui_response' || typeof data.id !== 'string') throw new Error('Invalid UI response'); return remote.owns(id)?remote.respond(id,data):sessions.respond(id,data); });
+  handle('omp:close', id => remote.owns(id)?remote.close(id):sessions.close(id));
+  handle('omp:list', () => [...sessions.list(),...remote.listConnections()]);
   handle('omp:path', async () => {const s=await settingsStore.get();return s.runtime==='wsl'?s.wslExecutable:s.windowsExecutable;});
   handle('session:choose', async () => { const r = await dialog.showOpenDialog(window, { title: '选择 OMP 会话并导入副本（原件保留）', filters: [{ name: 'OMP session', extensions: ['jsonl'] }], properties: ['openFile'] }); selectedHistory = r.canceled ? null : r.filePaths[0]; return selectedHistory; });
-  handle('session:list', async root => {
+  handle('session:list', async (root,hostId) => {
+    if(hostId)return remote.history(root,hostId);
     const works = await listWorks();
     if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
     const settings=await settingsStore.get();
@@ -331,6 +352,6 @@ let quitting=false;
 app.on('before-quit', event => {
   if(quitting)return;
   event.preventDefault();quitting=true;feedback?.dispose();pet?.dispose();terminal?.dispose();
-  void (sessions?.closeAll()||Promise.resolve()).finally(async()=>{await workRunner.stopAutomatic();app.quit();});
+  void Promise.allSettled([sessions?.closeAll(),remote?.shutdown()]).finally(async()=>{await workRunner.stopAutomatic();app.quit();});
 });
 app.on('before-quit', () => terminal?.dispose());

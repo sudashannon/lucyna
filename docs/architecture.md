@@ -1,5 +1,11 @@
 # 架构
 
+SSH 已接入正式设置、主进程 IPC 和工作台：保存主机后自动部署 frozen host，打开远端目录、受管历史与 OMP 会话，SSH 断线及客户端重开时接回原进程。无系统 Python/无公网安装和隔离 OpenSSH 桌面流程已验证；远端文件、附件文件落盘、终端、完整 Work 管理和发行矩阵尚未完成。见 [自动部署设计](ssh-host-design.md)、[开发计划](ssh-host-implementation-plan.md) 和 [review/验收记录](ssh-host-review.md)。
+
+SSH 实现复用 OpenSSH/systemd，运行时分发采用 PyInstaller onedir；框架候选与取舍见 [开源复用评估](ssh-host-reuse-review.md)。
+
+`hosts/registry.cjs` 将 SSH profile、安装身份和会话描述符原子保存在客户端 `ssh-hosts.json`；`hosts/desktop.cjs` 对接现有受信 IPC，负责安装进度、连接、有限自动重试、退出 detach 与显式 stop。renderer 以 hostId + 原始 Linux root 区分工作区、历史和草稿，旧本机 key 保持不变。进程和 journal 归远端服务所有，客户端只保存定位信息与回放游标；prompt 的操作 ID 在发送前落盘，确认不明时显示核对入口，不自动重发。
+
 Lucyna 提供 UI 和进程路由；OMP 保留模型、工具、技能和会话循环。Work 与 Stele 负责不同层次的上下文。
 
 客户端辅助任务由独立的 Vercel AI SDK `ToolLoopAgent` 执行。`auxiliary-settings.cjs` 管理协议、地址、模型、超时和加密密钥；只有主进程读取密钥。`auxiliary-agent.cjs` 显式连接用户配置的 Chat Completions 或 Responses 服务，单步、无工具、无自动网络重试；Responses 请求关闭服务端存储。它不创建 OMP 会话，也不向主对话追加命名提示。原生任务执行仍由 OMP 管理。
