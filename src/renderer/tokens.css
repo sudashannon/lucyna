@@ -1,4 +1,11 @@
 :root {
+  /* Shared reading scale; headings and diagram geometry keep their own roles. */
+  --font-size-caption: 12px;
+  --font-size-small: 13px;
+  --font-size-ui: 14px;
+  --font-size-body: 15px;
+  --font-size-reading: 16px;
+  --font-size-code: 13px;
   --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
   --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.2rem; --text-xl: 1.44rem; --text-2xl: 1.728rem; --text-3xl: 2.074rem;
   --text-display-s: 1.44rem; --text-display: 1.728rem; --text-section: 1.2rem; --text-title: 1rem; --text-lead: 1rem;

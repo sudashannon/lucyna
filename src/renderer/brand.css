@@ -7,7 +7,7 @@
 .brand-about { display: flex; align-items: center; gap: var(--space-5); margin-bottom: var(--space-5); }
 .brand-about .cindy-companions { width: 112px; height: 112px; }
 .brand-about strong { font-size: var(--text-20); font-weight: 550; }
-.brand-about p { color: var(--muted-readable); font-size: var(--text-12); margin-top: var(--space-2); }
+.brand-about p { color: var(--muted-readable); font-size: var(--font-size-small); margin-top: var(--space-2); }
 @media (max-height: 760px) {
   .welcome-mark.welcome-character { width: 72px; height: 72px; }
 }

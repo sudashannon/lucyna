@@ -14,7 +14,7 @@ export function TerminalPanel({root, visible, theme, onHide, onActive, onError}:
   useEffect(() => {
     let alive = true;
     const onActive=(active:boolean)=>callbacks.current.onActive(active),onError=(e:unknown)=>callbacks.current.onError(e);
-    const t = new Terminal({fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--font-code'), fontSize: 12, cursorBlink: true, scrollback: 5000});
+    const t = new Terminal({fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--font-code'), fontSize: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-code')) || 13, cursorBlink: true, scrollback: 5000});
     const f = new FitAddon(); terminal.current = t; fit.current = f; t.loadAddon(f); t.open(host.current!);
     const ended = (current: Attempt, label: string) => {
       clearTimeout(current.timer);

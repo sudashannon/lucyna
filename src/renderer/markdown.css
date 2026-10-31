@@ -5,7 +5,7 @@
 .markdown-engine [data-streamdown="mermaid-block"] { border-color: var(--border-default); background: var(--code-bg); border-radius: 12px; }
 .markdown-engine [data-streamdown="code-block-body"] { background: var(--surface-elevated); border-color: var(--border-default); }
 .markdown-engine [data-streamdown="code-block-body"] pre { margin: 0; padding: 0; border-radius: 0; background: transparent; max-height: none; overflow: visible; }
-.markdown-engine [data-streamdown="code-block-body"] code { font-size: 12px; }
+.markdown-engine [data-streamdown="code-block-body"] code { font-size: var(--font-size-code); }
 .markdown-engine [data-streamdown="code-block-actions"],
 .markdown-engine [data-streamdown="mermaid-block-actions"] { background: var(--code-bg); border-color: var(--border-default); }
 .markdown-engine [data-streamdown="mermaid-block"]>div:first-child { padding-inline: 4px; }
@@ -22,7 +22,7 @@
 .markdown-engine input[type="checkbox"] { margin-inline: 0 8px; accent-color: var(--text-primary); }
 .markdown-engine details { border: 1px solid var(--border-default); border-radius: 8px; padding: 10px 14px; margin-block: 12px; }
 .markdown-engine summary { cursor: pointer; font-weight: 500; }
-.markdown-engine section[data-footnotes] { margin-top: 24px; border-top: 1px solid var(--border-default); font-size: 12px; }
+.markdown-engine section[data-footnotes] { margin-top: 24px; border-top: 1px solid var(--border-default); font-size: var(--font-size-small); }
 .markdown-diagram-error, .markdown-long-notice { padding: 16px; color: var(--muted-readable); }
 .markdown-diagram-error button, .markdown-long-notice button { border: 1px solid var(--border-default); border-radius: 6px; padding: 5px 10px; }
 [data-streamdown="mermaid-fullscreen"], [data-streamdown="table-fullscreen"] { z-index: 2000; background: var(--surface); color: var(--text-primary); }

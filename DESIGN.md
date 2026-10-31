@@ -314,31 +314,31 @@ typography:
     letterSpacing: "-0.01em"
   app-navigation:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
-    fontSize: "14px"
+    fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.5
   body:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
-    fontSize: "14px"
+    fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.85
   compact-body:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
-    fontSize: "13px"
+    fontSize: "14px"
     fontWeight: 550
     lineHeight: 1.55
   label:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
-    fontSize: "12px"
+    fontSize: "13px"
     fontWeight: 400
     lineHeight: 1.7
   rail-label:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
-    fontSize: "10px"
+    fontSize: "12px"
     fontWeight: 400
   studio-navigation:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
-    fontSize: "13px"
+    fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.5
   folio-brand:
@@ -364,7 +364,7 @@ typography:
     lineHeight: 1.5
   folio-message:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
-    fontSize: "15px"
+    fontSize: "16px"
     fontWeight: 400
     lineHeight: 1.95
   pixel-work-title:
@@ -386,7 +386,7 @@ typography:
     fontWeight: 650
   pixel-message:
     fontFamily: "Source Han Sans SC, Microsoft YaHei, system-ui, sans-serif"
-    fontSize: "14px"
+    fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.75
 rounded:
@@ -636,9 +636,9 @@ Four palette families share the same Work loop. The frontmatter records the rend
 - **Current Work:** Blue work heading (21px); Folio heading (23px, 600, 1.5); Pixel heading (18px, 600).
 - **Reading headings:** Folio assistant and knowledge headings (24px, 600, 1.6); Pixel assistant heading (20px, 650, 1.5).
 - **Work details:** Folio identity heading (23px, 600); Pixel identity heading (19px, 650); Pixel knowledge page title (23px, 650).
-- **Body:** Blue messages (14px, 1.85); Folio messages (15px, 1.95); Pixel messages (14px, 1.75). At narrow widths, Folio and Pixel messages step down to 13px.
-- **Navigation:** Blue destination tabs (14px); Folio and Pixel destination tabs (13px); compact Knowledge subnavigation (12px).
-- **Labels:** Existing Cindy labels, compact body, and icon-rail roles remain available in frontmatter.
+- **Body:** Classic, Blue and Pixel messages use 15px; Folio uses 16px with its existing 1.95 leading. Narrow Folio/Pixel messages retain a 15px reading floor. Composer and document prose use 15px.
+- **Navigation:** Blue destination tabs (15px); Folio and Pixel destination tabs (14px); compact Knowledge subnavigation (13px).
+- **Labels:** Common UI and Cindy buttons use 14px, compact copy uses 13px, supporting captions use 12px, and code/terminal text uses 13px. Semantic `--font-size-*` tokens in `src/renderer/tokens.css` own the scale. Existing heading sizes, illustration sizes, chart tick labels and layout columns are preserved.
 
 **The Folio Reading Stack Rule.** Keep the declared Source Han Serif SC, Noto Serif CJK SC, Songti SC, SimSun, serif fallback stack to the Folio brand and reading headings. Body text remains Source Han Sans; the repository does not bundle a serif face.
 
