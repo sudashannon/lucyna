@@ -17,9 +17,9 @@ const time=(value?:string)=>value?new Date(value).toLocaleString('zh-CN',{month:
 const short=(value?:string)=>value?.slice(0,10)||'—';
 const assetLabels={note:'共享笔记 · L1',log:'会话日志 · L2',script:'可复用脚本',evidence:'引用证据'};
 const states:Record<string,string>={active:'进行中',paused:'已暂停',delivered:'已交付',merged:'已合并',archived:'已归档',abandoned:'已放弃'};
-type Props={work:Work;active:boolean;connections?:number;onConnections?:()=>void;history:HistoryEntry[];onOpen:(file:FilePreview)=>void;onResume:(entry:HistoryEntry)=>void;onCommand:(command:string)=>void;onMemory:(query:string)=>void;onError:(error:unknown)=>void};
+type Props={work:Work;active:boolean;connections?:number;onConnections?:()=>void;history:HistoryEntry[];onOpen:(file:FilePreview)=>void;onGit?:(member:string,action:string,scope:string)=>void;onResume:(entry:HistoryEntry)=>void;onCommand:(command:string)=>void;onMemory:(query:string)=>void;onError:(error:unknown)=>void};
 
-export function WorkDetails({work,active,connections,onConnections,history,onOpen,onResume,onCommand,onMemory,onError}:Props){
+export function WorkDetails({work,active,connections,onConnections,history,onOpen,onGit,onResume,onCommand,onMemory,onError}:Props){
   const [cache,setCache]=useState<Record<string,WorkDetail>>({}),[tabs,setTabs]=useState<Record<string,string>>({}),[queries,setQueries]=useState<Record<string,string>>({});
   const [loading,setLoading]=useState(''),[error,setError]=useState(''),[revision,setRevision]=useState(0),[expanded,setExpanded]=useState<Record<string,boolean>>({});
   const [inspect,setInspect]=useState<{root:string;member:WorkMember;action:string;scope:string}|null>(null),[directory,setDirectory]=useState(''),[opening,setOpening]=useState('');
@@ -36,7 +36,7 @@ export function WorkDetails({work,active,connections,onConnections,history,onOpe
   const source=(anchor?:string)=>{if(detail)onOpen({name:'SESSION.md',path:'SESSION.md',kind:'markdown',content:detail.content,anchor});};
   const navigate=async(href:string)=>{const root=work.root;try{const [reference,anchor]=href.split('#');const file=await api.readPreview(root,decodeURIComponent(reference),'SESSION.md');if(rootNow.current===root)onOpen({...file,anchor:anchor?decodeURIComponent(anchor):undefined});}catch(e){onError(e);}};
   const openAsset=async(asset:WorkAsset)=>{if(asset.directory){setDirectory(asset.path);return;}const root=work.root;setOpening(asset.path);try{const file=await api.readPreview(root,asset.path);if(rootNow.current===root)onOpen(file);}catch(e){onError(e);}finally{if(rootNow.current===root)setOpening('');}};
-  const show=(member:WorkMember,action:string,scope='unstaged')=>setInspect({root:work.root,member,action,scope});
+  const show=(member:WorkMember,action:string,scope='unstaged')=>{if(onGit&&action!=='mr')onGit(member.name,action,scope);else setInspect({root:work.root,member,action,scope});};
   const toggle=(name:string,value:boolean)=>setExpanded(previous=>({...previous,[work.root+'|'+name]:value}));
   const isOpen=(name:string)=>!!expanded[work.root+'|'+name];
   const unindexed=(detail?.assets||[]).filter(a=>!a.indexed&&['note','log'].includes(a.kind)).length;

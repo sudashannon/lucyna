@@ -6,6 +6,7 @@ async function main(){
  await build({configFile:path.join(root,'vite.config.ts'),build:{outDir:staged,emptyOutDir:true}});
  await fs.mkdir(path.join(staged,'third-party'),{recursive:true});
  await fs.copyFile(path.join(root,'src/assets/fonts/LICENSE.txt'),path.join(staged,'third-party/SourceHanSans-LICENSE.txt'));
+  await fs.copyFile(path.join(root,'node_modules/react-diff-view/LICENSE'),path.join(staged,'third-party/react-diff-view-LICENSE.txt'));
  const result=await publishRenderer(staged,path.join(root,'dist/renderer'));
  console.log(`Renderer published: ${result.added} new files, ${result.retained} unchanged. Existing window assets retained.`);
 }

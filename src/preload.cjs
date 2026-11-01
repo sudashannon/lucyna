@@ -1,9 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
   mode:'native',
-  workDetails:root=>ipcRenderer.invoke('work:details',root),
+  workDetails:(root,hostId)=>ipcRenderer.invoke('work:details',root,hostId),
   workRun:(operation,data)=>ipcRenderer.invoke('work:run',operation,data),
-  workGit:(root,member,action,options)=>ipcRenderer.invoke('work:git',root,member,action,options),
+  workGit:(root,member,action,options,hostId)=>ipcRenderer.invoke('work:git',root,member,action,options,hostId),
+  gitWorkspace:(root,member,action,options,hostId)=>ipcRenderer.invoke('workspace:git',root,member,action,options,hostId),
   openExternal:url=>ipcRenderer.invoke('external:open',url),
   windowChrome:{
     enabled:process.argv.includes('--lucyna-titlebar'),
@@ -31,6 +32,7 @@ contextBridge.exposeInMainWorld('desktop', {
   listHosts:()=>ipcRenderer.invoke('host:list'),
   saveHost:input=>ipcRenderer.invoke('host:save',input),
   connectHost:id=>ipcRenderer.invoke('host:connect',id),
+  updateHost:id=>ipcRenderer.invoke('host:update',id),
   cancelHost:id=>ipcRenderer.invoke('host:cancel',id),
   disconnectHost:id=>ipcRenderer.invoke('host:disconnect',id),
   removeHost:id=>ipcRenderer.invoke('host:remove',id),
@@ -68,8 +70,8 @@ contextBridge.exposeInMainWorld('desktop', {
   closeTerminal: id => ipcRenderer.invoke('terminal:close', id),
   onTerminal: fn => { const listener = (_event, data) => fn(data); ipcRenderer.on('terminal:event', listener); return () => ipcRenderer.removeListener('terminal:event', listener); },
   choosePreview: root => ipcRenderer.invoke('preview:choose-file', root),
-  readPreview: (root, reference, basePath) => ipcRenderer.invoke('preview:read', root, reference, basePath),
-  listFiles: (root, directory, options) => ipcRenderer.invoke('preview:list', root, directory, options),
+  readPreview: (root, reference, basePath,hostId) => ipcRenderer.invoke('preview:read', root, reference, basePath,hostId),
+  listFiles: (root, directory, options,hostId) => ipcRenderer.invoke('preview:list', root, directory, options,hostId),
   webPreview: url => ipcRenderer.invoke('web:preview', url),
   onEvent: fn => { const listener = (_event, data) => fn(data); ipcRenderer.on('omp:event', listener); return () => ipcRenderer.removeListener('omp:event', listener); }
 });

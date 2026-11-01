@@ -27,7 +27,8 @@ import { SettingsDialog } from './components/SettingsDialog';
 import { RunActivity, SessionTranscript } from './components/SessionTranscript';
 import { phaseLabels } from './session-view';
 import { CommandInput } from './components/CommandInput';
-import { DocumentReader, EventsPanel, MemoryResults, PanelPage, PreviewPane } from './components/ToolPanels';
+import { DocumentReader, EventsPanel, MemoryResults, PanelPage } from './components/ToolPanels';
+import {WorkspaceFiles,type GitLocation} from './components/WorkspaceFiles';
 import { WorkDetails } from './components/WorkDetails';
 import { KnowledgeWorkspace as KnowledgePanel } from './components/KnowledgeWorkspace';
 import { TriangleAlert, Info, ClipboardCheck } from 'lucide-react';
@@ -49,7 +50,7 @@ import {readVisualTheme, visualThemeKey, visualThemes, type VisualTheme} from '.
 import {buildTimeline,messageDomId,type TimelineEntry} from './conversation-timeline';
 
 type Tab = 'work' | 'history' | 'preview' | 'memory' | 'events';
-const tabs: {value: Tab; label: string}[] = [{value: 'work', label: '工作'}, {value: 'history', label: '会话'}, {value: 'preview', label: '预览'}, {value: 'memory', label: '记忆'}, {value: 'events', label: '事件'}];
+const tabs: {value: Tab; label: string}[] = [{value: 'work', label: '工作'}, {value: 'history', label: '会话'}, {value: 'memory', label: '记忆'}, {value: 'events', label: '事件'}];
 const dateLabel = (entry: HistoryEntry) => {
   const value = entry.modifiedAt || entry.importedAt || entry.modified;
   if (!value) return '';
@@ -61,6 +62,11 @@ const noTextAttachments:DraftTextAttachment[]=[];
 export function App() {
   useFeedback();
   const w = useWorkbench();
+  const workIdentity=w.work?workKey(w.work):'';
+  const [workspaceTab,setWorkspaceTab]=useSessionState<'chat'|'files'>(workIdentity,'chat');
+  const [filesVisited,setFilesVisited]=useState<Record<string,Work>>({});
+  const [gitTargets,setGitTargets]=useState<Record<string,GitLocation>>({});
+  const gitNavigation=useRef(0);
   const customChrome=!!api.windowChrome?.enabled;
   const [workChecksOpen, setWorkChecksOpen] = useState(false);
   const workIssueCount = w.works.reduce((sum, work) => sum + workIssues(work).length, 0);
@@ -83,7 +89,7 @@ export function App() {
   const [imageBusy,setImageBusy]=useSessionState(w.id,false),imagePicker=useRef<HTMLInputElement>(null);
   const [palette, setPalette] = useState(false), [filter, setFilter] = useState('');
   const [web, setWeb] = useState(false), [url, setUrl] = useState(''), [webBusy, setWebBusy] = useState(false), [webError, setWebError] = useState('');
-  const [about, setAbout] = useState(false), [file, setFile, sessionFiles] = useSessionState<FilePreview | null>(w.id,null), [zoom, setZoom] = useState<string | null>(null);
+  const [about, setAbout] = useState(false), [file, setFile, workFiles] = useSessionState<FilePreview | null>(workIdentity,null), [zoom, setZoom] = useState<string | null>(null);
   const [terminals, setTerminals] = useState<Record<string,{root:string;report:(e:unknown)=>void}>>({}), [terminalVisible, setTerminalVisible, terminalVisibility] = useSessionState(w.id,false);
   const [query, setQuery] = useSessionState(w.id,''), [memory, setMemory] = useSessionState(w.id,''), [memoryBusy, setMemoryBusy] = useSessionState(w.id,false), [memoryError, setMemoryError] = useSessionState(w.id,'');
   const [dialogBusy, setImportBusy] = useSessionState(w.id,false), [commandOpenRequest, setCommandOpenRequest] = useState(0);
@@ -96,31 +102,33 @@ export function App() {
   },[w.id,w.sessions.length,w.pruneEmpty,allDrafts,allImages,allTextAttachments,draftsLoaded,imagesLoaded,textAttachmentsLoaded,draftError,imageError,textAttachmentError,terminals]);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false),[clientSettings,setClientSettings]=useState<ClientSettings|null>(null);
-  const remote=!!w.work?.hostId,workIdentity=w.work?workKey(w.work):'';
+  const remote=!!w.work?.hostId;
+  useEffect(()=>{if(workspaceTab==='files'&&w.work)setFilesVisited(previous=>({...previous,[workIdentity]:w.work!}));},[workspaceTab,workIdentity]);
+  useEffect(()=>{if(tab==='preview'){setWorkspaceTab('files');setTab('work');}},[tab,w.id,setWorkspaceTab,setTab]);
   const remoteOffline=remote&&['disconnected','reconnecting'].includes(w.connection);
   const runtime=clientSettings?.runtime || 'windows', runtimeLabel=remote?`SSH · ${w.work?.hostName}`:(w.runtime || runtime)==='wsl'?'WSL OMP':'Windows OMP';
   useEffect(()=>{if(!previewMode&&api.getSettings)void api.getSettings().then(info=>setClientSettings(info.settings)).catch(w.report);},[w.report]);
   const [historySearch, setHistorySearch] = useSessionState(w.id,''), [historySource, setHistorySource] = useSessionState(w.id,'all'), [workReading, setWorkReading] = useState(false);
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   useLayoutEffect(()=>{
-    const update=()=>w.setConversationVisible(section==='workbench'&&!narrowToolsOpen&&!settingsOpen&&!workReading&&!zoom&&!palette&&!about&&document.visibilityState==='visible'&&document.hasFocus());
+    const update=()=>w.setConversationVisible(section==='workbench'&&workspaceTab==='chat'&&!narrowToolsOpen&&!settingsOpen&&!workReading&&!zoom&&!palette&&!about&&document.visibilityState==='visible'&&document.hasFocus());
     const blur=()=>w.setConversationVisible(false);
     update();window.addEventListener('focus',update);window.addEventListener('blur',blur);document.addEventListener('visibilitychange',update);
     return()=>{window.removeEventListener('focus',update);window.removeEventListener('blur',blur);document.removeEventListener('visibilitychange',update);};
-  },[section,narrowToolsOpen,settingsOpen,workReading,zoom,palette,about,w.id,w.setConversationVisible]);
+  },[section,workspaceTab,narrowToolsOpen,settingsOpen,workReading,zoom,palette,about,w.id,w.setConversationVisible]);
   const [completionActive, setCompletionActive] = useState(false);
   const [deferredQuestion,setDeferredQuestion]=useSessionState(w.id,'');
   const [petTarget,setPetTarget]=useState('');
   useEffect(()=>api.onPetNavigate?.(({id})=>{setPetTarget(id);setKnowledgeOpen(false);setSettingsOpen(false);setPalette(false);setModelsOpen(false);setWorkReading(false);setZoom(null);}),[]);
-  useEffect(()=>{if(petTarget===w.id){setDeferredQuestion('');setPetTarget('');}},[petTarget,w.id,setDeferredQuestion]);
-  useEffect(()=>{void api.petContext?.({theme,id:w.id,title:w.title,visible:section==='workbench'&&!settingsOpen&&!workReading&&!zoom}).catch(()=>{});},[theme,w.id,w.title,section,settingsOpen,workReading,zoom]);
+  useEffect(()=>{if(petTarget===w.id){setWorkspaceTab('chat');setDeferredQuestion('');setPetTarget('');}},[petTarget,w.id,setDeferredQuestion,setWorkspaceTab]);
+  useEffect(()=>{void api.petContext?.({theme,id:w.id,title:w.title,visible:section==='workbench'&&workspaceTab==='chat'&&!settingsOpen&&!workReading&&!zoom}).catch(()=>{});},[theme,w.id,w.title,section,workspaceTab,settingsOpen,workReading,zoom]);
   const sendPending = useRef(new Set<string>());
   const readingPositions=useRef(new Map<string,{top:number;follow:boolean}>());
   const [panelWidth, setPanelWidth] = useState(() => Math.max(320, Math.min(520, Number(localStorage.getItem('omp.panelWidth')) || 370)));
   const [sidebarWidth, setSidebarWidth] = useState(() => Math.max(sidebarMinWidth, Math.min(sidebarMaxWidth, Number(localStorage.getItem('omp.sidebarWidth')) || sidebarDefaultWidth)));
   const [knowledgeSidebarWidth,setKnowledgeSidebarWidth]=useState(()=>Math.max(280,Math.min(480,Number(localStorage.getItem('omp.knowledgeSidebarWidth'))||340)));
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth), [sidebarResizing, setSidebarResizing] = useState(false);
-  const panelVisible = panel && (viewportWidth > 1280 || narrowToolsOpen);
+  const panelVisible = panel && workspaceTab==='chat' && (viewportWidth > 1280 || narrowToolsOpen);
   const toolsOverlayOpen = panelVisible && viewportWidth <= 1280 && section === 'workbench';
   useEffect(()=>{if(viewportWidth>1280||section!=='workbench')setNarrowToolsOpen(false);},[viewportWidth,section]);
   useEffect(()=>setNarrowToolsOpen(false),[w.id]);
@@ -129,7 +137,7 @@ export function App() {
   // preferred width so enlarging the window restores it automatically.
   const activeSidebarMin=knowledgeOpen?280:sidebarMinWidth;
   const navigationWidth=blue && sidebar && viewportWidth>760 ? (viewportWidth>1100?184:72) : 0;
-  const sideBySide=panel&&section==='workbench'&&viewportWidth>1280;
+  const sideBySide=panel&&workspaceTab==='chat'&&section==='workbench'&&viewportWidth>1280;
   const visiblePanelWidth=sideBySide?Math.min(panelWidth,Math.max(320,viewportWidth-navigationWidth-(sidebar?activeSidebarMin:64)-640)):panelWidth;
   const sidebarLimit = Math.max(activeSidebarMin, Math.min(knowledgeOpen?480:sidebarMaxWidth, viewportWidth - navigationWidth - (sideBySide ? visiblePanelWidth : 0) - (sideBySide?640:480)));
   const visibleSidebarWidth = Math.min(knowledgeOpen?knowledgeSidebarWidth:sidebarWidth, sidebarLimit);
@@ -165,11 +173,11 @@ export function App() {
   useEffect(() => { if (w.work) localStorage.setItem('omp.work', workKey(w.work)); document.querySelector('.work-row[aria-current="page"]')?.scrollIntoView({block: 'nearest'}); }, [workIdentity]);
   useEffect(()=>{setModelsOpen(false);setWorkReading(false);setZoom(null);},[w.id]);
   useLayoutEffect(()=>{
-    if(section!=='workbench')return;
+    if(section!=='workbench'||workspaceTab!=='chat')return;
     const position=readingPositions.current.get(w.id);follow.current=position?.follow??!historyEndAnchor;
     if(transcript.current)transcript.current.scrollTop=follow.current?transcript.current.scrollHeight:position?.top||0;
     setAwayFromLatest(!follow.current);
-  },[w.id,section]);
+  },[w.id,section,workspaceTab]);
   useEffect(() => {if (sidebar) document.querySelector('.work-row[aria-current="page"]')?.scrollIntoView({block: 'nearest'});}, [sidebar]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -179,7 +187,7 @@ export function App() {
     };
     window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler);
   }, []);
-  useEffect(() => { if (section==='workbench'&&follow.current && transcript.current) transcript.current.scrollTop = transcript.current.scrollHeight; }, [w.messages, w.busy,historyEndAnchor,historyAnchor,section]);
+  useEffect(() => { if (section==='workbench'&&workspaceTab==='chat'&&follow.current && transcript.current) transcript.current.scrollTop = transcript.current.scrollHeight; }, [w.messages, w.busy,historyEndAnchor,historyAnchor,section,workspaceTab]);
   useEffect(() => { if (composer.current) {composer.current.style.height = 'auto'; composer.current.style.height = Math.min(200, composer.current.scrollHeight) + 'px';} }, [draft]);
   const pick = (work: Work) => {
     setKnowledgeOpen(false);
@@ -192,7 +200,8 @@ export function App() {
   if(workFilter==='recent')visibleWorks.sort((a,b)=>(recentWorks[workKey(b)]||0)-(recentWorks[workKey(a)]||0));
   const matchingWorks = w.works.filter(x => `${x.name} ${x.hostName||''} ${x.root}`.toLowerCase().includes(filter.toLowerCase()));
   const workNavigation = useListNavigation(matchingWorks.length, `${palette}:${filter}`, index => pick(matchingWorks[index]));
-  const openPanel = (next: Tab) => {if(viewportWidth<=1280&&!narrowToolsOpen)toolsOpener.current=document.activeElement as HTMLElement;setKnowledgeOpen(false);setTab(next);setPanel(true);if(viewportWidth<=1280)setNarrowToolsOpen(true);};
+  const openPanel = (next: Tab) => {setKnowledgeOpen(false);if(next==='preview'){setWorkspaceTab('files');setNarrowToolsOpen(false);return;}setWorkspaceTab('chat');if(viewportWidth<=1280&&!narrowToolsOpen)toolsOpener.current=document.activeElement as HTMLElement;setTab(next);setPanel(true);if(viewportWidth<=1280)setNarrowToolsOpen(true);};
+  const openGit=(member:string,action:string,scope='unstaged')=>{setGitTargets(previous=>({...previous,[workIdentity]:{member,view:action==='commits'?'history':action==='branches'?'branches':action==='worktrees'?'worktrees':'changes',scope,revision:++gitNavigation.current}}));setWorkspaceTab('files');setNarrowToolsOpen(false);};
   const toggleToolsPanel = (open: boolean) => {
     if(open&&viewportWidth<=1280)toolsOpener.current=document.activeElement as HTMLElement;
     if(viewportWidth<=1280){setNarrowToolsOpen(open);if(open)setPanel(true);}else setPanel(open);
@@ -227,8 +236,8 @@ export function App() {
       });
     };
   },[toolsOverlayOpen]);
-  const focusComposer = () => requestAnimationFrame(() => {if (!document.querySelector('[role="dialog"]')) composer.current?.focus();});
-  const quoteKnowledge=useCallback((text:string)=>{setDraft(previous=>[previous,text].filter(Boolean).join('\n\n'));setKnowledgeOpen(false);requestAnimationFrame(()=>composer.current?.focus());},[setDraft]);
+  const focusComposer = () => {setWorkspaceTab('chat');requestAnimationFrame(() => {if (!document.querySelector('[role="dialog"]')) composer.current?.focus();});};
+  const quoteKnowledge=useCallback((text:string)=>{setDraft(previous=>[previous,text].filter(Boolean).join('\n\n'));setKnowledgeOpen(false);setWorkspaceTab('chat');requestAnimationFrame(()=>composer.current?.focus());},[setDraft,setWorkspaceTab]);
   const newConversation = async () => {
     setKnowledgeOpen(false);
     if (!await w.newSession()) return false;
@@ -236,7 +245,7 @@ export function App() {
   };
   const hideTerminal = () => {setTerminalVisible(false); focusComposer();};
   const toggleTerminal = () => { if (!workValid || !w.work || remote) return; const root=w.work.root;setTerminals(previous=>({...previous,[w.id]:previous[w.id]||{root,report:w.report}})); if (terminalVisible) hideTerminal(); else setTerminalVisible(true); };
-  const chooseFile = async () => {if (!w.work || remote) return; try {const selected = await api.choosePreview(w.work.root); if (selected) {setFile(selected); openPanel('preview');}} catch (e) {w.report(e);} };
+  const chooseFile = async () => {if(w.work){setWorkspaceTab('files');setNarrowToolsOpen(false);}};
   const openWeb = async () => { if (!url.trim()) return; setWebBusy(true); setWebError(''); try {await api.openExternal(url.trim()); setWeb(false);} catch (e) {setWebError(errorText(e));} finally {setWebBusy(false);} };
   const addImages=(added:DraftImage[])=>setImages(previous=>{try{validateInput('',[...previous,...added]);return [...previous,...added];}catch(e){queueMicrotask(()=>w.report(e));return previous;}});
   const attachImages=async(files:File[])=>{setImageBusy(true);try{const added=await Promise.all(files.map(readImage));addImages(added);}catch(e){w.report(e);}finally{setImageBusy(false);}};
@@ -355,13 +364,15 @@ export function App() {
       </div>
     </aside>
     <main id="primary-panel-workbench" role="tabpanel" aria-labelledby="primary-tab-workbench" className="workspace-main" hidden={section!=='workbench'}>
-      <header className="workspace-header" key={workIdentity||'no-work'}><div className="breadcrumb"><FolderOpen size={16}/><button onClick={() => setPalette(true)}>{selectedName}<ChevronDown size={13}/></button><span className="breadcrumb-divider">/</span><button className="session-title" title={w.title} onClick={() => openPanel('history')}>{w.title}</button></div><div className="header-actions">
+      <header className="workspace-header" key={workIdentity||'no-work'}><div className="breadcrumb"><FolderOpen size={16}/><button onClick={() => setPalette(true)}>{selectedName}<ChevronDown size={13}/></button><span className="breadcrumb-divider">/</span>{workspaceTab==='chat'?<button className="session-title" title={w.title} onClick={() => openPanel('history')}>{w.title}</button>:<span className="workspace-environment">{remote?'SSH · '+w.work?.hostName:'WSL 工作区'}</span>}</div><div className="header-actions">
         <label className="visual-theme-switch"><Palette size={15}/><select aria-label="视觉主题" value={visualTheme} onChange={event=>setVisualTheme(event.target.value as VisualTheme)}>{visualThemes.map(option=><option key={option.id} value={option.id}>{option.name}</option>)}</select></label>
         <SidebarIconButton icon={TerminalSquare} label="WSL 终端" active={terminalVisible} disabled={!workValid||remote} onClick={toggleTerminal}/>
         <SidebarIconButton icon={Globe2} label="在默认浏览器打开网页" onClick={() => {setWeb(true); setWebError('');}}/>
-        <SidebarIconButton icon={FileImage} label="预览 Markdown 或图片" disabled={!workValid||remote} onClick={() => void chooseFile()}/>
-        {!panelVisible && <><span className="toolbar-divider"/><SidebarIconButton icon={PanelRightOpen} label="展开工具面板" aria-controls="tools-panel" aria-expanded={false} onClick={() => toggleToolsPanel(true)}/></>}
+        <SidebarIconButton icon={FileImage} label="工作区文件" active={workspaceTab==='files'} disabled={!workValid} onClick={() => void chooseFile()}/>
+        {!panelVisible&&workspaceTab==='chat' && <><span className="toolbar-divider"/><SidebarIconButton icon={PanelRightOpen} label="展开工具面板" aria-controls="tools-panel" aria-expanded={false} onClick={() => toggleToolsPanel(true)}/></>}
       </div></header>
+      <div className="workspace-content-tabs" role="tablist" aria-label="工作区内容">{([['chat','对话工作'],['files','工作区文件']] as const).map(([value,label],index)=><button key={value} role="tab" id={'workspace-tab-'+value} aria-controls={'workspace-content-'+value} aria-selected={workspaceTab===value} tabIndex={workspaceTab===value?0:-1} disabled={value==='files'&&!w.work} onClick={()=>{setWorkspaceTab(value);setNarrowToolsOpen(false);}} onKeyDown={e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const n=e.key==='Home'?0:e.key==='End'?1:1-index;const next=n?'files':'chat';if(next==='files'&&!w.work)return;setWorkspaceTab(next);(e.currentTarget.parentElement?.children[n] as HTMLElement)?.focus();}}>{label}</button>)}</div>
+      <div className="workspace-conversation" id="workspace-content-chat" role="tabpanel" aria-labelledby="workspace-tab-chat" hidden={workspaceTab!=='chat'}>
       {previewMode && <div className="preview-banner">浏览器外观预览 · 会话与 WSL 功能请在桌面客户端使用</div>}
       {remote&&<div className="remote-connection" data-remote-connection={w.connection}>
         <div><p>{runtimeLabel} · {w.connection==='ready'?'会话已连接':remoteOffline?w.connection==='reconnecting'?'正在接回原会话':'连接已断开':w.connection==='starting'?'正在连接':'准备开始'}</p><small>{remoteOffline?'草稿已保留；连接中断不会重发消息。':'断开连接或退出客户端后，远端会话由主机服务持有。'}</small></div>
@@ -401,7 +412,9 @@ export function App() {
         </div>
         {!w.messages.length && w.work && <section className="recent-sessions"><div className="recent-header"><span>最近会话</span><button onClick={() => openPanel('history')}>查看全部 <ArrowUpRight size={12}/></button></div>{w.historyError ? <button className="text-action" onClick={() => void w.refreshHistory()}>会话读取失败，点击重试</button> : !w.history ? <div className="inline-loading"><Spinner size={13}/>读取会话…</div> : entries.length ? historyList(entries.slice(0, 3), true) : <p className="empty-line">还没有历史会话。发送第一条消息即可开始。</p>}</section>}
       </div>
-      {Object.entries(terminals).filter(([id])=>w.sessions.some(s=>s.id===id)).map(([id,t])=><TerminalPanel key={id} root={t.root} visible={id===w.id&&!!terminalVisibility[id]} theme={theme} onHide={hideTerminal} onActive={()=>{}} onError={t.report}/>)}
+      {Object.entries(terminals).filter(([id])=>w.sessions.some(s=>s.id===id)).map(([id,t])=><TerminalPanel key={id} root={t.root} visible={workspaceTab==='chat'&&id===w.id&&!!terminalVisibility[id]} theme={theme} onHide={hideTerminal} onActive={()=>{}} onError={t.report}/>)}
+      </div>
+      <div className="workspace-files-panel" id="workspace-content-files" role="tabpanel" aria-labelledby="workspace-tab-files" hidden={workspaceTab!=='files'}>{Object.entries(filesVisited).map(([identity,work])=><WorkspaceFiles key={identity} work={work} active={section==='workbench'&&workspaceTab==='files'&&identity===workIdentity} selected={workFiles[identity]||null} target={gitTargets[identity]} onError={w.report} onImage={setZoom} onDiscuss={text=>{setDraft(previous=>[previous,text].filter(Boolean).join('\n\n'));setWorkspaceTab('chat');focusComposer();}}/>)}</div>
       <footer className="workspace-status"><span><Folder size={11}/>{w.work?.root || '工作区保留在 WSL'}</span><button onClick={() => openPanel('events')}><SlidersHorizontal size={12}/>{w.connection === 'ready' ? 'OMP 已连接' : 'OMP'}</button></footer>
     </main>
     {knowledgeVisited?<KnowledgePanel sidebarTarget={knowledgeSidebarTarget} sidebarExpanded={sidebar&&viewportWidth>760} active={knowledgeOpen} workName={w.work?.name||''} onQuote={quoteKnowledge}/>:<section id="primary-panel-knowledge" role="tabpanel" aria-labelledby="primary-tab-knowledge" hidden/>}
@@ -420,10 +433,7 @@ export function App() {
         {w.historyError ? <p role="alert" className="error-text">{w.historyError}</p> : !w.history ? <div className="inline-loading"><Spinner size={14}/>读取中…</div> : <><p className="results-caption">{filteredHistory.length} / {entries.length} 个会话</p>{filteredHistory.length ? historyList(filteredHistory) : <p className="empty-line">{historySearch || historySource !== 'all' ? '没有匹配的会话，试试其他关键词或来源。' : '没有发现此工作区的历史会话。'}</p>}{(w.history.warnings || []).map((warning, i) => <p key={i} className="helper-text">{warning}</p>)}</>}</>}
       </PanelPage>
       <PanelPage name="work" active={panelVisible && tab === 'work'} identity={workIdentity}>
-        {remote ? <div className="remote-work-details"><h2>{w.work?.hostName}</h2><p className="panel-intro">{w.work?.root}</p><p className="helper-text">OMP 在此主机执行。远端文件浏览、终端与 Work 管理尚未接入。</p>{w.documentError?<p className="error-text">{w.documentError}</p>:<pre className="remote-work-document">{w.document||"正在读取 SESSION.md…"}</pre>}</div> : w.work ? <WorkDetails work={w.work} connections={w.sessions.filter(s=>w.work&&sameWork(s,w.work)&&['ready','starting','closing'].includes(s.connection)).length} onConnections={()=>setSection('sessions')} active={panelVisible&&tab==='work'&&section==='workbench'} history={entries} onOpen={next=>{setFile(next);openPanel('preview');}} onResume={entry=>void resume(entry)} onCommand={command=>{setDraft(previous=>[command,previous].filter(Boolean).join('\n\n'));focusComposer();}} onMemory={value=>{setQuery(value);openPanel('memory');void searchMemory(value);}} onError={w.report}/> : <Empty icon={FolderOpen} title="选择工作区" description="查看工作进展、仓库与 Worktree，以及工作资产。"/>}
-      </PanelPage>
-      <PanelPage name="preview" active={panelVisible && tab === 'preview'} identity={workIdentity}>
-        {remote&&<p className="helper-text">远端文件预览尚未接入；可让 OMP 在远端读取文件。</p>}{w.sessions.filter(s=>!s.hostId).map(s=><div key={s.id} hidden={s.id!==w.id} className="session-preview"><PreviewPane selected={sessionFiles[s.id]||null} root={s.root} active={s.id===w.id&&panel&&tab==='preview'} choose={() => void chooseFile()} onError={s.report} onImage={setZoom}/></div>)}
+        {remote ? <div className="remote-work-details"><h2>{w.work?.hostName}</h2><p className="panel-intro">{w.work?.root}</p><p className="helper-text">OMP 在此主机执行。文件与 Git 请在「工作区文件」查看。远端终端与完整 Work 管理尚未接入。</p>{w.documentError?<p className="error-text">{w.documentError}</p>:<pre className="remote-work-document">{w.document||"正在读取 SESSION.md…"}</pre>}</div> : w.work ? <WorkDetails work={w.work} connections={w.sessions.filter(s=>w.work&&sameWork(s,w.work)&&['ready','starting','closing'].includes(s.connection)).length} onConnections={()=>setSection('sessions')} active={panelVisible&&tab==='work'&&section==='workbench'} history={entries} onGit={openGit} onOpen={next=>{setFile(next);openPanel('preview');}} onResume={entry=>void resume(entry)} onCommand={command=>{setDraft(previous=>[command,previous].filter(Boolean).join('\n\n'));focusComposer();}} onMemory={value=>{setQuery(value);openPanel('memory');void searchMemory(value);}} onError={w.report}/> : <Empty icon={FolderOpen} title="选择工作区" description="查看工作进展、仓库与 Worktree，以及工作资产。"/>}
       </PanelPage>
       <PanelPage name="memory" active={panelVisible && tab === 'memory'} identity="stele">
         <div className="panel-title"><h2>Stele 记忆</h2><Button variant="secondary" compact onClick={openKnowledge}>知识库<ArrowUpRight size={13}/></Button></div><p className="panel-intro">{remote?"这是客户端连接的 Stele 知识库，引用内容由你发送到远端会话。":"查找长期知识，引用到当前对话。"}</p>

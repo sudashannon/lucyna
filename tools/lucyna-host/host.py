@@ -50,7 +50,7 @@ def respond(request, info, negotiated, manager=None):
     elif operation not in ('ping', 'host.status'):
         if manager is None:
             raise ValueError('unsupported_operation')
-        data = manager.dispatch(operation, request.get('args', {}))
+        data = manager.workspace.dispatch(operation, request.get('args', {})) if operation in getattr(manager, 'workspace_capabilities', []) else manager.dispatch(operation, request.get('args', {}))
         return dict(version=1, id=request_id, ok=True, data=data), negotiated
     return dict(version=1, id=request_id, ok=True, data=info), negotiated
 
@@ -69,9 +69,17 @@ def serve_stream(reader, writer, info, manager=None):
             response, negotiated = respond(request, info, negotiated, manager)
         except (ValueError, TypeError, AttributeError, KeyError, OSError) as error:
             response = dict(version=1, id=request.get('id') if isinstance(request, dict) else None,
-                            ok=False, code=str(error) if isinstance(error, ValueError) and re.fullmatch('[a-z_]+', str(error)) else 'invalid_request')
+                            ok=False, code=str(error) if isinstance(error, ValueError) and re.fullmatch('[a-z_]+', str(error)) else 'invalid_request',
+                            message=str(error)[:3000])
         # Match the UTF-8 byte limits used by the session replay buffer.
-        writer.write(PREFIX+json.dumps(response, separators=(',', ':'), ensure_ascii=False).encode()+b'\n')
+        try:encoded=json.dumps(response,separators=(',', ':'),ensure_ascii=False).encode()
+        except UnicodeEncodeError:
+            encoded=json.dumps(dict(version=1,id=request.get('id') if isinstance(request,dict) else None,ok=False,
+                                    code='response_encoding_unsupported',message='文件名或内容无法以 UTF-8 传输，请在终端处理')).encode()
+        if len(PREFIX)+len(encoded)+1>LIMIT:
+            encoded=json.dumps(dict(version=1,id=request.get('id') if isinstance(request,dict) else None,ok=False,
+                                    code='response_too_large',message='读取结果超过传输上限，请缩小范围')).encode()
+        writer.write(PREFIX+encoded+b'\n')
         writer.flush()
 
 
@@ -89,8 +97,11 @@ def serve(state):
     info = metadata(state)
     from sessions import SessionManager
     manager = SessionManager(state)
+    from workspace import Workspace, CAPABILITIES
+    manager.workspace = Workspace(state, manager)
+    manager.workspace_capabilities = CAPABILITIES
     info.update(ompSessionsSupported=True, capabilities=info['capabilities']+[
-        'workspace.inspect', 'session.create', 'session.attach', 'session.list', 'session.request', 'session.events', 'session.stop', 'operation.get'])
+        'workspace.inspect', 'session.create', 'session.attach', 'session.list', 'session.request', 'session.events', 'session.stop', 'operation.get', *CAPABILITIES])
 
     class Handler(socketserver.StreamRequestHandler):
         def handle(self):
@@ -156,12 +167,13 @@ def main():
     parser.add_argument('--expected-release')
     parser.add_argument('--install-mode', choices=['connection', 'user-service'], default='user-service')
     parser.add_argument('--prefix')
+    parser.add_argument('--upgrade',action='store_true')
     args = parser.parse_args()
     if args.mode == 'install':
         import install
         try:
             answer = install.install_frozen(args.source, args.expected_release,
-                                            dict(mode=args.install_mode, prefix=args.prefix))
+                                            dict(mode=args.install_mode, prefix=args.prefix,upgrade=args.upgrade))
         except Exception as error:
             answer = dict(ok=False, code=str(error) if isinstance(error, ValueError) else type(error).__name__)
         print('LUCYNA_HOST_V1 '+json.dumps(answer), flush=True)
@@ -171,6 +183,7 @@ def main():
         import sqlite3  # validate the frozen session runtime before activation
         assert sqlite3.sqlite_version
         import sessions
+        import workspace
         return
     state = Path(args.state)
     entry = state.lstat()

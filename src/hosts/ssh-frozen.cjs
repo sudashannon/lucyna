@@ -43,7 +43,7 @@ async function loadArtifact(indexPath) {
   return {index, bytes};
 }
 
-async function deployFrozen(input, indexPath, {mode = 'user-service', prefix, signal, onProgress = () => {}, execute = runSSH} = {}) {
+async function deployFrozen(input, indexPath, {mode = 'user-service', prefix, upgrade=false,signal, onProgress = () => {}, execute = runSSH} = {}) {
   const config = validateSsh(input);
   if (!['connection', 'user-service'].includes(mode)) throw Error('未知 host 模式');
   if (prefix) linuxPath(prefix);
@@ -61,7 +61,7 @@ async function deployFrozen(input, indexPath, {mode = 'user-service', prefix, si
     .split(/\r?\n/).filter(line => line.trim() && !line.trim().startsWith('#')).join(' ');
   onProgress({phase: 'transferring', bytes: index.bytes});
   const installed = response(await execute(config, ['sh', '-c', script, 'lucyna-bootstrap', index.sha256,
-    index.release, String(index.bytes), mode, prefix || ''], {input: bytes, signal, timeoutMs: 180000}));
+    index.release, String(index.bytes), mode, prefix || '',upgrade?'upgrade':''], {input: bytes, signal, timeoutMs: 180000}));
   if (installed.release !== index.release || installed.mode !== mode || installed.format !== 'frozen' ||
       typeof installed.installationId !== 'string') throw Error('远端安装身份不匹配');
   linuxPath(installed.entry); linuxPath(installed.state);

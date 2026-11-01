@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import hashlib
 from urllib.parse import urlparse, quote
 
 spec = importlib.util.spec_from_file_location('work_inventory', Path(__file__).with_name('work-inventory.py'))
@@ -22,7 +23,7 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def run(args, limit=LIMIT, timeout=25):
+def run(args, limit=LIMIT, timeout=25, accepted=(0,)):
     # Spool output to disk; a large diff never fills the desktop process heap.
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         process = subprocess.Popen(args, stdout=output, stderr=errors, stdin=subprocess.DEVNULL,
@@ -33,15 +34,15 @@ def run(args, limit=LIMIT, timeout=25):
             process.kill(); process.wait()
             raise ValueError('读取超时，请缩小范围后重试')
         errors.seek(0)
-        if process.returncode:
+        if process.returncode not in accepted:
             raise ValueError(errors.read(3000).decode('utf-8', 'replace').strip() or '读取失败')
         output.seek(0); data = output.read(limit + 1)
         return data[:limit].decode('utf-8', 'replace'), len(data) > limit
 
 
-def git(member, *args, limit=LIMIT):
+def git(member, *args, limit=LIMIT, accepted=(0,)):
     return run(['git', '--no-optional-locks', '-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false',
-                '-C', str(member), *args], limit=limit)
+                '-C', str(member), *args], limit=limit, accepted=accepted)
 
 
 def optional(member, *args):
@@ -144,8 +145,8 @@ def member_detail(root, row):
         member, meta = member_path(root, row['name'])
         result['repo'] = str(Path(meta['repo']).expanduser().resolve())
         branch = git(member, 'branch', '--show-current')[0].strip()
-        result.update(branch=branch or 'detached HEAD', detached=not branch, head=git(member, 'rev-parse', 'HEAD')[0].strip())
-        current = status(member); result.update(counts=current['counts'], statusTruncated=current['truncated'])
+        result.update(branch=branch or 'detached HEAD', detached=not branch, head=optional(member, 'rev-parse', '--verify', 'HEAD'))
+        current = status(member); result.update(counts=current['counts'], changedFiles=len(current['files']), statusTruncated=current['truncated'])
         upstream = optional(member, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}')
         result['upstream'] = upstream
         if upstream:
@@ -256,11 +257,68 @@ def mr_status(member, meta):
                 pipelineStatus=pipeline.get('status'), pipelineSha=pipeline.get('sha'), pipelineMatchesHead=bool(pipeline.get('sha') and pipeline.get('sha') == value.get('sha')))
 
 
-def inspect_git(value, name, action, scope='unstaged', filename=''):
+def history_page(member, cursor='', query=''):
+    head = optional(member, 'rev-parse', '--verify', 'HEAD')
+    if not head:
+        return dict(kind='history', commits=[], nextCursor=None, checkedAt=now())
+    if not isinstance(query, str) or len(query) > 200 or '\0' in query:
+        raise ValueError('无效提交搜索')
+    signature = hashlib.sha256(query.encode()).hexdigest()[:16]
+    offset = 0
+    if cursor:
+        parts = cursor.split(':')
+        if len(parts) != 3 or parts[:2] != [head, signature] or not parts[2].isdigit() or int(parts[2]) > 100000:
+            raise ValueError('提交列表已变化，请刷新后重新读取')
+        offset = int(parts[2])
+    args = ['log', '--max-count=41', '--skip='+str(offset), '--format=%H%x00%P%x00%aI%x00%an%x00%s%x00']
+    if query:
+        args += ['--fixed-strings', '--regexp-ignore-case', '--grep='+query]
+    raw, cut = git(member, *args, limit=128*1024)
+    fields = raw.split('\0'); rows = []
+    for i in range(0, len(fields)-5, 5):
+        oid, parents, date, author, subject = fields[i:i+5]
+        oid = oid.strip()
+        if not re.fullmatch('[a-fA-F0-9]{40,64}', oid):
+            break
+        rows.append(dict(oid=oid, parents=parents.split(), date=date, author=author, subject=subject))
+    if optional(member, 'rev-parse', '--verify', 'HEAD') != head:
+        raise ValueError('提交列表已变化，请刷新后重新读取')
+    more = len(rows) > 40
+    return dict(kind='history', commits=rows[:40], nextCursor=f'{head}:{signature}:{offset+40}' if more else None,
+                truncated=cut, checkedAt=now())
+
+
+def refs_list(member):
+    raw, cut = git(member, 'for-each-ref', '--sort=-committerdate', '--count=201',
+                   '--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(committerdate:iso-strict)%00%(HEAD)',
+                   'refs/heads/', 'refs/remotes/', limit=128*1024)
+    rows = []
+    for line in raw.splitlines():
+        fields = line.split('\0')
+        if len(fields) != 5:
+            continue
+        ref, oid, upstream, date, current = fields
+        remote = ref.startswith('refs/remotes/')
+        rows.append(dict(ref=ref, name=ref.removeprefix('refs/remotes/' if remote else 'refs/heads/'),
+                         oid=oid, upstream=upstream, date=date, current=current.strip() == '*', remote=remote))
+    return dict(kind='refs', branches=rows[:200], truncated=cut or len(rows)>200, checkedAt=now())
+
+
+def resolve_commit(member, reference):
+    if not isinstance(reference, str) or len(reference)>512 or '\0' in reference or not (
+            reference == 'HEAD' or reference.startswith(('refs/heads/', 'refs/remotes/', 'refs/tags/'))
+            or re.fullmatch('[a-fA-F0-9]{40,64}', reference)):
+        raise ValueError('无效提交引用')
+    return git(member, 'rev-parse', '--verify', '--end-of-options', reference+'^{commit}')[0].strip()
+
+
+def inspect_git(value, name, action, scope='unstaged', filename='', cursor='', query='', commit='', base='', target='HEAD'):
     root = work_root(value); member, meta = member_path(root, name)
     if action == 'path': return dict(path=str(member))
     if action == 'mr': return mr_status(member, meta)
     if action == 'changes': return dict(kind=action, **status(member), checkedAt=now())
+    if action == 'history': return history_page(member, cursor, query)
+    if action == 'refs': return refs_list(member)
     if action == 'worktrees':
         rows, truncated = trees(member); return dict(kind=action, worktrees=rows, truncated=truncated, checkedAt=now())
     if action == 'diff':
@@ -274,7 +332,21 @@ def inspect_git(value, name, action, scope='unstaged', filename=''):
             args += [base, 'HEAD']
         args += ['--']
         if filename: args += [':(literal)' + filename]
-        text, truncated = git(member, *args, limit=256 * 1024)
+        untracked = filename and scope == 'unstaged' and any(f['path'] == filename and f['untracked'] for f in status(member)['files'])
+        if untracked:
+            location = member / filename
+            if not location.resolve().is_relative_to(member.resolve()):
+                raise ValueError('文件指向成员工作树之外')
+            text, truncated = git(member, 'diff', '--no-index', '--no-ext-diff', '--no-textconv', '--no-color',
+                                  '--', os.devnull, filename, limit=256*1024, accepted=(0,1))
+        else:
+            text, truncated = git(member, *args, limit=256 * 1024)
+    elif action == 'commit':
+        oid = resolve_commit(member, commit)
+        text, truncated = git(member, 'show', '--format=', '--no-ext-diff', '--no-textconv', '--no-color', oid, '--', limit=256*1024)
+    elif action == 'compare':
+        start, end = resolve_commit(member, base), resolve_commit(member, target)
+        text, truncated = git(member, 'diff', '--no-ext-diff', '--no-textconv', '--no-color', start, end, '--', limit=256*1024)
     elif action == 'commits':
         text, truncated = git(member, 'log', '--max-count=40', '--date=iso-strict', '--format=%h  %ad  %s', limit=128 * 1024)
     elif action == 'branches':
@@ -290,8 +362,12 @@ def inspect_git(value, name, action, scope='unstaged', filename=''):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('root'); parser.add_argument('--member'); parser.add_argument('--action', default='details'); parser.add_argument('--scope', default='unstaged'); parser.add_argument('--file', default='')
+    for option in ('cursor', 'query', 'commit', 'base'):
+        parser.add_argument('--'+option, default='')
+    parser.add_argument('--target', default='HEAD')
     args = parser.parse_args()
     try:
-        print(json.dumps(details(args.root) if args.action == 'details' else inspect_git(args.root, args.member, args.action, args.scope, args.file), ensure_ascii=False))
+        print(json.dumps(details(args.root) if args.action == 'details' else inspect_git(args.root, args.member, args.action, args.scope, args.file,
+                         args.cursor, args.query, args.commit, args.base, args.target), ensure_ascii=False))
     except Exception as error:
         print(str(error), file=__import__('sys').stderr); raise SystemExit(1)

@@ -46,6 +46,10 @@ const sessionTitles=new SessionTitles(auxiliaryAgent,auxiliarySettings);
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const historyTrash = new HistoryTrash(app.getPath('userData'));
 const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get(),auxiliary:()=>auxiliarySettings.resolve()});
+const gitWorkspace = require('./git-service.cjs').createGitService({listWorks,runnerState:workRunner.state,lifecycle:(root,run)=>workRunner.interactive(root,async()=>{
+  if(sessions?.list().some(c=>c.root===root)||[...(terminal?.records.values()||[])].some(t=>t.record?.root===root))throw Error('此 Work 仍有会话或终端连接，请先结束后再管理工作树');
+  return run();
+})});
 const onlyMain = event => { if (!window || event.sender !== window.webContents) throw new Error('Unauthorized IPC sender'); };
 async function readBounded(filePath, limit, label) {
   const handle = await fs.open(filePath, 'r');
@@ -90,6 +94,7 @@ app.whenReady().then(async () => {
   handle('host:list',()=>remote.list());
   handle('host:save',input=>remote.save(input));
   handle('host:connect',id=>remote.reconnect(id).then(()=>remote.list()));
+  handle('host:update',id=>remote.updateHost(id));
   handle('host:cancel',id=>remote.cancel(id));
   handle('host:disconnect',id=>remote.disconnectHost(id));
   handle('host:remove',id=>remote.remove(id));
@@ -122,9 +127,13 @@ app.whenReady().then(async () => {
     if(local.status==='rejected'&&!hosts.value.length)throw local.reason;
     return [...(local.status==='fulfilled'?local.value:[]),...hosts.value];
   });
-  handle('work:details', root => workDetails(root));
+  handle('work:details', (root,hostId) => hostId?remote.workspaceCall(hostId,root,'workspace.details'):workDetails(root));
   handle('work:run', (operation,data) => workRunner.call(operation,data));
-  handle('work:git', (root, member, action, options) => workDetails(root, member, action, options));
+  handle('work:git', (root, member, action, options,hostId) => hostId?remote.workspaceCall(hostId,root,'workspace.git.read',{member,action,options}):workDetails(root, member, action, options));
+  handle('workspace:git', (root,member,action,options,hostId)=>{
+    require('./git-service.cjs').validate(root,member,action,options||{});
+    return hostId?remote.workspaceCall(hostId,root,'workspace.git',{member,action,options}):gitWorkspace(root,member,action,options);
+  });
   handle('clipboard:write-text', async text => {
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 4 * 1024 * 1024) throw new Error('复制内容超过 4 MiB，请分段复制');
     await clipboard.writeText(text);
@@ -296,14 +305,16 @@ app.whenReady().then(async () => {
       return require('node-pty').spawn('wsl.exe', [...runtime.wslPrefix, '--cd', root], {name: 'xterm-256color', cols, rows, env, useConptyDll: true});
     },
   });
-  handle('terminal:start', (root, dimensions) => terminal.start(root, dimensions));
+  handle('terminal:start', (root, dimensions) => workRunner.admit(root,()=>terminal.start(root, dimensions)));
   handle('terminal:input', (id, data) => terminal.input(id, data));
   handle('terminal:resize', (id, cols, rows) => terminal.resize(id, cols, rows));
   handle('terminal:close', id => terminal.close(id));
-  handle('preview:list', async (root, directory, options) => {
+  handle('preview:list', async (root, directory, options,hostId) => {
+    if(hostId)return remote.workspaceCall(hostId,root,'workspace.files.list',{directory,options});
     const works = await listWorks();
     if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
-    return listDirectory(wslUnc(root), directory, options);
+    const listing=await listDirectory(wslUnc(root), directory, options),base=await fs.realpath(wslUnc(root));
+    return {...listing,entries:listing.entries.map(entry=>({...entry,path:path.relative(base,entry.path).split(path.sep).join('/')}))};
   });
   handle('preview:choose-file', async root => {
     const works = await listWorks();
@@ -317,7 +328,8 @@ app.whenReady().then(async () => {
     if (result.canceled || !result.filePaths[0]) return null;
     return readPreview(root, result.filePaths[0]);
   });
-  async function readPreview(root, reference, basePath) {
+  async function readPreview(root, reference, basePath,hostId) {
+    if(hostId)return remote.workspaceCall(hostId,root,'workspace.files.read',{reference,basePath});
     const works = await listWorks();
     if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
     if (typeof reference !== 'string' || !reference || reference.includes('\0')) throw new Error('无效文件路径');
@@ -332,12 +344,12 @@ app.whenReady().then(async () => {
     if (kind === 'markdown' || kind === 'text') {
       const data = await readBounded(selectedPath, 1024 * 1024, kind === 'markdown' ? 'Markdown 文件' : '文本文件');
       if (data.includes(0)) throw new Error('该文件包含二进制数据，无法作为文本预览');
-      return { kind, name: path.basename(selectedPath), path: selectedPath, content: data.toString('utf8') };
+      return { kind, name: path.basename(selectedPath), path: relative.split(path.sep).join('/'), content: data.toString('utf8') };
     }
     const mime = IMAGE_MIME[extension];
     if (!mime) throw new Error('此文件类型不支持预览');
     const data = await readBounded(selectedPath, 10 * 1024 * 1024, '图片');
-    return { kind: 'image', name: path.basename(selectedPath), path: selectedPath, dataUrl: `data:${mime};base64,${data.toString('base64')}` };
+    return { kind: 'image', name: path.basename(selectedPath), path: relative.split(path.sep).join('/'), dataUrl: `data:${mime};base64,${data.toString('base64')}` };
   }
   handle('preview:read', readPreview);
   // Older renderers use this channel; keep the same system-browser behavior.

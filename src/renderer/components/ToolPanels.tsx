@@ -55,16 +55,16 @@ export function WorkSummary({work, content, loading, error, updated, refresh, on
   </>;
 }
 
-export function DocumentReader({file, root, onError, onNavigate, positions: sharedPositions, active = true}: {file: FilePreview; root?: string; onError: (e: unknown) => void; onNavigate?: (file: FilePreview) => void; positions?: Map<string, ReaderPosition>; active?: boolean}) {
+export function DocumentReader({file, root,hostId, onError, onNavigate, positions: sharedPositions, active = true}: {file: FilePreview; root?: string;hostId?:string; onError: (e: unknown) => void; onNavigate?: (file: FilePreview) => void; positions?: Map<string, ReaderPosition>; active?: boolean}) {
   const [search, setSearch] = useState(''), [index, setIndex] = useState(0), [count, setCount] = useState(0);
   const body = useRef<HTMLDivElement>(null), localPositions = useRef(new Map<string, ReaderPosition>()), positions = sharedPositions || localPositions.current;
   const handledAnchor = useRef<FilePreview|null>(null);
   const identity = `${root || ''}|${file.path || file.name}`, headings = useMemo(() => file.kind === 'markdown' ? documentHeadings(file.content || '') : [], [file.content, file.kind]);
   const navigate = useCallback(async (href: string) => {
     if (!root || !file.path || !onNavigate) {onError('请在文件预览中打开此链接。'); return;}
-    try {const [reference,anchor] = href.split('#'); const next = await api.readPreview(root, decodeURIComponent(reference), file.path); onNavigate({...next,anchor:anchor?decodeURIComponent(anchor):undefined});} catch (e) {onError(e);}
-  }, [root, file.path, onNavigate, onError]);
-  const resolveImage = useCallback(async (src: string) => {const next = await api.readPreview(root!, decodeURIComponent(src), file.path); if (next.kind !== 'image') throw Error('不是图片'); return next.dataUrl!;}, [root, file.path]);
+    try {const [reference,anchor] = href.split('#'); const next = await api.readPreview(root, decodeURIComponent(reference), file.path,hostId); onNavigate({...next,anchor:anchor?decodeURIComponent(anchor):undefined});} catch (e) {onError(e);}
+  }, [root,hostId, file.path, onNavigate, onError]);
+  const resolveImage = useCallback(async (src: string) => {const next = await api.readPreview(root!, decodeURIComponent(src), file.path,hostId); if (next.kind !== 'image') throw Error('不是图片'); return next.dataUrl!;}, [root,hostId, file.path]);
   useLayoutEffect(() => {
     const el = body.current; if (!el || !active) return;
     restoreReaderPosition(el, positions.get(identity));

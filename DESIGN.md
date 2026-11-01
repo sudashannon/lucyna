@@ -688,6 +688,16 @@ The appearance section offers Blue, Classic, Folio, and Pixel as visual choices,
 
 Knowledge keeps a document list and source reader. Use the selected-row color to locate the current document and keep article content on the theme’s reading plane. Folio applies its serif stack to reading headings; Pixel keeps its compact sans hierarchy. The companion does not take space while Knowledge is open.
 
+### Work files and Git review
+
+The Work content keeps **对话工作** and **工作区文件** mounted as sibling surfaces, so changing tabs preserves the conversation draft, terminal, opened files, and reader positions for that Work and host while the client stays open. File browsing and Git review use the main Work width. The file surface groups **浏览、改动、历史、分支、Worktree** under one secondary navigation; the reader reuses the existing document reader, while diff additions and deletions use semantic status colors and explicit labels.
+
+Keep the repository selector and current branch context visible beside the view controls. Changes distinguish staged, unstaged, and registered-baseline comparisons, with whole-file or server-validated hunk/line staging and unstaging. Commit only the reviewed index contents; retain normal hooks and signing, guard the reviewed tree and parent, and preserve independently staged changes. Fetch and push name the configured remote and target, verify the resulting remote ref, and never force-push. History provides message filtering and paged results; branch selection compares the chosen ref with `HEAD`, while branch management creates or switches a branch and permits fast-forward-only merges. Worktree management is limited to registered members of the selected Work.
+
+Keep write state legible: durable operation IDs and recent history accompany progress, reconciliation, and an explicit user acknowledgement after an uncertain result. Do not imply that an interrupted write is automatically retried. Branch/worktree lifecycle actions require a clean tree and no active Work session; the Worktree manager refuses dirty, untracked, or locked members. During WSL lifecycle operations, a socket-owned lease blocks WorkRunner ordinary and automatic task admission; closing the owning socket releases it. There is no conflict editor, and diverged merges remain a terminal task. Git credentials, hooks, and signing configuration stay on the execution host; interactions that need user input are handled in that host's terminal. SSH uses the same surfaces only when the host advertises the workspace capabilities.
+
+At wide sizes, pair a 280px list with a flexible reading area; Worktree details use the full area. At a file-surface container width of 720px or less, expose the list and reader progressively. Enable split diffs only when the file-surface container reaches 1120px. Controls inherit the active scheme's surface, border, accent, and status tokens; the existing eight-pixel control radius narrows to six pixels in Folio and four pixels in Pixel. Commit messages and pending operation IDs persist per Work/host/member in local storage; opened files and reader positions stay in client memory and do not survive a restart.
+
 ### Brand assets
 
 Keep the silver-haired character and black cat as the existing illustrations. Pixel’s original 5×7 geometric SVG wordmark is the only bitmap-style typography; the Chinese UI remains ordinary text.

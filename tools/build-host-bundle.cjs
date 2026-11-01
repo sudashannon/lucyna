@@ -2,8 +2,9 @@ const fs=require('node:fs/promises'),path=require('node:path'),{createHash}=requ
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 async function buildBundle(){
   const files={};
-  for(const name of ['host.py','install.py','host_runtime.py','artifacts.py','sessions.py','protocol.py']){
-    const bytes=Buffer.from((await fs.readFile(path.join(__dirname,name==='protocol.py'?'work-runner':'lucyna-host',name),'utf8')).replaceAll('\r\n','\n'));
+  for(const name of ['host.py','install.py','host_runtime.py','artifacts.py','sessions.py','protocol.py','workspace.py','git_workspace.py','workspace_files.py','work-details.py','work-inventory.py']){
+    const folder=['git_workspace.py','workspace_files.py','work-details.py','work-inventory.py'].includes(name)?'../src':name==='protocol.py'?'work-runner':'lucyna-host';
+    const bytes=Buffer.from((await fs.readFile(path.join(__dirname,folder,name),'utf8')).replaceAll('\r\n','\n'));
     files[name]={sha256:digest(bytes),data:bytes.toString('base64')};
   }
   const release=digest(Object.keys(files).sort().map(name=>name+'\0'+files[name].sha256+'\n').join(''));

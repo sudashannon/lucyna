@@ -29,6 +29,8 @@ def main():
     parser.add_argument('--bundle', help='Linux path of frozen index.json')
     parser.add_argument('--sealed', action='store_true', help='Run SSH commands in a no-Python, no-network root')
     parser.add_argument('--sessions', action='store_true')
+    parser.add_argument('--workspace',action='store_true',help='Real remote files/Git and idle frozen upgrade acceptance')
+    parser.add_argument('--previous-bundle',help='Older frozen index.json for the workspace upgrade regression')
     parser.add_argument('--desktop', action='store_true', help='Production Electron settings/session/restart acceptance')
     parser.add_argument('--omp', help='Real OMP executable for isolated no-model RPC acceptance')
     args = parser.parse_args()
@@ -143,6 +145,18 @@ LogLevel ERROR
                     report['scenarios'].append({'mode': mode, 'firstInstall': True, 'repeatReuse': True,
                                                 'stableIdentity': True, 'sameDaemon': mode == 'user-service',
                                                 'format': first.get('format'), 'release': first['release'], 'persistenceVerified': False})
+                    if mode=='user-service' and args.workspace:
+                        from git_workspace_test import GitWorkspaceTests
+                        fixture=GitWorkspaceTests('runTest');fixture.setUp()
+                        try:
+                            fixture.changed()
+                            remote=fixture.base/'remote.git';fixture.git('init','--bare','-q',str(remote));fixture.git('-C',str(fixture.member),'remote','add','origin',str(remote))
+                            hook=fixture.repo/'.git/hooks/pre-commit';hook.write_text('#!/bin/sh\nsleep 1\n');hook.chmod(0o700)
+                            installed_file=folder/'installed.json';installed_file.write_text(json.dumps(first))
+                            upgrade_prefix=str(prefix)+'-upgrade';units.append('lucyna-host-test-'+hashlib.sha256((upgrade_prefix+'/state').encode()).hexdigest()[:12]+'.service')
+                            options_file=folder/'workspace-options.json';options_file.write_text(json.dumps(dict(root=str(fixture.root),prefix=str(prefix),bundle=windows_path(args.bundle),previousBundle=windows_path(args.previous_bundle or ROOT/'resources/remote-host/index.json'))))
+                            report['workspace']=json.loads(run([args.node,windows_path(ROOT/'test/fixtures/workspace-ssh-native.cjs'),windows_path(profile),windows_path(installed_file),windows_path(options_file)]).stdout)
+                        finally:fixture.doCleanups()
                     if mode == 'user-service' and args.sessions:
                         installed_file = folder/'installed.json'
                         installed_file.write_text(json.dumps(first))

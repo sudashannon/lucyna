@@ -25,8 +25,9 @@ spec.loader.exec_module(installer)
 
 def bundle():
     files = {}
-    for name in ('host.py', 'install.py', 'host_runtime.py', 'artifacts.py', 'sessions.py', 'protocol.py'):
-        data = ((SOURCE.parent/'work-runner' if name == 'protocol.py' else SOURCE)/name).read_bytes().replace(b'\r\n', b'\n')
+    for name in sorted(installer.SOURCES):
+        folder=SOURCE.parents[1]/'src' if name in ('git_workspace.py','workspace_files.py','work-details.py','work-inventory.py') else SOURCE.parent/'work-runner' if name=='protocol.py' else SOURCE
+        data = (folder/name).read_bytes().replace(b'\r\n', b'\n')
         files[name] = dict(data=base64.b64encode(data).decode(), sha256=hashlib.sha256(data).hexdigest())
     release = hashlib.sha256(''.join(name+'\0'+files[name]['sha256']+'\n' for name in sorted(files)).encode()).hexdigest()
     return dict(version=1, release=release, files=files)

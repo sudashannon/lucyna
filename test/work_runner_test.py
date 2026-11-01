@@ -171,6 +171,21 @@ class Lifecycle(unittest.IsolatedAsyncioTestCase):
         page=await self.runner.dispatch({'op':'get','runId':run['id'],'after':0});self.assertTrue(page['events'])
         self.assertEqual((await self.runner.dispatch({'op':'get','runId':run['id'],'after':page['events'][-1]['seq']}))['events'],[])
 
+    async def test_workspace_lease_blocks_task_and_automatic_admission(self):
+        request={'op':'workspace-lock','root':str(self.root),'_connectionId':'git-worker'}
+        self.assertTrue((await self.runner.dispatch(request))['locked'])
+        with self.assertRaisesRegex(ValueError,'正在管理'):
+            await self.runner.dispatch(self.request)
+        with self.assertRaisesRegex(ValueError,'正在管理'):
+            await self.runner.dispatch(dict(request,_connectionId='second-worker'))
+        await self.runner.automatic.advance(self.runner.automatic.policy(str(self.root)))
+        self.assertFalse(self.runner.tasks)
+        self.runner.workspace_leases.clear()  # serve() does this when the owning socket closes
+        first=await self.runner.dispatch(self.request)
+        with self.assertRaisesRegex(ValueError,'未结束'):
+            await self.runner.dispatch(request)
+        await self.runner.dispatch({'op':'cancel','runId':first['id']})
+
     async def test_cancel_before_dispatch_and_restart_never_replays(self):
         first=await self.runner.dispatch(self.request)
         stopped=await self.runner.dispatch({'op':'cancel','runId':first['id']});self.assertEqual(stopped['state'],'cancelled')

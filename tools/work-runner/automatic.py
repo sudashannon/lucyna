@@ -142,6 +142,8 @@ class Automatic:
 
     async def advance(self, value):
         now, root = self.clock(), value['root']
+        if root in self.runner.workspace_leases:
+            self.status(value,'waiting_idle','等待工作树管理操作结束。');return
         if not value['enabled']:
             self.status(value, 'disabled'); return
         if not value['profile']:

@@ -53,7 +53,7 @@ class HostConnection extends EventEmitter {
           if (!request) continue;
           clearTimeout(request.timer); this.pending.delete(frame.id);
           if (frame.ok) request.resolve(frame.data);
-          else request.reject(Object.assign(Error(frame.code || 'host_error'), {code: frame.code}));
+          else request.reject(Object.assign(Error(frame.message || frame.code || 'host_error'), {code: frame.code}));
         } catch { invalid(); break; }
       }
     });

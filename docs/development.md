@@ -16,13 +16,13 @@
 
 OMP 18.13.3 的 `--no-tools` 不排除后加载的 MCP 或自动学习工具。任务 overlay 关闭 autolearn 和 memory backend；服务自带 `policy.mjs` 显式加载并完成握手，每轮启用登记的 Work 工具，执行前阻止其他工具和模型自行替换 goal 预算。恢复 goal 时必须重新启用已登记工具，不能只过滤当时的活动集合。
 
-`capabilities.py` 提供受控搜索、公共 skill 读取、Stele 读取白名单、隔离命令和成员 Git 查看。不是启用原生通用 bash 后靠提示约束；公共 home 不挂载给命令，固定验收文件与 Work 身份文件只读。`evolution.py` 管理快照、worker、采纳日志与回退，`evo_worker.py` 在独立 venv 中实际调用 AntOmniEvo `Optimizer`、`ParetoFrontierEvolutionAlgorithm` 和 `LocalCandidateStore`；`LocalAgentProposer` 通过私有 stdio 调用现有 `AuxiliaryAgent`（AI SDK `ToolLoopAgent`），用目标文件白名单迭代 Work，不创建 OMP session，`WorkSystem` / `WorkEvaluator` 运行冻结检查并映射归一化分数。并发候选数为 1，训练反馈送入 proposer，留出结果只用于评估/选择和用户展示。留出集参与多轮选择，不等于完全未触及的最终泛化测试集。
+`capabilities.py` 提供受控搜索、公共 skill 读取、Stele 读取白名单、隔离命令和成员 Git 只读查看。Work Runner 不暴露 Git 写入或设备操作；独立的工作区文件 UI 使用固定 Git API 管理一个已登记成员仓库。它不是启用原生通用 bash 后靠提示约束；公共 home 不挂载给命令，固定验收文件与 Work 身份文件只读。`evolution.py` 管理快照、worker、采纳日志与回退，`evo_worker.py` 在独立 venv 中实际调用 AntOmniEvo `Optimizer`、`ParetoFrontierEvolutionAlgorithm` 和 `LocalCandidateStore`；`LocalAgentProposer` 通过私有 stdio 调用现有 `AuxiliaryAgent`（AI SDK `ToolLoopAgent`），用目标文件白名单迭代 Work，不创建 OMP session，`WorkSystem` / `WorkEvaluator` 运行冻结检查并映射归一化分数。并发候选数为 1，训练反馈送入 proposer，留出结果只用于评估/选择和用户展示。留出集参与多轮选择，不等于完全未触及的最终泛化测试集。
 
 离线回归：`node --require ./test/setup.cjs --test test/work-runner.test.cjs`；WSL 中运行 `python3 test/work_runner_test.py -v` 和 `python3 test/work_evolution_test.py -v`。Python 测试需要 bwrap，使用临时文件和假 RPC，不访问真实 Work、不调用付费模型。`work_local_agent_test.py` 另用真实 AntOmniEvo 和本地 HTTP 模拟模型验证完整本地 agent 工具循环，缺少可选 Ant 环境时跳过该项。真实模型、Ant 优化器、Electron 采纳/回退及服务 SIGKILL 验收使用独立临时 Work、服务单元和客户端 profile，不进入默认测试。
 
 本地 agent 的模型接口与密钥复用「辅助模型」配置，与自动命名开关独立。Work 每步（模型调用及工具执行）使用独立的 120 秒超时，整个实验另受总时长限制；会话标题保留辅助模型设置中的短请求超时。主进程解密后经私有管道同步给服务，凭据仅保留在内存；正常关闭客户端后可以继续运行，服务重启后等待客户端重新同步。实验可覆盖同一接口中的模型名称。WSL 需 Node.js 22+（支持现有 NVM 安装）；agent 直接复用客户端的 SDK 模块，限 12 步、每步最多 16384 输出 Token（计入原实验总预算），逐步核算总预算，未知用量或中断按预留上限记账。确认写入且训练检查通过后立即交回 AntOmniEvo，不再请求模型生成总结；独立留出检查仍由框架执行。只提供 Work 文件列举、读取、受限写入和训练检查，留出文件不可读取，公共 L3/skill 不进入工具集。暂停/取消会结束整个 worker 进程组。
 
-不宣称普通原生会话热迁移、外部副作用自动重放、多仓 Git 写入或长期进化收益。维护协议时检查 v2 分块、问题代次、同 Work 准入、冻结输入、候选快照漂移、采纳中断与故障后的旧进程身份。源快照最多 100 MiB/10000 文件，忽略 node_modules、.agent-tmp、__pycache__ 和私有路径；实验依赖应放在可复制输入中。候选库保留用于审计，不自动清理。
+不宣称普通原生会话热迁移、外部副作用自动重放、跨多仓库单次 Git 事务或长期进化收益。工作区文件 Git API 按成员分别操作，不把多个仓库的写入合并成一个事务。维护 Work Runner 协议时检查 v2 分块、问题代次、同 Work 准入、冻结输入、候选快照漂移、采纳中断与故障后的旧进程身份。源快照最多 100 MiB/10000 文件，忽略 node_modules、.agent-tmp、__pycache__ 和私有路径；实验依赖应放在可复制输入中。候选库保留用于审计，不自动清理。
 
 ```text
 src/                 Electron 主进程、预加载、会话与文件服务
@@ -52,9 +52,14 @@ docs/                公共文档与演示截图
 | `npm run test:experience` | 空会话、删除文件范围预览与取消、会话和 Work 备忘的真实移动/恢复、慢连接、长历史时间轴、并行监控、停止后的草稿归属与窄窗口回归 |
 | `npm run test:usability` | 独立 profile 与合成服务：文档加载/空白/失败/竞态、证据检索来源与版本、连接冲突预检、宽表单固定操作区、工作区筛选、设置导航与窄屏布局 |
 | `npm run test:work:ui` | 工作详情、搜索、来源跳转、阅读位置、大 diff、窄窗口/深色与读取失败保留旧数据的离线 UI 回归 |
+| `npm run test:workspace-files` | 隔离合成 preload 下的工作区文件标签、浏览/阅读、视图切换、主题和窄窗口 UI 回归；不运行真实 Git 或 SSH |
 | `npm run test:history:native -- --work=/绝对/work/路径` | 可选真实 OMP 验收：原地续聊、显式复制、原件/副本切换与跨运行时复制 |
 | `python -m unittest discover -s test -p work_inventory_test.py` | 临时 Git 仓库中的工作区诊断测试 |
 | `python -m unittest discover -s test -p work_details_test.py` | Linux 临时 Git 仓库中的工作详情、分离差异、资产索引、路径边界与旧版 Git 兼容测试 |
+| `python3 test/git_workspace_test.py -v` | 临时 Linux Git 仓库：快照校验、文件/块/行暂存、提交、网络与 Work 生命周期 |
+| `python3 test/workspace_remote_test.py -v` | 远端 daemon 的工作区文件/Git 能力、身份与操作转发测试 |
+| `python3 test/workspace_ui_native.py --node /绝对路径/node.exe` | 正式 Electron renderer 对临时 WSL Git 仓库的验收；需要可从 WSL 调用的 Windows Node.js |
+| `python3 test/ssh_host_native.py --node /绝对路径/node.exe --report /tmp/ssh-host-workspace.json --bundle /绝对路径/index.json --workspace` | 可选 WSL OpenSSH loopback + frozen host 的远端文件/Git与更新验收；需先构建 host 制品和可用 WSL systemd 用户服务 |
 | `npm run test:pet:animation` | 动画状态、帧尺寸与设置回归 |
 | `npm run test:pet:layout` | 桌宠布局回归 |
 | `npm run test:pet:recovery` | 桌宠画布丢失、隐藏/唤醒、跨屏重置与渲染进程崩溃恢复；隔离 profile，不启动 OMP |
@@ -73,6 +78,10 @@ docs/                公共文档与演示截图
 工作详情验收使用 `test/desktop-log.cjs` 将日志先写到本次 `.runtime/` 目录的 `desktop.log`，再输出到终端。调用方关闭 stdout/stderr 管道时仅处理 `EPIPE`，测试继续保存结果并正常退出；其他异常保持可见，不使用全局异常吞噬。新增 Electron 验收入口应复用此日志工具。
 
 测试报告应区分 **逻辑单测**、**合成协议驱动的真实 UI** 和 **真实模型/WSL 实测**。后者需要明确选择独立测试 work 与 profile，确认模型费用和写入范围，不能拿截图 fixture 当作成功证据。
+
+`npm run test:workspace-files` 在隔离 Electron profile 中使用合成 preload，覆盖浏览、改动/历史/分支/Worktree 视图、内容标签状态保留、SSH Work 身份隔离、四种主题的浅深外观，以及 960px/390px 布局；不调用真实 Git、SSH 或模型。`workspace_ui_native.py` 另外以临时 Git 仓库操作正式 renderer，不启动 OMP；覆盖包含签名失败时保留提交草稿、移动 Worktree 后仍选中对应成员，以及移除成员后选择剩余成员。WSL 生命周期操作通过 socket 所有的 WorkRunner 租约阻止普通任务和自动任务启动，socket EOF 时释放。`ssh_host_native.py --workspace` 使用 WSL loopback OpenSSH、临时 host 与 frozen bundle 验证远端服务，不代表跨物理主机或 aarch64 验收。
+
+2026-11-01 工作区 Git 交付的已知验证：默认 Node 回归 231 项通过、1 项跳过；类型检查、renderer 构建与 gallery 验收通过。真实 WSL Git Python 测试 13 项、文件/恢复/安装器/WorkRunner-wire 测试 5 项通过；WorkRunner 10 项、自动任务 8 项、Work Details 8 项、SSH host 9 项与 SSH session 9 项通过。正式 renderer 的真实 WSL 验收通过 9 项且 OMP 启动数为 0，其中覆盖签名失败后保留草稿和 Worktree 成员移动/移除后的选择。OpenSSH/frozen host workspace 验收通过 8 项，包含旧 frozen release `592319da` 到当前 release `0856d99d` 的真实升级及稳定 installation ID。测试运行在隔离临时 WSL loopback 环境；没有重启用户正在使用的客户端或 host。跨物理主机、aarch64 及完整主题/窗口/特殊路径/故障发行验收矩阵仍未认证，因此这些结果不等于 P0–P5 全面发布验收完成。
 
 `test:history:native` 不属于默认离线测试，需要先构建 renderer、配置 WSL 和 Windows OMP，并指定已发现的有效 work。它使用独立客户端 profile，通过真实模型创建带有“Lucyna 原地续聊验收”标记的新 journal，再实际操作生产历史界面；会消耗少量模型额度。它不打开用户已有 journal，也不写 work 文件；测试日志与副本留在忽略目录 `.runtime/history-native-*/`，原生测试 journal 留在该 work 对应的 WSL OMP 历史目录。
 

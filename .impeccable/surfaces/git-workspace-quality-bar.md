@@ -1,0 +1,11 @@
+# Work files extension quality bar
+
+This is a code-led extension of an established Operate surface, with user-pinned topology. The user confirmed the design on 2026-11-01. There is no catalog roll, dealt candidate, or seed to fabricate: reference/new-work.md section 3 explicitly says not to run the concept process for a local extension or a precisely specified narrow request.
+
+The incumbent visual authority is DESIGN.md and the existing Blue/Classic/Folio/Pixel workbench; the category reference is GitDesktop's changes/diff layout from the pinned research in docs/git-workspace-design.md. Design studies are critique references, not pixel-comp build gates.
+
+The bar is a functioning desktop work surface: Work and host context stay identifiable; the two content tabs preserve ongoing work; a single list and a spacious reader occupy the content width; added/deleted content is explicit and readable; empty/error/read-only/unsupported capabilities are honest; keyboard navigation and narrow list/content transitions work without hidden focus or horizontal page overflow. Existing fonts, control geometry, semantic colors and brand assets remain the visual system.
+
+The signature interaction is selecting a file or diff and bringing a bounded excerpt into the existing conversation draft without sending or starting OMP, then returning to the retained reading position.
+
+The user extended this slice through P5. The commit form, explicit sync targets, branch/member lifecycle controls and SSH capability states now belong to the acceptance scope. Mutation gates are backed by temporary real Git repositories: reviewed-tree commits with normal hooks/signing, preservation of external staging, stale-selection refusal, durable operation IDs and result reconciliation. Worktree management checks live sessions and coordinates registration; WSL additionally holds a socket-owned Work Runner lease against automatic task admission. UI polish does not stand in for those execution tests. The supported merge is fast-forward only, worktree mutations are limited to registered same-Work members, and SSH preview is bounded to 1 MiB; physical-host/aarch64 certification is not claimed by loopback evidence.

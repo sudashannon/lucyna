@@ -36,7 +36,8 @@ def main():
         work = Path(temporary)
         env = dict(os.environ, PYINSTALLER_CONFIG_DIR=str(work/'cache'), SOURCE_DATE_EPOCH='0', PYTHONHASHSEED='0')
         subprocess.run([sys.executable, '-m', 'PyInstaller', '--onedir', '--noupx',
-                        '--name', 'lucyna-host', '--paths', str(SOURCE.parent/'work-runner'), '--distpath', str(work/'dist'),
+                        '--name', 'lucyna-host', '--paths', str(SOURCE.parent/'work-runner'), '--paths', str(SOURCE.parents[1]/'src'),
+                        '--add-data', str(SOURCE.parents[1]/'src/work-details.py')+':.', '--add-data', str(SOURCE.parents[1]/'src/work-inventory.py')+':.', '--distpath', str(work/'dist'),
                         '--workpath', str(work/'build'), '--specpath', str(work),
                         str(SOURCE/'host.py')], check=True, env=env)
         folder = work/'dist/lucyna-host'

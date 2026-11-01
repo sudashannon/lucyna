@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 import uuid
+import sqlite3
 
 MARKER = '# Managed by Lucyna SSH Host v1\n'
 
@@ -64,7 +65,17 @@ def read_json(file):
     return json.loads(file.read_text())
 
 
-SOURCES = {'host.py', 'install.py', 'host_runtime.py', 'artifacts.py', 'sessions.py', 'protocol.py'}
+def atomic_text(file,value):
+    temporary=file.with_name(file.name+'.'+uuid.uuid4().hex+'.tmp')
+    try:
+        with os.fdopen(os.open(temporary,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w',encoding='utf-8') as stream:
+            stream.write(value);stream.flush();os.fsync(stream.fileno())
+        os.replace(temporary,file)
+    finally:temporary.unlink(missing_ok=True)
+
+
+SOURCES = {'host.py', 'install.py', 'host_runtime.py', 'artifacts.py', 'sessions.py', 'protocol.py',
+           'workspace.py', 'git_workspace.py', 'workspace_files.py', 'work-details.py', 'work-inventory.py'}
 
 
 def validate(bundle):
@@ -115,6 +126,32 @@ def hello(state):
         if not response.get('ok') or response.get('id') != 'health':
             raise ValueError('unhealthy_service')
         return response['data']
+
+
+def unit_content(command,state):
+    return (MARKER+'[Unit]\nDescription=Lucyna SSH host\n[Service]\nType=simple\n'
+            'ExecStart='+' '.join(unit_arg(arg) for arg in [*command,'serve','--state',str(state)])+'\n'
+            'UMask=0077\nRestart=on-failure\nRestartSec=3\nKillMode=control-group\nTimeoutStopSec=10\n'
+            '[Install]\nWantedBy=default.target\n')
+
+
+def stop_idle_service(state,unit):
+    # Lock durable admission before the idle check and service stop. An old
+    # host cannot create a session between this check and stopping its cgroup.
+    connections=[]
+    try:
+        for file,query in [(state/'sessions.sqlite3','SELECT record FROM sessions'),
+                           (state/'git/operations.sqlite',"SELECT status FROM operations WHERE status IN ('queued','running')")]:
+            if not file.exists():continue
+            if file.is_symlink():raise ValueError('unsafe_database')
+            db=sqlite3.connect(file,timeout=5);connections.append(db);db.execute('BEGIN IMMEDIATE')
+            rows=db.execute(query).fetchall()
+            if file.name=='sessions.sqlite3':rows=[r for r in rows if json.loads(r[0])['status'] in ('starting','live')]
+            if rows:raise ValueError('upgrade_busy')
+        if systemctl('stop',unit).returncode or systemctl('is-active','--quiet',unit).returncode==0:
+            raise ValueError('upgrade_stop_failed')
+    finally:
+        for db in connections:db.rollback();db.close()
 
 
 def install(bundle, options):
@@ -190,9 +227,8 @@ def install_package(release_id, options, files=None, source=None):
                     shutil.rmtree(stage)
         current_file = state/'active.json'
         current = read_json(current_file) if current_file.exists() else None
-        # Do not replace a live or previous release until upgrade/rollback is implemented.
-        if current and (current['release'] != release_id or current['mode'] != mode):
-            raise ValueError('update_pending')
+        upgrading=bool(current and (current['release']!=release_id or current['mode']!=mode))
+        if upgrading and (not options.get('upgrade') or mode!='user-service' or current['mode']!=mode):raise ValueError('update_pending')
         command = launch(release, frozen)
         entry = release/('lucyna-host' if frozen else 'host.py')
         unit_name = 'lucyna-host.service' if not prefix else 'lucyna-host-test-'+digest(str(state).encode())[:12]+'.service'
@@ -204,12 +240,13 @@ def install_package(release_id, options, files=None, source=None):
                     raise ValueError('symlink_unit_directory')
             unit_dir.mkdir(parents=True, exist_ok=True)
             unit = unit_dir/unit_name
-            content = (MARKER+'[Unit]\nDescription=Lucyna SSH host\n[Service]\nType=simple\n'
-                       'ExecStart='+' '.join(unit_arg(arg) for arg in [*command, 'serve', '--state', str(state)])+'\n'
-                       'UMask=0077\nRestart=on-failure\nRestartSec=3\nKillMode=control-group\nTimeoutStopSec=10\n'
-                       '[Install]\nWantedBy=default.target\n')
+            content = unit_content(command,state)
+            previous_content=unit_content(launch(releases/current['release'],current.get('format')=='frozen'),state) if upgrading else content
             existed = os.path.lexists(unit)
-            if existed and (unit.is_symlink() or unit.read_text() != content):
+            journal=state/'upgrade.json'
+            resumed=upgrading and journal.exists() and read_json(journal)==dict(previous=current['release'],candidate=release_id)
+            if upgrading and not existed:raise ValueError('unit_conflict')
+            if existed and (unit.is_symlink() or unit.read_text() not in ([previous_content,content] if resumed else [previous_content])):
                 raise ValueError('unit_conflict')
             if systemctl('show-environment').returncode:
                 raise ValueError('user_service_unavailable')
@@ -217,7 +254,11 @@ def install_package(release_id, options, files=None, source=None):
                 # Exclusive create: never overwrite another installer or manual unit.
                 with open(unit, 'x', encoding='utf8') as stream:
                     stream.write(content)
+            elif upgrading:
+                atomic_json(journal,dict(previous=current['release'],candidate=release_id))
+                stop_idle_service(state,unit_name)
             try:
+                if upgrading:atomic_text(unit,content)
                 for args in [('daemon-reload',), ('enable', unit_name), ('start', unit_name)]:
                     if systemctl(*args).returncode:
                         raise ValueError('service_start_failed')
@@ -233,12 +274,18 @@ def install_package(release_id, options, files=None, source=None):
                             raise ValueError('service_health_timeout')
                         time.sleep(.1)
             except Exception:
-                if not existed:
+                if upgrading:
+                    systemctl('stop',unit_name)
+                    atomic_text(unit,previous_content)
+                    systemctl('daemon-reload')
+                    if systemctl('start',unit_name).returncode:raise ValueError('upgrade_rollback_failed') from None
+                elif not existed:
                     systemctl('disable', '--now', unit_name)
                     unit.unlink(missing_ok=True)
                     systemctl('daemon-reload')
                 raise
         atomic_json(current_file, dict(release=release_id, mode=mode, format='frozen' if frozen else 'source'))
+        (state/'upgrade.json').unlink(missing_ok=True)
         return dict(ok=True, release=release_id, installationId=identity['installationId'],
                     mode=mode, entry=str(entry), state=str(state), reused=reused,
                     launcher=command, format='frozen' if frozen else 'source',

@@ -21,7 +21,7 @@ test('SSH rejects option injection and retains the selected executor',()=>{
 });
 test('bundle is deterministic across builds and includes no machine configuration',async()=>{
   const a=await buildBundle(),b=await buildBundle();assert.deepEqual(a,b);
-  assert.deepEqual(Object.keys(a.files).sort(),['artifacts.py','host.py','host_runtime.py','install.py','protocol.py','sessions.py']);
+  assert.deepEqual(Object.keys(a.files).sort(),['artifacts.py','git_workspace.py','host.py','host_runtime.py','install.py','protocol.py','sessions.py','work-details.py','work-inventory.py','workspace.py','workspace_files.py']);
   for(const item of Object.values(a.files))assert.equal(digest(Buffer.from(item.data,'base64')),item.sha256);
 });
 test('deployment verifies both payload and the live installation identity',async()=>{

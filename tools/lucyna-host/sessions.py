@@ -234,6 +234,7 @@ class SessionManager:
         self.state = Path(state)
         self.lock = threading.RLock()
         self.creating = 0
+        self.workspace_lock = threading.RLock()
         self.closing = False
         self.creation_done = threading.Condition(self.lock)
         self.live = {}
@@ -354,7 +355,8 @@ class SessionManager:
         if not isinstance(args, dict):
             raise ValueError('invalid_arguments')
         if operation == 'session.create':
-            return self.create(args)
+            with self.workspace_lock:
+                return self.create(args)
         if operation == 'workspace.inspect':
             root = Path(canonical_path(args.get('root'), directory=True))
             executable = args.get('omp') or shutil.which('omp', path=host_runtime.login_env().get('PATH', ''))

@@ -5,7 +5,7 @@ import { Spinner } from '@cindy/components/ui/spinner';
 import { api } from '../api';
 import type { FileEntry, FileListing, FilePreview } from '../types';
 
-export function FileBrowser({root, active, selected, onOpen, onError, initialDirectory=''}: {root: string; active: boolean; selected?: string; onOpen: (file: FilePreview) => void; onError: (e: unknown) => void; initialDirectory?:string}) {
+export function FileBrowser({root,hostId, active, selected, onOpen, onError, initialDirectory=''}: {root: string;hostId?:string; active: boolean; selected?: string; onOpen: (file: FilePreview) => void; onError: (e: unknown) => void; initialDirectory?:string}) {
   const [directory, setDirectory] = useState(initialDirectory), [query, setQuery] = useState(''), [showHidden, setShowHidden] = useState(false), [collapsed, setCollapsed] = useState(false);
   const [listing, setListing] = useState<FileListing | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(''), [opening, setOpening] = useState('');
   const [offset, setOffset] = useState(0), [revision, setRevision] = useState(0);
@@ -18,7 +18,7 @@ export function FileBrowser({root, active, selected, onOpen, onError, initialDir
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const next = await api.listFiles(root, directory, {query, showHidden, offset});
+          const next = await api.listFiles(root, directory, {query, showHidden, offset},hostId);
           if (request.current !== id || !alive.current) return;
           setListing(previous => ({...next, entries: offset && previous?.directory === next.directory ? [...previous.entries, ...next.entries] : next.entries})); loaded.current = key;
           if (!offset) requestAnimationFrame(() => {if (request.current === id && scroll.current) scroll.current.scrollTop = positions.current.get(directory) || 0;});
@@ -27,12 +27,12 @@ export function FileBrowser({root, active, selected, onOpen, onError, initialDir
       })();
     }, query ? 180 : 0);
     return () => {clearTimeout(timer); request.current++;};
-  }, [root, active, directory, query, showHidden, offset, revision, collapsed]);
+  }, [root,hostId, active, directory, query, showHidden, offset, revision, collapsed]);
   const navigate = (path: string) => {setDirectory(path); setQuery(''); setOffset(0); setListing(null); setError('');};
   const open = async (entry: FileEntry) => {
     if (entry.kind === 'directory') {navigate([listing?.directory, entry.name].filter(Boolean).join('/')); return;}
     setOpening(entry.path); setError('');
-    try {const file = await api.readPreview(root, entry.path); if (alive.current) onOpen(file);}
+    try {const file = await api.readPreview(root, entry.path,undefined,hostId); if (alive.current) onOpen(file);}
     catch (e) {if (alive.current) {setError(String(e)); onError(e);}}
     finally {if (alive.current) setOpening('');}
   };

@@ -10,6 +10,8 @@ const messages = {
   omp_not_executable: '远端未找到 OMP，请填写可执行文件的绝对路径。',
   user_service_unavailable: '远端 systemd 用户服务不可用，请先启用用户服务。',
   update_pending: '远端已有其他版本，当前版本已暂存；保留原服务，请先完成版本更新。',
+  upgrade_busy: '远端仍有活动会话或 Git 操作，请结束后再更新；原服务保持不变。',
+  upgrade_rollback_failed: '更新失败，恢复旧服务也未成功；原版本与数据仍保留，请检查远端用户服务。',
   controller_busy: '此会话由另一台客户端控制。请在原客户端断开，或明确接管。',
   stale_controller: '会话控制权已转移，请重新连接后核对状态。',
   session_interrupted: '远端进程已结束；可从历史记录明确续聊原会话，任务不会自动重放。',
@@ -46,7 +48,7 @@ class RemoteDesktop {
   }
   async connectHost(id) {
     identifier(id); this.paused.delete(id);
-    if (this.jobs.has(id)) return this.jobs.get(id).promise;
+    if (this.jobs.has(id)) {const job=this.jobs.get(id);if(job.updating)throw Error('主机组件正在更新，请完成后重试');return job.promise;}
     const current = this.connections.get(id);
     if (current?.connection.child && current.workspace) return current;
     const controller = new AbortController();
@@ -281,6 +283,30 @@ class RemoteDesktop {
     const {connection} = await this.connectHost(hostId);
     const workspace = await connection.request('workspace.inspect', {root, omp: profile.omp, agentDir: profile.agentDir});
     return workspace.document || '# '+profile.name+'\n\n远端工作目录：'+root+'\n\n此目录尚无 SESSION.md。';
+  }
+  async workspaceCall(hostId, root, operation, args = {}) {
+    const profile = await this.registry.get(identifier(hostId));
+    if (profile.root !== root) throw Error('工作区不属于所选 SSH 主机');
+    if(this.paused?.has(hostId))throw Error('此主机已手动断开，请在 SSH 设置中连接后刷新');
+    const {connection} = await this.connectHost(hostId);
+    if (!connection.hello?.capabilities?.includes(operation)) throw Error('此主机版本尚不支持文件与 Git，请在 SSH 设置中更新主机服务');
+    return connection.request(operation, {...args,root}, 60000);
+  }
+  async updateHost(id) {
+    identifier(id);
+    if(this.jobs.has(id))throw Error('主机正在连接，请稍后更新');
+    if([...this.active.values()].some(item=>item.saved.hostId===id&&!item.saved.ended))throw Error('请先结束此主机的远端会话，再更新组件');
+    const profile=await this.registry.get(id);
+    await this.disconnectHost(id);
+    const controller=new AbortController();
+    const promise=(async()=>{
+      try{
+        const installed=await this.deploy(profile.ssh,this.bundle,{upgrade:true,signal:controller.signal,...(this.prefix?{prefix:this.prefix(id)}:{}),onProgress:value=>this.status(id,value.phase)});
+        await this.registry.installed(id,installed);this.connections.delete(id);this.status(id,'disconnected');
+      }catch(error){this.status(id,'error',{error:readable(error)});throw Error(readable(error));}
+      finally{this.jobs.delete(id);}
+    })();
+    this.jobs.set(id,{controller,promise,updating:true});await promise;await this.connectHost(id);return this.list();
   }
   async shutdown() {
     this.quitting = true;

@@ -1,5 +1,5 @@
 import type {KnowledgeCatalog, KnowledgeDetail, KnowledgeCandidate, KnowledgeReview} from './knowledge-types';
-import type {WorkDetail, GitInspection} from './work-detail-data';
+import type {WorkDetail, GitInspection, GitReadOptions} from './work-detail-data';
 export interface WorkIssue {code: string; severity: 'error' | 'warning' | 'info'; message: string; member?: string; actual?: string; expected?: string}
 export interface Work { name: string; root: string; kind: string; hostId?:string;hostName?:string;hostStatus?:string;state?: string; error?: string; health?: 'ok' | 'warning' | 'error'; issues?: WorkIssue[] }
 export interface HistoryEntry { title?: string; id?: string; path?: string; cwd?: string; sessionFile?: string; agentDir?: string; modified?: string; modifiedAt?: string; importedAt?: string; sourceKind?: string; runtime?: 'windows' | 'wsl' | 'ssh';hostId?:string;remoteSessionId?:string;status?:string }
@@ -22,8 +22,9 @@ export interface WorkEvent { id: string; time: string; text: string; level: 'inf
 export type OmpEvent = Record<string, any>;
 export interface Desktop {
   workRun(operation:string,data?:Record<string,unknown>):Promise<any>;
-  workDetails(root:string):Promise<WorkDetail>;
-  workGit(root:string,member:string,action:string,options?:{scope?:string;file?:string}):Promise<GitInspection>;
+  workDetails(root:string,hostId?:string):Promise<WorkDetail>;
+  workGit(root:string,member:string,action:string,options?:GitReadOptions,hostId?:string):Promise<GitInspection>;
+  gitWorkspace?(root:string,member:string,action:string,options?:Record<string,unknown>,hostId?:string):Promise<any>;
   openExternal(url:string):Promise<void>;
   mode?:'native'|'demo';
   windowChrome?:{enabled:boolean;menu:(id:string,position:{x:number;y:number})=>Promise<unknown>;theme:(theme:string,visualTheme?:import('./appearance').VisualTheme)=>Promise<unknown>;onAction:(fn:(action:string)=>void)=>()=>void};
@@ -52,6 +53,7 @@ export interface Desktop {
   copyText(text: string): Promise<void>;
   listWorks(): Promise<Work[]>; readWork(root: string,hostId?:string): Promise<string>;
   listHosts?():Promise<SshHost[]>;saveHost?(input:Partial<SshHost>):Promise<SshHost>;connectHost?(id:string):Promise<SshHost[]>;
+  updateHost?(id:string):Promise<SshHost[]>;
   cancelHost?(id:string):Promise<void>;disconnectHost?(id:string):Promise<void>;removeHost?(id:string):Promise<void>;
   onHosts?(fn:(event:OmpEvent)=>void):()=>void;reconnectRemote?(id:string):Promise<void>;detachRemote?(id:string):Promise<void>;
   remoteOperation?(id:string,clear?:boolean):Promise<{status:string;operationId?:string}>;
@@ -67,8 +69,8 @@ export interface Desktop {
   terminal(root: string): Promise<unknown>; startTerminal(root: string, dimensions: {cols: number; rows: number; requestId?: string}): Promise<{id: string}>;
   terminalInput(id: string, data: string): Promise<unknown>; terminalResize(id: string, cols: number, rows: number): Promise<unknown>; closeTerminal(id: string): Promise<unknown>;
   onTerminal(fn: (event: OmpEvent) => void): () => void; onEvent(fn: (event: OmpEvent) => void): () => void;
-  choosePreview(root: string): Promise<FilePreview | null>; readPreview(root: string, reference: string, basePath?: string): Promise<FilePreview>; webPreview(url: string): Promise<unknown>;
-  listFiles(root: string, directory?: string, options?: {query?: string; showHidden?: boolean; offset?: number}): Promise<FileListing>;
+  choosePreview(root: string): Promise<FilePreview | null>; readPreview(root: string, reference: string, basePath?: string,hostId?:string): Promise<FilePreview>; webPreview(url: string): Promise<unknown>;
+  listFiles(root: string, directory?: string, options?: {query?: string; showHidden?: boolean; offset?: number},hostId?:string): Promise<FileListing>;
 }
 declare global { interface Window { desktop?: Desktop } }
 export interface PetSettings {version:1;enabled:boolean;animated:boolean;animationMode?:'system'|'always';alwaysOnTop:boolean;appearance:'duo'|'cat';size:'small'|'medium'|'large';quiet:boolean;privacy:boolean;reducedMotion:boolean;closeToTray:boolean;notifyCompletion:boolean;notifyError:boolean;pinnedSessionId:string;position:{displayId:number;right:number;bottom:number}|null}

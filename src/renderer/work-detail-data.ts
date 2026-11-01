@@ -2,11 +2,14 @@ import {documentHeadings, plainText, workOutline} from './panel-data';
 import type {HistoryEntry, WorkIssue} from './types';
 export interface GitCounts {staged:number;unstaged:number;untracked:number;conflicts:number}
 export interface GitTree {path:string;head?:string;branch?:string;detached?:boolean;bare?:boolean;locked?:string|boolean;prunable?:string|boolean}
-export interface WorkMember {name:string;path:string;repo:string;branch:string;registeredBranch:string;head?:string;detached?:boolean;base?:string;baseSha?:string;mr?:string;counts?:GitCounts;upstream?:string;ahead?:number;behind?:number;baseAhead?:number;baseBehind?:number;worktrees?:GitTree[];detailError?:string;statusTruncated?:boolean;treesTruncated?:boolean}
+export interface WorkMember {name:string;path:string;repo:string;branch:string;registeredBranch:string;head?:string;detached?:boolean;base?:string;baseSha?:string;mr?:string;counts?:GitCounts;changedFiles?:number;upstream?:string;ahead?:number;behind?:number;baseAhead?:number;baseBehind?:number;worktrees?:GitTree[];detailError?:string;statusTruncated?:boolean;treesTruncated?:boolean}
 export interface WorkAsset {path:string;name:string;title?:string;kind:'note'|'log'|'script'|'evidence';indexed:boolean;directory?:boolean;size?:number;modifiedAt?:string;unavailable?:string}
 export interface WorkDetail {root:string;name:string;content:string;modifiedAt:string;fetchedAt:string;members:WorkMember[];assets:WorkAsset[];issues:WorkIssue[];warnings:string[];kind:string}
 export interface GitFile {path:string;oldPath?:string;code:string;staged:boolean;unstaged:boolean;untracked:boolean;conflict:boolean}
-export interface GitInspection {kind:string;text?:string;truncated?:boolean;checkedAt?:string;files?:GitFile[];counts?:GitCounts;worktrees?:GitTree[];state?:string;draft?:boolean;sourceBranch?:string;targetBranch?:string;sha?:string;url?:string;updatedAt?:string;pipelineStatus?:string;pipelineSha?:string;pipelineMatchesHead?:boolean}
+export interface GitCommit {oid:string;parents:string[];date:string;author:string;subject:string}
+export interface GitRef {ref:string;name:string;oid:string;upstream:string;date:string;current:boolean;remote:boolean}
+export interface GitReadOptions {scope?:string;file?:string;cursor?:string;query?:string;commit?:string;base?:string;target?:string}
+export interface GitInspection {kind:string;text?:string;truncated?:boolean;checkedAt?:string;files?:GitFile[];counts?:GitCounts;worktrees?:GitTree[];commits?:GitCommit[];branches?:GitRef[];nextCursor?:string|null;state?:string;draft?:boolean;sourceBranch?:string;targetBranch?:string;sha?:string;url?:string;updatedAt?:string;pipelineStatus?:string;pipelineSha?:string;pipelineMatchesHead?:boolean}
 export function workRecord(text:string){
   const outline=workOutline(text), headings=documentHeadings(text);
   const sections=outline.sections.map((s,i)=>({...s,anchor:headings.filter(h=>h.level===2)[i]?.id}));

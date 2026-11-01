@@ -44,6 +44,11 @@ docs/*
 !docs/development.md
 !docs/screenshots/
 !docs/screenshots/**
+!docs/git-workspace-design.md
+!docs/design/
+docs/design/*
+!docs/design/git-workspace/
+!docs/design/git-workspace/**
 design/*
 !design/app-logo-v1/
 !design/app-logo-v1/**
@@ -110,3 +115,11 @@ src/pet/assets/companions-atlas-v2.png
 !test/blue-theme-desktop.cjs
 !test/pet-topmost-desktop.cjs
 !test/visual-themes-desktop.cjs
+!test/workspace-files-desktop.cjs
+!test/workspace-files-preload.cjs
+!test/git_workspace_test.py
+!test/workspace_remote_test.py
+!test/git-service.test.cjs
+!test/workspace-git-desktop.cjs
+!test/workspace-git-preload.cjs
+!test/workspace_ui_native.py

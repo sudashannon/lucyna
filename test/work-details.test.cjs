@@ -21,3 +21,13 @@ test('Work detail bridge decodes WSL UTF-16 failures and keeps timeout errors ac
  await assert.rejects(make(Error('failed'),Buffer.from('服务连接超时 WSAETIMEDOUT','utf16le'))('/work'),/服务连接超时 WSAETIMEDOUT/);
  await assert.rejects(make({killed:true},Buffer.alloc(0))('/work'),/已有任务与草稿保持不变/);
 });
+
+test('read-only Git bridge keeps paging, filter and commit identities in distinct requests',async()=>{
+ const calls=[];const read=createWorkDetails({listWorks:async()=>[{root:'/work'}],execute:(_file,args,_options,cb)=>{calls.push(args);setTimeout(()=>cb(null,'{}',''),5);}});
+ await Promise.all([read('/work','app','history',{query:'[literal]'}),read('/work','app','history',{query:'other'}),read('/work','app','commit',{commit:'a'.repeat(40)})]);
+ assert.equal(calls.length,3);assert.ok(calls.some(args=>args.includes('--query=[literal]')));
+ await read('/work','app','diff',{file:'新 文件\n.md'});assert.ok(calls.at(-1).includes('--file=新 文件\n.md'));
+ await read('/work','app','diff',{file:'--literal.txt'});assert.ok(calls.at(-1).includes('--file=--literal.txt'));
+ await assert.rejects(read('/work','app','history',{query:'x'.repeat(201)}),/无效/);
+ await assert.rejects(read('/work','app','commit',{commit:'a\0b'}),/无效/);
+});

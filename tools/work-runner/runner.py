@@ -74,6 +74,7 @@ class Runner:
         self.auxiliary = None  # Credentials are ephemeral and never part of a run or client record.
         self.answers = {}
         self.admission = asyncio.Lock()
+        self.workspace_leases = {}
         for run in self.store.list():
             if run['state'] in BUSY:
                 run['elapsedSeconds'] += max(0, time.time()-run.get('attemptStartedAt', time.time()))
@@ -89,7 +90,7 @@ class Runner:
     async def dispatch(self, request):
         operation = request.get('op')
         if operation == 'status':
-            return {'installed': True, 'version': 4, 'scope': 'work-tools', 'automaticEvolution': True, 'evolutionAgent': 'auxiliary', 'workRoot': self.config['workRoot'], 'tools':[t['name'] for t in TOOLS+EXTRA_TOOLS]}
+            return {'installed': True, 'version': 4, 'workspaceLock':True, 'scope': 'work-tools', 'automaticEvolution': True, 'evolutionAgent': 'auxiliary', 'workRoot': self.config['workRoot'], 'tools':[t['name'] for t in TOOLS+EXTRA_TOOLS]}
         if operation == 'list':
             return self.store.list(request.get('root'))
         if operation == 'get':
@@ -99,6 +100,15 @@ class Runner:
                 raise ValueError('无效事件游标')
             return {'run': run, **self.store.events(run['id'], after)}
         async with self.admission:
+            if operation=='workspace-lock':
+                root=request.get('root');self.automatic.check_root(root)
+                owner=request.get('_connectionId')
+                if not owner:raise ValueError('工作区占用锁需要持有服务连接')
+                if root in self.workspace_leases and self.workspace_leases[root]!=owner:raise ValueError('此 Work 正在管理分支或工作树')
+                if any(r['root']==root and (r['state'] not in TERMINAL or still_alive(r.get('process'))) for r in self.store.list()):
+                    raise ValueError('此 Work 仍有未结束的后台任务，请先完成或取消')
+                self.workspace_leases[root]=owner
+                return {'locked':True}
             if operation == 'auxiliary-configure':
                 self.configure_auxiliary(request.get('auxiliary'))
                 return {'ready': bool(self.auxiliary)}
@@ -112,6 +122,7 @@ class Runner:
             if operation == 'create':
                 return await self.create(request)
             run = self.store.get(request.get('runId'))
+            if operation in ('resume','adopt','rollback') and run['root'] in self.workspace_leases:raise ValueError('此 Work 正在管理分支或工作树')
             if operation in ('adopt','rollback'):
                 if run['id'] in self.tasks or any(r['id']!=run['id'] and r['root']==run['root'] and r['state'] not in TERMINAL for r in self.store.list()):
                     raise ValueError('该 Work 仍有执行中的任务')
@@ -174,6 +185,7 @@ class Runner:
     async def create(self, request, automatic=None):
         key = text(request.get('requestKey'), '请求标识', 100)
         root = text(request.get('root'), 'Work 根', 4096)
+        if root in self.workspace_leases:raise ValueError('此 Work 正在管理分支或工作树')
         objective = text(request.get('objective'), '任务目标')
         acceptance = text(request.get('acceptance'), '验收标准', 8000)
         existing = self.store.by_request(key)
@@ -530,6 +542,7 @@ async def serve(directory, config):
                 request_id = None
                 try:
                     request = json.loads(line)
+                    request['_connectionId']=str(id(writer))
                     request_id = request.get('id')
                     result = await runner.dispatch(request)
                     reply = {'id': request_id, 'success': True, 'data': result}
@@ -540,6 +553,7 @@ async def serve(directory, config):
         except (ConnectionError, ValueError):
             pass
         finally:
+            runner.workspace_leases={root:owner for root,owner in runner.workspace_leases.items() if owner!=str(id(writer))}
             writer.close()
             await writer.wait_closed()
     server = await asyncio.start_unix_server(client, path=str(socket_path), limit=512*1024)

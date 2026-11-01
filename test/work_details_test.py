@@ -51,6 +51,32 @@ class WorkDetailsTest(unittest.TestCase):
         with self.assertRaises(ValueError):details.inspect_git(str(self.root),'app','checkout')
         self.meta['repo']=str(self.parent/'wrong');(self.root/'work.json').write_text(json.dumps({'version':1,'members':[self.meta]}))
         with self.assertRaises(ValueError):details.inspect_git(str(self.root),'app','changes')
+    def test_history_cursor_filter_refs_and_commit_diff_are_read_only(self):
+        for i in range(42):
+            self.git('-C',str(self.member),'commit','--allow-empty','-qm',f'entry {i} [literal]')
+        index=Path(self.git('-C',str(self.member),'rev-parse','--git-path','index')); before=index.read_bytes()
+        manifest=(self.root/'work.json').read_bytes()
+        first=details.inspect_git(str(self.root),'app','history',query='[literal]')
+        self.assertEqual(len(first['commits']),40); self.assertTrue(first['nextCursor'])
+        second=details.inspect_git(str(self.root),'app','history',cursor=first['nextCursor'],query='[literal]')
+        self.assertEqual(len(second['commits']),2)
+        self.assertFalse(set(c['oid'] for c in first['commits']) & set(c['oid'] for c in second['commits']))
+        refs=details.inspect_git(str(self.root),'app','refs')['branches']
+        self.assertTrue(any(b['name']=='feature' and b['current'] for b in refs))
+        self.assertIn('+base',details.inspect_git(str(self.root),'app','commit',commit=self.sha)['text'])
+        self.assertEqual(details.inspect_git(str(self.root),'app','compare',base='refs/heads/main')['text'],'')
+        self.assertEqual(index.read_bytes(),before); self.assertEqual((self.root/'work.json').read_bytes(),manifest)
+        self.git('-C',str(self.member),'commit','--allow-empty','-qm','external update')
+        with self.assertRaisesRegex(ValueError,'列表已变化'):
+            details.inspect_git(str(self.root),'app','history',cursor=first['nextCursor'],query='[literal]')
+        with self.assertRaises(ValueError):details.inspect_git(str(self.root),'app','commit',commit='--help')
+    def test_untracked_literal_file_diff_and_unborn_history(self):
+        name='新 文件[1]\n.md'; (self.member/name).write_text('new content\n',encoding='utf-8')
+        result=details.inspect_git(str(self.root),'app','diff',filename=name)
+        self.assertIn('+new content',result['text']); self.assertTrue(details.status(self.member)['files'][0]['untracked'])
+        self.git('-C',str(self.member),'checkout','--orphan','empty','-q')
+        result=details.inspect_git(str(self.root),'app','history')
+        self.assertEqual(result['commits'],[]);self.assertIsNone(result['nextCursor'])
     def test_rename_and_conflict_states(self):
         self.git('-C',str(self.member),'mv','tracked.txt','renamed file.txt');s=details.status(self.member)
         self.assertEqual(s['files'][0]['oldPath'],'tracked.txt');self.assertEqual(s['counts']['staged'],1)
