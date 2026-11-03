@@ -2,7 +2,7 @@ import type { OmpEvent } from './types';
 import {settledOutcome} from '../run-outcome.cjs';
 
 export type Message = { id: string; role: string; content: any; title?: string; intent?: string; args?: any; status?: string; startedAt?: number; endedAt?: number; streaming?: boolean; thinkingActive?: boolean; optimistic?: boolean; skill?: {name: string; path?: string} };
-export type Run = { active: boolean; phase: string; startedAt: number; updatedAt: number; endedAt?: number; detail?: string; tools: number; outcome?: 'completed' | 'aborted' | 'error' };
+export type Run = { active: boolean; phase: string; startedAt: number; updatedAt: number; endedAt?: number; detail?: string; tools: number; waitingMs?:number; waitingSince?:number; outcome?: 'completed' | 'aborted' | 'error' };
 export type Queued = { queue: 'steering' | 'followUp'; message: string };
 export type SessionView = { messages: Message[]; run: Run | null; queued: Queued[] };
 export const emptyView = (): SessionView => ({ messages: [], run: null, queued: [] });
@@ -70,7 +70,7 @@ export function projectEvent(view: SessionView, event: OmpEvent, now = Date.now(
     run = {...(run?.active ? run : {startedAt: now, tools: 0}), active: true, phase, detail, updatedAt: now};
   };
   const finish = (outcome: Run['outcome']) => {
-    if (run) run = {...run, active: false, outcome, phase: outcome || 'completed', endedAt: now, updatedAt: now};
+    if (run) run = {...run, active: false, outcome, phase: outcome || 'completed', endedAt: now, updatedAt: now,waitingMs:(run.waitingMs||0)+(run.waitingSince?now-run.waitingSince:0),waitingSince:undefined};
     messages = messages.map(m => m.streaming || m.status === '执行中' ? {...m, streaming: false, thinkingActive: false, endedAt: now, status: m.role === 'tool' ? (outcome === 'completed' ? '完成' : '已中断') : m.status} : m);
   };
   const upsert = (message: Message) => { messages = messages.some(x => x.id === message.id) ? messages.map(x => x.id === message.id ? {...x, ...message} : x) : [...messages, message]; };
@@ -81,7 +81,12 @@ export function projectEvent(view: SessionView, event: OmpEvent, now = Date.now(
   if (event.type === 'local_send_failed') { messages = messages.filter(x => x.id !== event.id || !x.optimistic); finish('error'); }
   if (event.type === 'local_command_complete') { messages = messages.map(m => m.id === event.id ? {...m, optimistic: false} : m); if (run?.active) finish('completed'); }
   if (event.type === 'local_stop') progress('stopping');
+  if(event.type==='local_input_wait'&&run?.active){
+    if(event.waiting&&!run.waitingSince)run={...run,waitingSince:now};
+    if(!event.waiting&&run.waitingSince)run={...run,waitingMs:(run.waitingMs||0)+now-run.waitingSince,waitingSince:undefined};
+  }
   if (event.type === 'local_stop_failed' && run) run = {...run, phase: 'waiting', updatedAt: now};
+  if (event.type === 'local_force_stopped') {finish('aborted');queued=[];}
   if (event.type === 'agent_start') progress('waiting');
   const user = event.type === 'message_start' && event.message ? userMessage(event.message) : null;
   if (user) {

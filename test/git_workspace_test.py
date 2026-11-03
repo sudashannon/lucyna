@@ -25,7 +25,7 @@ class GitWorkspaceTests(unittest.TestCase):
         self.git('-C',str(self.repo),'add','.');self.git('-C',str(self.repo),'commit','-qm','initial')
         (self.root/'repos').mkdir(parents=True);(self.root/'SESSION.md').write_text('# Test')
         self.git('-C',str(self.repo),'worktree','add','-qb','feature',str(self.member))
-        self.meta=dict(name='app',path='repos/app',repo=str(self.repo/'.git'),branch='feature',baseSha=self.git('-C',str(self.member),'rev-parse','HEAD'))
+        self.meta=dict(name='app',path='repos/app',repo=str(self.repo/'.git'),branch='feature',base='main',baseSha=self.git('-C',str(self.member),'rev-parse','HEAD'))
         (self.root/'work.json').write_text(json.dumps(dict(version=1,members=[self.meta])))
         self.service=workspace.GitWorkspace(self.base/'state')
 
@@ -140,6 +140,45 @@ class GitWorkspaceTests(unittest.TestCase):
         r=self.service.dispatch(str(self.root),'renamed','snapshot')
         result=self.service.dispatch(str(self.root),'renamed','worktree-remove',dict(operationId=uuid.uuid4().hex,expected=r['token']))
         self.assertEqual(result['status'],'completed',result);self.assertFalse((self.root/'repos/renamed').exists())
+
+    def test_lfs_review_checkout_and_switch_keep_pointers(self):
+        if subprocess.run(['git','lfs','version'],capture_output=True).returncode:
+            self.skipTest('Git LFS is unavailable')
+        repo, member = str(self.repo), str(self.member)
+        self.git('-C',repo,'lfs','install','--local','--skip-repo')
+        self.git('-C',member,'lfs','track','*.bin')
+        (self.member/'asset.bin').write_bytes(b'a'*1024**2)
+        self.git('-C',member,'add','.gitattributes','asset.bin')
+        self.git('-C',member,'commit','-qm','Add asset')
+        config = (self.repo/'.git/config').read_bytes()
+        result = self.act('worktree-create',name='review',branch='review',lfsMode='review')
+        self.assertEqual(result['status'],'completed',result)
+        asset = self.root/'repos/review/asset.bin'
+        self.assertLess(asset.stat().st_size,1024)
+        self.assertEqual((self.repo/'.git/config').read_bytes(),config)
+
+        self.git('-C',repo,'merge','--ff-only','feature')
+        (self.repo/'asset.bin').write_bytes(b'b'*2*1024**2)
+        self.git('-C',repo,'add','asset.bin')
+        self.git('-C',repo,'commit','-qm','Update asset')
+        self.git('-C',repo,'branch','review-next')
+        snapshot = self.service.dispatch(str(self.root),'review','snapshot')
+        self.assertEqual(snapshot['lfsMode'],'review')
+        result = self.service.dispatch(str(self.root),'review','branch-switch',
+            dict(branch='review-next',expected=snapshot['token'],operationId=uuid.uuid4().hex))
+        self.assertEqual(result['status'],'completed',result)
+        self.assertIn(b'size 2097152',asset.read_bytes())
+
+    def test_worktree_removal_refuses_ignored_files(self):
+        (self.member/'.gitignore').write_text('build.log\n')
+        self.git('-C',str(self.member),'add','.gitignore')
+        self.git('-C',str(self.member),'commit','-qm','Ignore build log')
+        output = self.member/'build.log'
+        output.write_text('Retain this evidence')
+        result = self.act('worktree-remove')
+        self.assertEqual(result['status'],'failed',result)
+        self.assertIn('忽略',result['result']['message'])
+        self.assertEqual(output.read_text(),'Retain this evidence')
 
     def test_fetch_and_push_to_local_bare_remote(self):
         remote=self.base/'remote.git';self.git('init','--bare','-q',str(remote));self.git('-C',str(self.member),'remote','add','origin',str(remote))

@@ -1,6 +1,20 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { wslUnc } = require('../src/backend.cjs');
+
+test('force-stop addresses only the captured WSL launch token and waits for the writer close event',async()=>{
+ const {EventEmitter}=require('node:events'),{OmpSession}=require('../src/backend.cjs');let finishKill,done=false;const calls=[];
+ const session=new OmpSession(()=>{},undefined,{executeTermination:(file,args)=>{calls.push({file,args});return new Promise(resolve=>finishKill=resolve);}});
+ const child=new EventEmitter();session.child=child;session.processRuntime='wsl';session.sessionToken='12345678-1234-1234-1234-123456789abc';
+ const pending=session.terminate().then(()=>done=true);assert.equal(calls[0].file,'wsl.exe');assert.equal(calls[0].args.at(-1),session.sessionToken);assert.ok(calls[0].args.some(x=>x.endsWith('/tools/terminate_wsl.py')));
+ finishKill();await Promise.resolve();assert.equal(done,false);child.emit('close');await pending;assert.ok(done);
+});
+
+test('force-stop failure never acknowledges that an active writer has exited',async()=>{
+ const {EventEmitter}=require('node:events'),{OmpSession}=require('../src/backend.cjs');
+ const session=new OmpSession(()=>{},undefined,{executeTermination:async()=>{throw Error('still alive');}});session.child=new EventEmitter();session.processRuntime='wsl';
+ await assert.rejects(session.terminate(),/still alive/);assert.ok(session.child);assert.equal(session.child.listenerCount('close'),0);
+});
 test('maps an allowed WSL work path to a UNC path', () => assert.equal(wslUnc('/home/user/develop/a'), '\\\\wsl.localhost\\Ubuntu-22.04\\home\\user\\develop\\a'));
 test('rejects traversal and paths outside the work root', () => { for (const value of ['/etc/passwd', '/home/user/develop/../secret', '/home/user/develop', 'C:\\temp']) assert.throws(() => wslUnc(value)); });
 test('closing a native session waits for process exit before a new session can start', async () => {

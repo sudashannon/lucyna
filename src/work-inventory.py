@@ -25,7 +25,7 @@ def git(root, *args):
 def inspect(root):
     root = Path(root).expanduser()
     issues = []
-    result = {'name': root.name, 'root': str(root), 'kind': 'work', 'members': [],
+    result = {'name': root.name, 'root': str(root), 'rootAvailable': False, 'kind': 'work', 'members': [],
               'issues': issues, 'paths': [str(root)], 'branch': '-', 'dirty': 0,
               'sessions': [], 'notes': [], 'state': '-', 'worktrees': 0, 'mergeState': 'unknown'}
 
@@ -48,6 +48,7 @@ def inspect(root):
         add('root_invalid', '工作根不存在、不是目录或为符号链接'); return finish()
     root = root.resolve()
     result['root'] = str(root)
+    result['rootAvailable'] = True
     try:
         content = (root / 'SESSION.md').read_text(encoding='utf-8')
         result['idleDays'] = max(0, int((time.time() - (root / 'SESSION.md').stat().st_mtime) // 86400))
@@ -136,7 +137,7 @@ def inspect(root):
 def safe_inspect(root):
     try: return inspect(root)
     except (OSError, ValueError, subprocess.SubprocessError) as e:
-        return {'name': root.name, 'root': str(root), 'kind': 'invalid', 'health': 'error',
+        return {'name': root.name, 'root': str(root), 'rootAvailable': False, 'kind': 'invalid', 'health': 'error',
                 'error': str(e), 'members': [], 'issues': [{'code': 'scan_failed', 'severity': 'error', 'message': str(e)}]}
 
 

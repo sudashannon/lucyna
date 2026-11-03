@@ -4,7 +4,7 @@
 
 当前目标平台是 **Windows 11 + WSL2**，开发验证使用 Ubuntu 22.04。需要 Windows Node.js 22.12+（建议 Node.js 24）、npm、Git，以及 WSL 内 Python 3.10+、Git 和可运行的 [OMP](https://github.com/can1357/oh-my-pi)。协议适配以 OMP 18.13.1 为基线；其他版本需要自行验证。Windows OMP 模式也需要 WSL，因为工作根、文件与终端仍由 WSL 承载。
 
-先在 WSL 终端独立验证 OMP 的模型认证和一次普通对话。客户端不会随仓库分发认证信息、Work 技能或 Stele 服务。
+先在 WSL 终端独立验证 OMP 的模型认证和一次普通对话。客户端不分发认证信息或 Work 技能；内置知识运行包的构建与使用见 [内部知识引擎](knowledge-managed-engine.md)。
 
 ## 安装
 
@@ -106,11 +106,11 @@ npm start
 
 ## Work + Stele（可选）
 
-核心会话、文件和终端不要求 Stele 在线。知识库与记忆功能需要已有 Stele 服务。当前集成协议与默认地址为 **WSL loopback `http://127.0.0.1:18989/mcp`**，这不是通用的任意 MCP 服务配置页。
+正式知识库现在默认使用 Lucyna 管理的内置 Windows Stele：进入「知识库管理」创建内部库、预览并复制导入文件夹。无需另装 Stele/Bun，也不要求 WSL Stele 在线。运行包须包含构建生成的引擎和向量资源，见 [构建与使用说明](knowledge-managed-engine.md)。原 WSL `http://127.0.0.1:18989/mcp` 作为既有环境保留；旧数据不自动迁移。
 
-自动安装适配前，确认 `skillDirectory/worktree-session/scripts/worktree-work.py` 和原生 OMP 的 `commands/work-{start,continue,review,end}.md` 已存在，且 Stele 服务已配置。将 `installWorkIntegration` 设为 `true` 后，启动会添加受管理的桥接配置；安装/恢复逻辑会校验内容，避免覆盖手工修改。该功能不安装或启动 Stele，也不附带 Work 技能本体。
+自动安装 Work 适配前，确认 `skillDirectory/worktree-session/scripts/worktree-work.py` 和原生 OMP 的 `commands/work-{start,continue,review,end}.md` 已存在。将 `installWorkIntegration` 设为 `true` 后，准备新的 Windows OMP 连接时会将受管理的 Work/Stele 桥接接入内部知识服务；已知旧配置可升级，手工修改的配置仍保留。该功能不附带 Work 技能本体，也不全局替换 WSL/SSH profile。
 
-Work 保存当前任务、SESSION 与共享笔记；L3 长期知识交给 Stele，读取和受控写入通过 MCP 提供给 agent。知识库界面通过主进程的固定操作接口接入 Stele，包含检索、图谱、来源资料、候选/复核、待办、报告、问答和恢复。文档编辑使用强 ETag，候选和复核提交服务端当前版本；冲突时保留编辑并提示重新核对。模型生成在明确点击后执行，使用 Stele 已配置的模型。恢复先预览范围和冲突、暂存归档，Stele 下次启动时应用。
+Work 保存当前任务、SESSION 与共享笔记；内部知识库由 Lucyna 管理正文与版本，由 Stele 提供检索和知识语义。读取与受控写入通过原生 MCP 提供给 agent。界面编辑使用强 ETag，候选和复核提交输入版本；冲突时保留编辑。模型生成仍需知识模型配置。现有外部恢复包、删除/死链修复和镜像同步尚未加入内部版本事务，受管模式拒绝这些写操作；完整迁移、备份和同步按后续阶段推进。
 
 ## 数据与回退
 

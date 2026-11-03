@@ -4,10 +4,11 @@ import {EvolutionView,FileChanges,RunStages,type Evolution,type FileDelta} from 
 import {Modal} from './Modal';
 import '../work-runs.css';
 
-type Run={id:string;root:string;objective:string;acceptance:string;state:string;reason:string;createdAt:number;updatedAt:number;tokenBudget:number;usedTokens:number|null;elapsedSeconds:number;wallSeconds:number;attemptStartedAt?:number;sessionId?:string;effectiveModel?:{id?:string;name?:string;provider?:string};model:string;result:string;question?:{key:string;text:string};verification?:{passed:boolean|null;output:string};mode?:string;phase?:string;evolution?:Evolution;changes?:FileDelta[];automatic?:{trigger:string}};
+type Run={id:string;root:string;objective:string;acceptance:string;state:string;reason:string;createdAt:number;updatedAt:number;tokenBudget:number|null;usedTokens:number|null;elapsedSeconds:number;wallSeconds:number;attemptStartedAt?:number;sessionId?:string;effectiveModel?:{id?:string;name?:string;provider?:string};model:string;result:string;question?:{key:string;text:string};verification?:{passed:boolean|null;output:string};mode?:string;phase?:string;evolution?:Evolution;changes?:FileDelta[];automatic?:{trigger:string}};
 type Check={argv:string[];cwd:string;files:string[]};
-type AutoProfile={objective:string;acceptance:string;model:string;tokenBudget:number;wallSeconds:number;evolution:{targets:string[];iterations:number;training:Check;validation:Check}};
-type Automation={enabled:boolean;status:string;label:string;message:string;profile:AutoProfile|null;nextAt?:number;lastRunId?:string;runsToday:number;dailyLimit:number;idleSeconds:number;cooldownSeconds:number};
+type AutoProfile={objective:string;acceptance:string;model:string;tokenBudget:number|null;wallSeconds:number;evolution:{targets:string[];iterations:number;training:Check;validation:Check;prepared?:string;inputs?:string[]}};
+type Preparation={id:string;state:string;message:string;usedTokens:number;tokenBudget:number|null;usageEstimated?:boolean;sources?:string[];evidence?:{purpose:string;path:string;quote:string}[];baseline?:{training:number;validation:number};controls?:{label:string;expected:string;scores:{training:number;validation:number}}[]};
+type Automation={enabled:boolean;status:string;label:string;message:string;profile:AutoProfile|null;preparation?:Preparation;preparationsToday?:number;profileOrigin?:string;nextAt?:number;lastRunId?:string;runsToday:number;dailyLimit:number;idleSeconds:number;cooldownSeconds:number};
 type Event={seq:number;time:number;type:string;message:string;path?:string;paths?:string[];output?:string};
 const states:Record<string,string>={queued:'排队中',starting:'正在启动',running:'执行中',waiting_user:'等待答复',stopping:'正在停止',verifying:'正在验收',completed:'已完成',waiting_review:'待人工验收',paused:'已暂停',interrupted:'执行中断',failed:'失败',cancelled:'已取消'};
 const reasons:Record<string,string>={service_restarted:'服务重启，已有改动保留；检查 Work 后可恢复。',execution_error:'执行发生异常，详情见事件记录。',wall_budget:'执行时间预算已用完。',verification_failed:'固定检查未通过，可根据结果继续修复。',native_goal_stopped:'原生目标已停止推进，请检查进度与预算。'};
@@ -24,6 +25,8 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
   const [validationCommand,setValidationCommand]=useState(''),[validationFiles,setValidationFiles]=useState(''),[validationCwd,setValidationCwd]=useState('.');
   const [expanded,setExpanded]=useState(false);
   const [automatic,setAutomatic]=useState<Automation|null>(null),[autoError,setAutoError]=useState(''),[configureAuto,setConfigureAuto]=useState(false);
+  const [clarification,setClarification]=useState('');
+  const preparing=automatic?.status==='preparing',preparation=automatic?.preparation;
   const cursor=useRef(0),requestKey=useRef(''),selection=useRef(''),alive=useRef(true),refreshing=useRef(false);
   const current=runs.find(r=>r.id===selected),occupied=runs.some(r=>!terminal.has(r.state));
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
@@ -70,7 +73,7 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
     }catch(e){setError(String(e));}finally{if(alive.current)setBusy('');}
   };
   const setupAutomatic=()=>{
-    const p=automatic?.profile;
+    const p=automatic?.profile?.evolution.prepared?null:automatic?.profile;
     setObjective(p?.objective||'改进当前 Work 的局部执行流程，提高独立检查通过率');setAcceptance(p?.acceptance||'留出检查全部通过且优于基线，保存候选与证据，等待人工采纳');
     setModel(p?.model||'');setTokens(String(p?.tokenBudget||100000));setMinutes(String((p?.wallSeconds||1800)/60));
     setTargets(p?.evolution.targets.join('\n')||'');setIterations(String(p?.evolution.iterations||2));
@@ -79,15 +82,27 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
     setConfigureAuto(true);setMode('evolution');setShowForm(true);setError('');
   };
   const toggleAutomatic=async()=>{setBusy('automatic');try{setAutomatic(await api.workRun('automatic-configure',{root,enabled:!automatic?.enabled}));setAutoError('');}catch(e){setAutoError(String(e));}finally{setBusy('');}};
+  const prepareAutomatic=async()=>{setBusy('prepare');try{setAutomatic(await api.workRun('automatic-prepare',{root,clarification}));setClarification('');setAutoError('');}catch(e){setAutoError(String(e));}finally{if(alive.current)setBusy('');}};
   const content=<section className="work-runs" hidden={!active} aria-label="Work 后台任务">
     {!showForm&&<><section className={`wr-automatic wr-auto-${automatic?.status||'loading'}`} aria-label="自动进化" aria-live="polite">
       <div className="wr-section-title"><strong><span className="wr-auto-dot"/>自动进化</strong><span>{automatic?.enabled?'已开启':automatic?'已暂停':'正在连接'}</span></div>
       <h3>{automatic?.label||'正在读取自动调度状态…'}</h3><p>{automatic?.message||'有新变化且空闲时自动比较候选，采纳由你确认。'}</p>
-      <ol className="wr-auto-flow" aria-label="自动进化流程"><li>检测变化</li><li>空闲评估</li><li>比较候选</li><li>你来采纳</li></ol>
+      <ol className="wr-auto-flow" aria-label="自动进化流程"><li aria-current={preparing&&preparation?.state==='reading'?'step':undefined}>读取文档</li><li aria-current={preparing&&preparation?.state==='checking'?'step':undefined}>验证评测</li><li aria-current={automatic?.status==='running'?'step':undefined}>自动迭代</li><li aria-current={automatic?.status==='review'?'step':undefined}>你来采纳</li></ol>
       {automatic&&<p className="wd-caption">空闲 {automatic.idleSeconds} 秒 · 间隔至少 {automatic.cooldownSeconds/60} 分钟 · 近 24 小时 {automatic.runsToday} / {automatic.dailyLimit} 次{automatic.nextAt&&automatic.nextAt>Date.now()/1000?<> · 最早 {date(automatic.nextAt)}</>:null}</p>}
       {automatic?.profile&&<p className="wr-auto-targets">优化对象：{automatic.profile.evolution.targets.join('、')}</p>}
+      {!automatic?.profile&&<p className="wd-caption">内嵌 agent 会从 SESSION.md 与相关文档准备目标、文件范围和检查。通过试跑后自动运行；缺少信息时在这里提示。</p>}
+      {preparation&&<details className="wr-preparation" open={preparing||automatic?.status==='needs_input'||undefined}><summary>评测准备 · {preparation.state==='ready'?'已验证':preparing?'进行中':'查看记录'}</summary>
+        <p>{preparation.message}</p><p className="wd-caption">准备已用 {preparation.usedTokens.toLocaleString()} Token · {preparation.tokenBudget===null?'不设 Token 上限':`上限 ${preparation.tokenBudget.toLocaleString()}`}{preparation.usageEstimated?(preparation.tokenBudget===null?'（中断请求用量可能不完整）':'（含中断请求的预留预算）'):''} · 近 24 小时 {automatic?.preparationsToday??0} / 2 次</p>
+        {preparing&&<progress aria-label="正在准备评测"/>}
+        {!!preparation.sources?.length&&<p className="wd-caption">已读取：{preparation.sources.join('、')}</p>}
+        {preparation.evidence?.map((item,i)=><blockquote key={i}><p>{item.quote}</p><cite>{item.purpose==='objective'?'目标依据':'验收依据'} · {item.path}</cite></blockquote>)}
+        {preparation.baseline&&<p>基线试跑：训练 {Math.round(preparation.baseline.training*100)}% · 留出 {Math.round(preparation.baseline.validation*100)}%</p>}
+        {preparation.controls?.map((control,i)=><p key={i}>{control.label}：{control.expected==='pass'?'正确行为通过':'错误行为被识别'}</p>)}
+      </details>}
+      {automatic?.profile?.evolution.prepared&&<details><summary>查看自动生成的配置</summary><p>{automatic.profile.objective}</p><p>{automatic.profile.acceptance}</p><p className="wd-caption">实验输入 {automatic.profile.evolution.inputs?.length??0} 个文件 · {automatic.profile.tokenBudget===null?'不设 Token 上限':`每次最多 ${automatic.profile.tokenBudget.toLocaleString()} Token`} · {automatic.profile.wallSeconds/60} 分钟</p><p className="wd-caption">评测已冻结。重新准备可更新评测，手动配置会替换自动配置。</p><pre>{JSON.stringify({training:automatic.profile.evolution.training,validation:automatic.profile.evolution.validation},null,2)}</pre></details>}
+      {['needs_input','preparation_failed'].includes(automatic?.status||'')&&<label>补充目标或运行条件<textarea value={clarification} onChange={e=>setClarification(e.target.value)} maxLength={4000} placeholder="补充上方缺少的信息；也可更新 Work 文档后重新准备" disabled={!!busy}/></label>}
       {autoError&&<p role="alert" className="error-text">自动调度未就绪：{autoError}</p>}
-      <div className="wr-actions"><button disabled={!!busy||!loaded} onClick={setupAutomatic}>{automatic?.profile?'调整评测配置':'配置一次评测'}</button>{automatic&&<button disabled={!!busy} onClick={()=>void toggleAutomatic()}>{automatic.enabled?'暂停后续实验':'开启自动进化'}</button>}{automatic?.lastRunId&&runs.some(r=>r.id===automatic.lastRunId)&&<button onClick={()=>{choose(automatic.lastRunId!);setExpanded(true);}}>查看最近结果</button>}</div>
+      <div className="wr-actions"><button disabled={!!busy||!loaded||preparing||occupied||(automatic?.preparationsToday??0)>=2} onClick={()=>void prepareAutomatic()}>{busy==='prepare'?'正在安排…':preparation||automatic?.profile?'重新准备评测':'从 Work 文档准备'}</button><button disabled={!!busy||!loaded||preparing} onClick={setupAutomatic}>{automatic?.profile&&!automatic.profile.evolution.prepared?'调整评测配置':'手动配置'}</button>{automatic&&<button disabled={!!busy} onClick={()=>void toggleAutomatic()}>{automatic.enabled?(preparing?'暂停准备与后续实验':'暂停后续实验'):'开启自动进化'}</button>}{automatic?.lastRunId&&runs.some(r=>r.id===automatic.lastRunId)&&<button onClick={()=>{choose(automatic.lastRunId!);setExpanded(true);}}>查看最近结果</button>}</div>
     </section><p className="wd-caption">进化实验在副本中自动运行，不中断普通会话，也不会自动采纳。关闭客户端后服务继续检查已配置的 Work。</p>
     <div className="wr-capabilities"><span>Work 内迭代</span><span>技能 / L3 只读</span><span>候选可回退</span></div>
     {!expanded&&<button className="wr-expand" onClick={()=>setExpanded(true)}>放大查看任务与实验</button>}</>}
@@ -117,11 +132,11 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
     {current&&<article className="wr-run">
       <div className={`wr-heading wr-state-${current.state}`} role="status" aria-live="polite"><strong>{current.mode==='evolution'&&current.state==='waiting_review'?'候选待采纳':states[current.state]||current.state}</strong><span>{current.evolution?.agent==='auxiliary'?'本地 agent':current.mode==='evolution'&&!current.effectiveModel?'等待 agent':'WSL OMP'} · {current.effectiveModel?.name||current.effectiveModel?.id||current.model||'默认模型'}</span></div>
       <RunStages state={current.state} phase={current.phase} evolution={current.mode==='evolution'}/>
-      {current.automatic&&<p className="wr-auto-origin">自动触发 · Work 有新变化且已空闲 · 候选等待你确认采纳</p>}
-      <h3>{current.objective}</h3><p className="wd-caption">{current.acceptance}</p>
-      <p className="wd-caption">Token {current.usedTokens??'未知'} / {current.tokenBudget} · 已执行 {Math.round(current.elapsedSeconds+(current.attemptStartedAt?Math.max(0,Date.now()/1000-current.attemptStartedAt):0))} 秒 / {current.wallSeconds} 秒<br/>更新于 {date(current.updatedAt)}</p>
-      <label className="wr-meter">Token 预算用量 <progress max={current.tokenBudget} value={current.usedTokens??0}/></label>
-      {current.evolution?.usageEstimated&&<p className="wd-caption">含中断调用的预留预算：缺失最终用量时按该次上限计入，不是精确账单。</p>}
+      {current.automatic&&<p className="wr-auto-origin">自动触发 · Work 有新变化且已空闲{current.state==='waiting_review'?' · 候选等待你确认采纳':''}</p>}
+      {current.objective.length>200||current.acceptance.length>300?<details className="wr-goal"><summary>查看完整目标与验收标准</summary><h3>{current.objective}</h3><p className="wd-caption">{current.acceptance}</p></details>:<><h3>{current.objective}</h3><p className="wd-caption">{current.acceptance}</p></>}
+      <p className="wd-caption">Token {current.usedTokens??'未知'} / {current.tokenBudget??'不限'} · 已执行 {Math.round(current.elapsedSeconds+(current.attemptStartedAt?Math.max(0,Date.now()/1000-current.attemptStartedAt):0))} 秒 / {current.wallSeconds} 秒<br/>更新于 {date(current.updatedAt)}</p>
+      {current.tokenBudget!==null&&<label className="wr-meter">Token 预算用量 <progress max={current.tokenBudget} value={current.usedTokens??0}/></label>}
+      {current.evolution?.usageEstimated&&<p className="wd-caption">{current.tokenBudget===null?'中断调用可能缺少最终用量；这里只显示已知用量，不是完整账单。':'含中断调用的预留预算：缺失最终用量时按该次上限计入，不是精确账单。'}</p>}
       {reasons[current.reason]&&<p className="wd-warning">{reasons[current.reason]}</p>}
       {current.state==='interrupted'&&<p className="wd-caption">{current.mode==='evolution'?'恢复会读取已保存的候选与评估记录；未完成的候选保留作诊断，重新提出候选可能消耗额外预算。':'恢复会复用原会话。请先检查 Work 中已发生的修改；未落盘的工具结果不会自动重放。'}</p>}
       <div className="wr-actions">

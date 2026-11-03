@@ -51,9 +51,9 @@ class Scheduling(unittest.IsolatedAsyncioTestCase):
     def end(self, run, state='completed', reason='no_improvement'):
         run.update(state=state, reason=reason); self.runner.store.save(run)
 
-    async def test_missing_configuration_never_invokes_model_and_cannot_escape_work(self):
+    async def test_missing_configuration_waits_for_idle_and_cannot_escape_work(self):
         await self.sync(); await self.auto.tick()
-        self.assertEqual(self.auto.view(str(self.root))['status'],'needs_profile'); self.assertEqual(self.launched,[])
+        self.assertEqual(self.auto.view(str(self.root))['status'],'stabilizing'); self.assertEqual(self.launched,[])
         with self.assertRaises(ValueError):self.auto.configure({'root':'/else','enabled':True})
         self.profile['evolution']['targets']=['holdout.py']
         with self.assertRaises(ValueError):self.configure()
@@ -110,6 +110,21 @@ class Scheduling(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.auto.view(str(self.root))['status'],'blocked'); self.assertEqual(len(self.launched),1)
         run.update(automaticRetries=2); self.runner.store.save(run); self.now+=61; await self.auto.tick()
         self.assertIn('上限',self.auto.view(str(self.root))['message']); self.assertEqual(len(self.launched),1)
+
+    async def test_unlimited_evolution_recovers_after_large_usage_but_tasks_still_require_budget(self):
+        with self.assertRaisesRegex(ValueError,'预算'):
+            await self.runner.create({'requestKey':'ordinary','root':str(self.root),'objective':'Task','acceptance':'Review','tokenBudget':None})
+        self.profile['tokenBudget']=None
+        self.configure();run=await self.trigger()
+        run['usedTokens']=750000;self.end(run,'interrupted','service_restarted')
+        folder=self.directory/'runs'/run['id']/'evolution';folder.mkdir(parents=True)
+        (folder/'request.json').write_text(json.dumps({'hashes':snapshot(str(self.root))}))
+        await self.auto.tick();self.now+=61;await self.auto.tick()
+        self.assertEqual(self.launched[-1],(run['id'],True))
+        saved=self.runner.store.get(run['id'])
+        self.assertIsNone(saved['tokenBudget']);self.assertEqual(saved['usedTokens'],750000)
+        self.end(saved,'paused','user_stop');self.now+=1000;await self.auto.tick()
+        self.assertEqual(len(self.launched),2)
 
     async def test_manual_interruption_is_never_automatically_replayed(self):
         self.configure(); run=await self.trigger(); run.pop('automatic'); self.end(run,'interrupted','service_restarted')

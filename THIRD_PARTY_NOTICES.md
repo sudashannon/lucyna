@@ -10,6 +10,8 @@ The original [LICENSE](src/renderer/vendor/cindy/LICENSE), [NOTICE](src/renderer
 
 [oh-my-pi](https://github.com/can1357/oh-my-pi) is an external runtime installed by the user; Lucyna invokes its native RPC protocol. Its agent runtime is not vendored here.
 
+The optional task-monitoring installer builds a separate OMP v18.15.0 runtime from commit `3fedf8d53267e32a6d7521ce725fdcc4a36fdc67`, with the RPC patch in `tools/omp-runtime`. The upstream [MIT license](tools/omp-runtime/OMP-LICENSE) is retained alongside the patch and installed executable. The installer pins and verifies its Bun compiler and native-addon downloads; it does not replace the system OMP.
+
 Electron, React, Radix UI, Tailwind CSS, Lucide, Streamdown, KaTeX, Mermaid, xterm.js and other npm dependencies retain their respective licenses. Versions are pinned in `package-lock.json`; consult each package's license when redistributing a bundled application.
 
 ## Vercel AI SDK
@@ -19,6 +21,10 @@ Lucyna's independent auxiliary agent uses [AI SDK](https://github.com/vercel/ai)
 ## Cytoscape.js
 
 Knowledge graph rendering uses [Cytoscape.js](https://github.com/cytoscape/cytoscape.js), copyright The Cytoscape Consortium, under the MIT license. Its license is retained in the installed package and must accompany distributions. Lucyna supplies its own interface, styling, data adapter and graph interactions.
+
+## Embedded knowledge engine
+
+The selected Stele backend is retained in `third_party/stele`, with original source hashes in `UPSTREAM.json` and the Lucyna integration changes in the same source tree. Its original web UI and user data are excluded. The bundled `@ternlight/base` 0.1.0 Node/WASM embedding package retains its MIT license at [third_party/ternlight-base/LICENSE](third_party/ternlight-base/LICENSE); its model and tokenizer are embedded in the WASM resource. Lucyna does not replace upstream component licensing with its application license.
 
 ## AntOmniEvo (optional runtime)
 

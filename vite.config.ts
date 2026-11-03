@@ -6,7 +6,7 @@ export default defineConfig({
   resolve: { alias: { '@cindy': path.resolve('src/renderer/vendor/cindy') } },
   // The running desktop can still reference an older hashed asset. The normal
   // build command stages and publishes atomically; direct Vite builds also retain it.
-  build: { commonjsOptions:{include:[/node_modules/,/run-outcome\.cjs$/]}, outDir: '../../dist/renderer', emptyOutDir: false, assetsInlineLimit: 0, rollupOptions: {output: {manualChunks(id) {
+  build: { commonjsOptions:{include:[/node_modules/,/run-outcome\.cjs$/,/work-knowledge-policy\.cjs$/]}, outDir: '../../dist/renderer', emptyOutDir: false, assetsInlineLimit: 0, rollupOptions: {output: {manualChunks(id) {
     if (!id.includes('node_modules')) return;
     if (id.includes('@xterm')) return 'terminal';
     if (/react-markdown|highlight|remark|rehype|micromark|hast|unist|mdast/.test(id)) return 'markdown';

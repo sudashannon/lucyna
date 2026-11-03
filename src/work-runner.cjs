@@ -6,7 +6,7 @@ const runtime=require('./runtime-config.cjs');
 const {waitForStartup}=require('./startup-control.cjs');
 const {toWslPath}=require('./client-settings.cjs');
 const TERMINAL=new Set(['completed','cancelled','failed']);
-const OPERATIONS=new Set(['status','list','get','create','pause','cancel','resume','answer','accept','adopt','rollback','automatic-status','automatic-configure']);
+const OPERATIONS=new Set(['status','list','get','create','pause','cancel','resume','answer','accept','adopt','rollback','automatic-status','automatic-configure','automatic-prepare']);
 const script=toWslPath(path.resolve(__dirname,'../tools/work-runner/cli.py'));
 const state=runtime.home+'/.local/state/lucyna/work-runner';
 
@@ -109,7 +109,7 @@ class WorkRunner {
   async call(op,data={}){
     if(!OPERATIONS.has(op)||!data||typeof data!=='object'||Array.isArray(data)||JSON.stringify(data).length>128000)throw Error('无效后台任务请求');
     // No arbitrary RPC passthrough, executable, environment or state-directory fields.
-    const allowed={status:[],list:['root'],get:['runId','after'],create:['root','requestKey','objective','acceptance','verification','model','tokenBudget','wallSeconds','mode','evolution'],pause:['runId'],cancel:['runId'],resume:['runId'],answer:['runId','answerKey','answer'],accept:['runId'],adopt:['runId'],rollback:['runId'],'automatic-status':['root'],'automatic-configure':['root','enabled','profile']}[op];
+    const allowed={status:[],list:['root'],get:['runId','after'],create:['root','requestKey','objective','acceptance','verification','model','tokenBudget','wallSeconds','mode','evolution'],pause:['runId'],cancel:['runId'],resume:['runId'],answer:['runId','answerKey','answer'],accept:['runId'],adopt:['runId'],rollback:['runId'],'automatic-status':['root'],'automatic-configure':['root','enabled','profile'],'automatic-prepare':['root','clarification']}[op];
     if(Object.keys(data).some(k=>!allowed.includes(k)))throw Error('不支持的后台任务参数');
     if(op==='list'||op==='create'||op.startsWith('automatic-')){
       const work=typeof data.root==='string'&&(await this.listWorks()).find(w=>w.root===data.root);

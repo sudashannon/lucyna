@@ -44,7 +44,11 @@
     "screenshots": "electron test/screenshot-gallery.cjs",
     "pet:preview": "electron tools/show-pet-animation.cjs",
     "icons:build": "electron tools/build-app-icons.cjs",
-    "start:legacy": "node tools/launch-legacy.cjs"
+    "start:legacy": "node tools/launch-legacy.cjs",
+    "test:knowledge:managed": "node test/knowledge-managed-native.cjs",
+    "test:knowledge:managed-ui": "electron test/knowledge-managed-desktop.cjs",
+    "test:work:knowledge-ui": "electron test/work-knowledge-desktop.cjs",
+    "knowledge:migrate-wsl": "node tools/migrate-wsl-knowledge.cjs"
   },
   "devDependencies": {
     "@types/react": "19.0.0",
@@ -82,8 +86,11 @@
     "react-diff-view": "3.3.2",
     "react-dom": "19.0.0",
     "react-i18next": "16.3.5",
+    "remark-parse": "11.0.0",
     "streamdown": "2.7.1",
-    "tailwind-merge": "2.6.0"
+    "tailwind-merge": "2.6.0",
+    "undici": "7.30.1",
+    "unified": "11.0.5"
   },
   "repository": {
     "type": "git",

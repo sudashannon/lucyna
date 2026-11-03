@@ -1,5 +1,5 @@
 export interface KnowledgeDocument {id:string;title:string;path:string;workspace:string;type:string;updatedAt?:string;frontmatter?:Record<string,unknown>}
-export interface KnowledgeWorkspace {alias:string;path:string;modelProvider?:string;purpose?:{goal?:string;keyQuestions?:string[];scope?:string}}
+export interface KnowledgeWorkspace {alias:string;name?:string;path:string;modelProvider?:string;purpose?:{goal?:string;keyQuestions?:string[];scope?:string}}
 export interface KnowledgeCatalog {documents:KnowledgeDocument[];workspaces:KnowledgeWorkspace[];fetchedAt:string}
 export interface KnowledgeEdge {from:string;to:string;kind:string;source:string}
 export interface KnowledgeGraphData {components:KnowledgeDocument[];edges:KnowledgeEdge[];communities?:Record<string,number>;communityLabels?:Record<string,string>}

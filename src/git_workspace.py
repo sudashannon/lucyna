@@ -151,7 +151,7 @@ def snapshot(member, meta, file=''):
     busy = [name for name in ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply') if git_path(member, name).exists()]
     return dict(kind='snapshot', token=digest(canonical(state).encode()), head=head, ref=ref, index=before,
                 counts=current['counts'], files=current['files'], truncated=current['truncated'],
-                busy=busy, checkedAt=details.now(), file=file)
+                busy=busy, checkedAt=details.now(), file=file, lfsMode=meta.get('lfsMode','normal'))
 
 
 def patch_catalog(member, meta, file, scope):
@@ -340,6 +340,8 @@ class GitWorkspace:
     def dispatch(self, root, name, action, options=None):
         options=options or {}
         if not isinstance(options,dict):raise ValueError('无效 Git 参数')
+        if 'lfsMode' in options and (action!='worktree-create' or options['lfsMode'] not in ('normal','review')):
+            raise ValueError('无效 LFS 检出方式')
         root=details.work_root(root)
         if action in ('operation','acknowledge','operations'):
             if action=='operations':
@@ -463,15 +465,17 @@ class GitWorkspace:
         index=next(i for i,m in enumerate(manifest['members']) if m['name']==meta['name'])
         branch=o.get('branch','')
         result=dict(message='操作完成')
+        review_env={'GIT_LFS_SKIP_SMUDGE':'1'}
+        checkout_env=review_env if meta.get('lfsMode')=='review' else None
         if action.startswith('branch-'):
             branch=branch_name(member,branch)
             if action=='branch-create':command(member,'branch','--',branch,snap['head'])
             elif action=='branch-switch':
-                command(member,'switch','--no-guess','--',branch)
+                command(member,'switch','--no-guess','--',branch,env=checkout_env)
                 manifest['members'][index]['branch']=branch
             else:
                 oid=details.resolve_commit(member,'refs/heads/'+branch)
-                command(member,'merge','--ff-only','--',oid)
+                command(member,'merge','--ff-only','--',oid,env=checkout_env)
             result['branch']=branch
         else:
             newname=o.get('name','')
@@ -481,14 +485,20 @@ class GitWorkspace:
                 if target.exists() or target.is_symlink() or any(m['name']==newname for m in manifest['members']):raise ValueError('目标成员或目录已经存在')
             if action=='worktree-create':
                 branch=branch_name(member,branch)
-                command(member,'worktree','add','-b',branch,'--',str(target),snap['head'])
-                manifest['members'].append(dict(name=newname,path='repos/'+newname,repo=meta['repo'],branch=branch,base=meta.get('branch'),baseSha=snap['head'],mr=None))
+                review=o.get('lfsMode')=='review'
+                command(member,'worktree','add','-b',branch,'--',str(target),snap['head'],env=review_env if review else None)
+                entry=dict(name=newname,path='repos/'+newname,repo=meta['repo'],branch=branch,base=meta.get('branch'),baseSha=snap['head'],mr=None)
+                if review:
+                    entry['lfsMode']='review'
+                    result['message']='已创建审阅工作树，LFS 资产按需下载'
+                manifest['members'].append(entry)
             elif action=='worktree-move':
                 command(member,'worktree','move','--',str(member),str(target))
                 manifest['members'][index].update(name=newname,path='repos/'+newname)
                 result['member']=newname
             else:
-                # No --force: Git refuses dirty, locked or untracked trees.
+                if command(member,'ls-files','--others','--ignored','--exclude-standard','--directory','-z'):
+                    raise ValueError('工作树有 Git 忽略的文件，请先在 Work 收尾中归档并核对')
                 command(member,'worktree','remove','--',str(member))
                 del manifest['members'][index];result['removed']=True
         if canonical(manifest)!=canonical(json.loads(original)):

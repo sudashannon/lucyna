@@ -11,11 +11,13 @@ import {Document} from './Document';
 import {FileBrowser} from './FileBrowser';
 import {WorkRuns} from './WorkRuns';
 import {Modal} from './Modal';
+import {classifyWorkAsset} from '../../work-knowledge-policy.cjs';
 import '../work-details.css';
 
+type WorkMaterial={id:string;root:string;relative:string;title:string;category:string;metadata:{createdAt:string;sourceHash?:string;snapshot:boolean;policy:{label:string;reason:string}}};
 const time=(value?:string)=>value?new Date(value).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'未记录';
 const short=(value?:string)=>value?.slice(0,10)||'—';
-const assetLabels={note:'共享笔记 · L1',log:'会话日志 · L2',script:'可复用脚本',evidence:'引用证据'};
+const assetLabels={note:'工作笔记 · L1',log:'会话日志 · L2',script:'可复用脚本',evidence:'引用证据'};
 const states:Record<string,string>={active:'进行中',paused:'已暂停',delivered:'已交付',merged:'已合并',archived:'已归档',abandoned:'已放弃'};
 type Props={work:Work;active:boolean;connections?:number;onConnections?:()=>void;history:HistoryEntry[];onOpen:(file:FilePreview)=>void;onGit?:(member:string,action:string,scope:string)=>void;onResume:(entry:HistoryEntry)=>void;onCommand:(command:string)=>void;onMemory:(query:string)=>void;onError:(error:unknown)=>void};
 
@@ -23,13 +25,23 @@ export function WorkDetails({work,active,connections,onConnections,history,onOpe
   const [cache,setCache]=useState<Record<string,WorkDetail>>({}),[tabs,setTabs]=useState<Record<string,string>>({}),[queries,setQueries]=useState<Record<string,string>>({});
   const [loading,setLoading]=useState(''),[error,setError]=useState(''),[revision,setRevision]=useState(0),[expanded,setExpanded]=useState<Record<string,boolean>>({});
   const [inspect,setInspect]=useState<{root:string;member:WorkMember;action:string;scope:string}|null>(null),[directory,setDirectory]=useState(''),[opening,setOpening]=useState('');
+  const [materials,setMaterials]=useState<Record<string,WorkMaterial[]>>({}),[materialError,setMaterialError]=useState(''),[savingMaterial,setSavingMaterial]=useState(''),[materialNotice,setMaterialNotice]=useState('');
+  useEffect(()=>{if(!active||tabs[work.root]!=='assets')return;let live=true;void api.knowledgeRequest('workAssetList',{root:work.root}).then(rows=>{if(live)setMaterials(old=>({...old,[work.root]:rows}));}).catch(e=>{if(live)setMaterialError(String(e));});return()=>{live=false;};},[active,work.root,tabs]);
+  const saveMaterial=async(asset:WorkAsset)=>{const root=work.root;setSavingMaterial(asset.path);setMaterialError('');setMaterialNotice('');try{await api.knowledgeRequest('workAssetCapture',{root,path:asset.path});const rows=await api.knowledgeRequest('workAssetList',{root});setMaterials(old=>({...old,[root]:rows}));if(rootNow.current===root)setMaterialNotice('已保存：'+(asset.title||asset.name)+'。仅属于当前 Work。');}catch(e){if(rootNow.current===root)setMaterialError(String(e));}finally{if(rootNow.current===root)setSavingMaterial('');}};
+  const readMaterial=async(item:WorkMaterial)=>{try{
+    const saved=await api.knowledgeRequest('workAssetRead',{root:item.root,id:item.id});if(rootNow.current!==item.root)return;
+    const extension=item.relative.split('.').pop()?.toLowerCase();
+    if(saved.base64&&['png','jpg','jpeg','webp','gif'].includes(extension||'')){onOpen({kind:'image',name:'工作证据快照 · '+item.title,dataUrl:'data:image/'+(extension==='jpg'?'jpeg':extension)+';base64,'+saved.base64});return;}
+    const text=saved.content??('# '+item.title+'\n\n'+(saved.metadata.snapshot?'附件副本已保存在 Lucyna，当前显示出处与版本。':'此记录保存出处与版本，不作为知识正文。')+'\n\n来源：'+item.relative+'\n\nSHA-256：'+(item.metadata.sourceHash||'未计算；仅登记元数据'));
+    onOpen({kind:'markdown',name:(saved.content!==null?'工作资料快照 · ':'资产记录 · ')+item.title,content:text});
+  }catch(e){if(rootNow.current===item.root)setMaterialError(String(e));}};
   const generation=useRef(0),rootNow=useRef(work.root);rootNow.current=work.root;
   const detail=cache[work.root],tab=tabs[work.root]||'overview',query=queries[work.root]||'';
   useEffect(()=>{if(!active)return;let live=true;setError('');setLoading(work.root);const id=++generation.current;
     void api.workDetails(work.root).then(value=>{if(live&&id===generation.current)setCache(previous=>({...previous,[work.root]:value}));}).catch(e=>{if(live)setError(String(e));}).finally(()=>{if(live)setLoading('');});
     return()=>{live=false;};
   },[work.root,active,revision]);
-  useEffect(()=>{setInspect(null);setDirectory('');setOpening('');setError('');},[work.root]);
+  useEffect(()=>{setInspect(null);setDirectory('');setOpening('');setError('');setMaterialError('');setSavingMaterial('');setMaterialNotice('');},[work.root]);
   useEffect(()=>{if(!active)return;const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&!loading)setRevision(v=>v+1);},60000);return()=>window.clearInterval(timer);},[active,loading]);
   const record=useMemo(()=>workRecord(detail?.content||''),[detail?.content]);
   const groups=useMemo(()=>groupRepositories(detail?.members||[]),[detail?.members]);
@@ -79,12 +91,13 @@ export function WorkDetails({work,active,connections,onConnections,history,onOpe
         </section>)}
         {!!detail.issues.length&&<details className="wd-record"><summary>登记检查 <span>{detail.issues.length} 项</span></summary>{detail.issues.map((issue,i)=><p key={i} className={issue.severity==='error'?'error-text':issue.severity==='warning'?'wd-warning':'wd-caption'}>{issue.member&&`${issue.member}：`}{issue.message}</p>)}</details>}
       </div>}
-      {tab==='assets'&&<div className="wd-assets"><Input aria-label="搜索工作资产" placeholder="搜索笔记、会话日志、脚本或证据…" value={query} onChange={value=>setQueries(p=>({...p,[work.root]:value}))}/><p className="wd-caption">从实际目录读取 · {unindexed?`${unindexed} 项未列入 L0 索引`:'L0 索引已覆盖当前笔记和日志'}</p>
-        {(Object.keys(assetLabels) as WorkAsset['kind'][]).map(kind=>{const all=detail.assets.filter(a=>a.kind===kind),rows=all.filter(a=>(a.path+' '+a.title).toLowerCase().includes(query.toLowerCase())).sort((a,b)=>(b.modifiedAt||'').localeCompare(a.modifiedAt||''));return <section className="wd-section" key={kind}><h3>{assetLabels[kind]} <span className="wd-caption">{rows.length}{query?` / ${all.length}`:''}</span></h3>{rows.map(asset=>{const related=kind==='log'?relatedHistory(asset,history):null;return <div className="wd-asset" key={asset.path}><button disabled={!!asset.unavailable||!!opening} onClick={()=>void openAsset(asset)} title={asset.unavailable||asset.path}>{opening===asset.path?<Spinner size={14}/>:asset.directory?<Folder size={14}/>:<FileText size={14}/>}<span><strong>{asset.title||asset.name}</strong><small>{asset.path}</small></span><ArrowUpRight size={12}/></button><div className="wd-asset-meta"><span>{asset.unavailable||time(asset.modifiedAt)}</span>{!asset.indexed&&kind!=='evidence'&&<span>未列入索引</span>}{related&&<button onClick={()=>onResume(related)}>继续原会话</button>}</div></div>;})}{!rows.length&&<p className="wd-caption">{query?'没有匹配项。':kind==='script'?'尚无可复用脚本。':kind==='evidence'?'SESSION.md 尚未引用 .agent-tmp 证据。':'此目录暂无记录。'}</p>}</section>;})}
+      {tab==='assets'&&<div className="wd-assets"><p className="wd-caption">知识库按用途管理：笔记保存为 Work 资料，日志归档，脚本登记引用，证据保留附件或出处。均不自动进入全局知识检索。</p>{materialError&&<p role="alert" className="error-text">{materialError}</p>}{materialNotice&&<p role="status" className="wd-caption">{materialNotice}</p>}<Input aria-label="搜索工作资产" placeholder="搜索笔记、会话日志、脚本或证据…" value={query} onChange={value=>setQueries(p=>({...p,[work.root]:value}))}/><p className="wd-caption">从实际目录读取 · {unindexed?`${unindexed} 项未列入 L0 索引`:'L0 索引已覆盖当前笔记和日志'}</p>
+        {(Object.keys(assetLabels) as WorkAsset['kind'][]).map(kind=>{const all=detail.assets.filter(a=>a.kind===kind),rows=all.filter(a=>(a.path+' '+a.title).toLowerCase().includes(query.toLowerCase())).sort((a,b)=>(b.modifiedAt||'').localeCompare(a.modifiedAt||''));return <section className="wd-section" key={kind}><h3>{assetLabels[kind]} <span className="wd-caption">{rows.length}{query?` / ${all.length}`:''}</span></h3>{rows.map(asset=>{const related=kind==='log'?relatedHistory(asset,history):null;return <div className="wd-asset" key={asset.path}><button disabled={!!asset.unavailable||!!opening} onClick={()=>void openAsset(asset)} title={asset.unavailable||asset.path}>{opening===asset.path?<Spinner size={14}/>:asset.directory?<Folder size={14}/>:<FileText size={14}/>}<span><strong>{asset.title||asset.name}</strong><small>{asset.path}</small></span><ArrowUpRight size={12}/></button><div className="wd-asset-meta"><span>{asset.unavailable||time(asset.modifiedAt)}</span><span title={classifyWorkAsset(asset).reason}>{materials[work.root]?.some(item=>item.relative===asset.path)?'已保存 · ':''}{classifyWorkAsset(asset).allowed?classifyWorkAsset(asset).label:null}</span><button disabled={!classifyWorkAsset(asset).allowed||!!savingMaterial} onClick={()=>void saveMaterial(asset)}>{savingMaterial===asset.path?'正在保存…':classifyWorkAsset(asset).action}</button>{!asset.indexed&&kind!=='evidence'&&<span>未列入索引</span>}{related&&<button onClick={()=>onResume(related)}>继续原会话</button>}</div></div>;})}{!rows.length&&<p className="wd-caption">{query?'没有匹配项。':kind==='script'?'尚无可复用脚本。':kind==='evidence'?'SESSION.md 尚未引用 .agent-tmp 证据。':'此目录暂无记录。'}</p>}</section>;})}
         <div className="wd-actions"><Button variant="secondary" compact onClick={()=>onMemory(record.goal?.text||work.name)}><BookOpen size={13}/>检索 Stele · L3</Button><button onClick={()=>setDirectory('.')}>浏览工作根</button></div><p className="wd-caption">L2 日志与 OMP 历史并非一一对应；仅在 ID 唯一匹配时提供续聊。临时证据只列文档引用，未扫描整个临时目录。</p>
       </div>}
       {detail.warnings.map((warning,i)=><p className="wd-warning" key={i}>{warning}</p>)}
     </>}
+      {tab==='assets'&&!!materials[work.root]?.length&&<section className="wd-section wd-materials"><h3>已保存的工作资料 <span className="wd-caption">{materials[work.root].length}</span></h3><p className="wd-caption">保存在 Lucyna 内部 · 仅属于此 Work · 需要审核提炼后才能成为共享知识。</p>{materials[work.root].filter(item=>(item.title+' '+item.relative).toLowerCase().includes(query.toLowerCase())).map(item=><div className="wd-asset" key={item.id}><button onClick={()=>void readMaterial(item)}><BookOpen size={14}/><span><strong>{item.title}</strong><small>{item.metadata.policy.label} · {time(item.metadata.createdAt)}</small></span><ArrowUpRight size={12}/></button></div>)}</section>}
     <Modal open={active&&!!directory} onClose={()=>setDirectory('')} title="工作文件" description={directory==='.'?work.root:work.root+'/'+directory} className="wd-file-modal"><FileBrowser key={work.root+'|'+directory} root={work.root} active={active&&!!directory} initialDirectory={directory==='.'?'':directory} onOpen={file=>{onOpen(file);setDirectory('');}} onError={onError}/></Modal>
     <GitInspector key={inspect?inspect.root+'|'+inspect.member.name:'none'} target={inspect} open={active&&!!inspect} close={()=>setInspect(null)} onError={onError} onOpen={onOpen}/>
   </div>;

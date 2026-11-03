@@ -4,6 +4,39 @@ const {Workbench}=require('../src/renderer/workbench-store.ts');
 const {isCompletedUnread}=require('../src/renderer/session-monitor.ts');
 const tick=()=>new Promise(r=>setImmediate(r));
 
+test('stop polls native settlement when the final event is missing, with no false completion while children remain',async t=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;await s.send('run');
+ f.states.get(s.id).isSettled=false;const request=f.api.request;
+ f.api.request=(type,data,id)=>type==='abort_and_restore_queue'?Promise.resolve({followUp:[{text:'restore once'}]}):request(type,data,id);
+ t.mock.timers.enable({apis:['setTimeout']});
+ assert.deepEqual(await s.stop(),[{text:'restore once'}]);assert.equal(s.view.run.phase,'stopping');
+ t.mock.timers.tick(1000);await tick();assert.equal(s.busy,true);
+ f.states.get(s.id).isSettled=true;t.mock.timers.tick(2000);await tick();
+ assert.equal(s.busy,false);assert.equal(s.view.run.outcome,'aborted');assert.equal(s.stopStalled,false);assert.equal(s.stopDeadline,undefined);
+ assert.equal(f.calls.filter(c=>c.type==='close').length,0);f.store.dispose();
+});
+
+test('a stalled stop exposes force only after its deadline and waits for actual termination of its own writer',async t=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;await a.send('A');await f.store.selectWork(f.works[1]);const b=f.store.active;await b.send('B');
+ const request=f.api.request;let rejectAbort,releaseForce;const forced=[];
+ f.api.request=(type,data,id)=>type==='abort_and_restore_queue'?new Promise((resolve,reject)=>rejectAbort=reject):type==='get_state'&&id===a.id?new Promise(()=>{}):request(type,data,id);
+ f.api.forceStop=id=>{forced.push(id);return new Promise(resolve=>releaseForce=resolve);};
+ t.mock.timers.enable({apis:['setTimeout']});
+ const stopping=a.stop();await a.forceStop();assert.equal(forced.length,0);
+ t.mock.timers.tick(15000);await tick();assert.ok(a.stopStalled);assert.ok(a.busy);assert.equal(a.view.run.phase,'stopping');
+ const file=a.sessionFile,key=a.draftKey;const force=a.forceStop();await a.forceStop();assert.deepEqual(forced,[a.id]);assert.equal(a.connection,'closing');assert.ok(a.busy);assert.ok(b.busy);
+ f.emit({type:'process_exit',clientSessionId:a.id,code:137});assert.equal(a.connection,'closing');
+ releaseForce();await force;rejectAbort(Error('OMP exited'));await stopping;
+ assert.equal(a.connection,'idle');assert.equal(a.busy,false);assert.equal(a.view.run.outcome,'aborted');assert.equal(a.sessionFile,file);assert.equal(a.draftKey,key);assert.ok(b.busy);assert.equal(a.error,'');
+ f.store.dispose();
+});
+
+test('an unconfirmed force-stop failure keeps the native writer busy and permits an explicit retry',async t=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;await s.send('run');
+ f.api.request=async()=>{throw Error('no response');};let attempts=0;f.api.forceStop=async()=>{attempts++;throw Error('writer still alive');};
+ t.mock.timers.enable({apis:['setTimeout']});await s.stop();assert.ok(s.stopStalled);await s.forceStop();assert.equal(s.connection,'ready');assert.ok(s.busy);assert.ok(s.stopStalled);assert.match(s.error,/writer still alive/);await s.forceStop();assert.equal(attempts,2);f.store.dispose();
+});
+
 test('same remote root on two hosts keeps drafts, documents and session selection separate',async()=>{
  const f=setup();await tick();f.works[0].hostId='host-a';f.works[1].hostId='host-b';f.works[1].root=f.works[0].root;
  const reads=[];f.api.readWork=async(root,hostId)=>{reads.push([root,hostId]);return hostId||'local';};
@@ -202,9 +235,43 @@ test('work refresh updates diagnostics of existing sessions without stopping run
  await f.store.loadWorks();assert.equal(f.store.active,active);assert.equal(active.id,id);assert.equal(active.draftKey,key);assert.ok(active.busy);assert.equal(active.work.health,'warning');assert.equal(f.calls.filter(c=>c.type==='close').length,0);f.store.dispose();
 });
 
-test('refresh clears only obsolete validation errors and keeps the existing conversation',async()=>{
- const f=setup();f.works[0]={...f.works[0],kind:'invalid',error:'old validation error'};await tick();await f.store.selectWork(f.works[0]);const active=f.store.active;assert.equal(active.error,'old validation error');
- f.works[0]={...f.works[0],kind:'work',error:undefined,health:'warning'};await f.store.loadWorks();await tick();assert.equal(f.store.active,active);assert.equal(active.error,'');assert.equal(active.work.kind,'work');assert.ok(f.store.view().document);assert.ok(f.store.view().history);assert.equal(f.calls.filter(c=>c.type==='close').length,0);f.store.dispose();
+test('refresh clears only obsolete root access errors and keeps the existing conversation',async()=>{
+ const f=setup();f.works[0]={...f.works[0],kind:'invalid',rootAvailable:false,error:'old root access error'};await tick();await f.store.selectWork(f.works[0]);const active=f.store.active;assert.equal(active.error,'old root access error');
+ f.works[0]={...f.works[0],kind:'work',rootAvailable:true,error:undefined,health:'warning'};await f.store.loadWorks();await tick();assert.equal(f.store.active,active);assert.equal(active.error,'');assert.equal(active.work.kind,'work');assert.ok(f.store.view().document);assert.ok(f.store.view().history);assert.equal(f.calls.filter(c=>c.type==='close').length,0);f.store.dispose();
+});
+
+test('unavailable root selection settles history and document reads without issuing IPC',async()=>{
+ const f=setup();await tick();f.works[0]={...f.works[0],kind:'invalid',rootAvailable:false,error:'missing directory'};
+ let reads=0;f.api.listHistory=f.api.readWork=async()=>{reads++;throw Error('should not read missing directory');};
+ await f.store.selectWork(f.works[0]);await tick();
+ assert.match(f.store.view().historyError,/工作目录暂不可用/);assert.match(f.store.view().documentError,/工作目录暂不可用/);assert.equal(f.store.view().documentLoading,false);
+ await f.store.refreshHistory();await f.store.refreshDocument();assert.equal(reads,0);assert.equal(f.store.active.error,f.works[0].error);f.store.dispose();
+});
+
+test('root becoming unavailable cancels stale read results and recovery reloads the same tab',async()=>{
+ const f=setup();await tick();let historyReply,documentReply;
+ f.api.listHistory=()=>new Promise(resolve=>historyReply=resolve);f.api.readWork=()=>new Promise(resolve=>documentReply=resolve);
+ await f.store.selectWork(f.works[0]);const active=f.store.active,key=active.draftKey;assert.equal(f.store.view().documentLoading,true);
+ f.works[0]={...f.works[0],kind:'invalid',rootAvailable:false,error:'missing directory'};await f.store.loadWorks();
+ assert.match(f.store.view().historyError,/工作目录暂不可用/);assert.equal(f.store.view().documentLoading,false);
+ historyReply({sessions:[{path:'stale'}],managed:[]});documentReply('stale document');await tick();
+ assert.equal(f.store.view().history,null);assert.equal(f.store.view().document,'');assert.match(f.store.view().historyError,/工作目录暂不可用/);
+ f.api.listHistory=async()=>({sessions:[],managed:[]});f.api.readWork=async()=>'recovered document';
+ f.works[0]={...f.works[0],kind:'work',rootAvailable:true,error:undefined};await f.store.loadWorks();await tick();
+ assert.equal(f.store.active,active);assert.equal(active.draftKey,key);assert.equal(f.store.view().historyError,'');assert.equal(f.store.view().document,'recovered document');assert.ok(f.store.view().history);assert.equal(f.calls.filter(c=>c.type==='close').length,0);f.store.dispose();
+});
+
+test('broken Git member permits reading history and continuing the original OMP journal',async()=>{
+ const f=setup();await tick();f.works[0]={...f.works[0],kind:'invalid',rootAvailable:true,error:'qcom-build: missing Git repository',issues:[{code:'git_top',severity:'error',member:'qcom-build',message:'missing Git repository'}]};
+ const entry={sessionFile:'C:/existing.jsonl',agentDir:'C:/agent',runtime:'wsl'};f.api.listHistory=async()=>({sessions:[],managed:[entry]});
+ await f.store.selectWork(f.works[0]);await tick();assert.equal(f.store.active.error,'');assert.equal(f.store.view().history.managed[0],entry);assert.ok(f.store.view().document);
+ await f.store.resume(entry);assert.equal(f.store.active.connection,'ready');assert.equal(f.calls.find(c=>c.type==='start').resume,entry.sessionFile);assert.equal(f.calls.filter(c=>c.type==='prompt').length,0);f.store.dispose();
+});
+
+test('Git failure discovered during a history read does not cancel that read or close connected sessions',async()=>{
+ const f=setup();await tick();let reply;f.api.listHistory=()=>new Promise(resolve=>reply=resolve);await f.store.selectWork(f.works[0]);const active=f.store.active;await active.start();
+ f.works[0]={...f.works[0],kind:'invalid',rootAvailable:true,error:'Git metadata missing'};await f.store.loadWorks();
+ reply({sessions:[],managed:[{title:'retained'}]});await tick();assert.equal(f.store.view().history.managed[0].title,'retained');assert.equal(active.connection,'ready');assert.equal(active.error,'');assert.equal(f.calls.filter(c=>c.type==='close').length,0);f.store.dispose();
 });
 test('same work new sessions retain original run, unread status and pending questions',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const a=f.store.active;await a.send('A');await f.store.newSession();const b=f.store.active;assert.notEqual(a.id,b.id);assert.notEqual(a.draftKey,b.draftKey);assert.ok(a.busy);

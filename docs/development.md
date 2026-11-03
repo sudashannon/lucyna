@@ -125,6 +125,8 @@ UI、文档与桌宠使用随包附带的思源黑体 SC 可变字体，来源�
 
 ## 知识库验收流程
 
+内置知识引擎的构建、内部存储和第一阶段验收见 [knowledge-managed-engine.md](knowledge-managed-engine.md)。当前正式入口默认使用受管 Windows 引擎；下面的 `preview:knowledge` 与 `test:knowledge:native` 仍是显式的外部 Stele 兼容/回归夹具，和内部数据目录隔离。内置链路使用 `test:knowledge:managed`、`test:knowledge:managed-ui`。
+
 `npm run preview:knowledge` 用独立临时 profile 打开正式渲染器，读取当前本地 Stele 的真实图谱；该预览的主进程拒绝写入、模型生成和恢复操作，不连接 OMP。日常完整功能使用 `npm start`。
 
 `npm run test:knowledge:native` 对预留端口 `19015` 的隔离 Stele 执行真实 API 和桌面操作验收。先在 WSL 的仓库目录执行 `python3 tools/knowledge-fixture.py`；可用 `LUCYNA_STELE_BINARY` 指定已有 Stele 二进制。夹具生成独立 HOME/数据目录和 Markdown 文档，关闭会话索引与公开分享，本地 `19017` 协议夹具提供模型响应。它验证文档强版本冲突、证据定位、图谱、资料捕获/采纳、复核转待办、报告、设置和恢复包，不测量真实模型质量或消耗真实模型额度。结果、截图和恢复包保留在忽略目录 `.runtime/knowledge-native/`。

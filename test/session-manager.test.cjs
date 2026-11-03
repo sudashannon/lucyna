@@ -1,6 +1,18 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {SessionManager}=require('../src/session-manager.cjs');
 
+test('an authoritative settled state clears stale backend busy state when the final event was lost',async()=>{
+ const {manager,native,start,events}=fixture();await start('a');native[0].emit({type:'agent_start'});assert.ok(manager.get('a').busy);
+ native[0].request=async()=>({isSettled:true});await manager.request('a','get_state');assert.equal(manager.get('a').busy,false);assert.equal(events.at(-1).type,'session_state');assert.equal(events.at(-1).isSettled,true);await manager.closeAll();
+});
+
+test('an old settled snapshot arriving after a new turn starts cannot clear busy state or confirm its stop',async()=>{
+ const {manager,native,start,events}=fixture();await start('a');let release;
+ native[0].request=()=>new Promise(resolve=>release=resolve);
+ const pending=manager.request('a','get_state');native[0].emit({type:'agent_start'});release({isSettled:true});
+ const state=await pending;assert.equal(state.isSettled,undefined);assert.equal(events.at(-1).isSettled,undefined);assert.ok(manager.get('a').busy);await manager.closeAll();
+});
+
 test('attachment preparation derives native paths from its owner; invalid or disconnected requests never write',async()=>{
  const {manager,native,start}=fixture(),writes=[];await start('a');await start('b');
  native[0].request=async()=>({sessionFile:'/home/user/native/a.jsonl',sessionId:'native-a'});
@@ -49,7 +61,8 @@ test('parallel native processes route events, requests, questions and stop by se
  const {manager,native,events,start}=fixture();await Promise.all([start('a'),start('b')]);
  native[0].emit({type:'message_end',message:{content:'A'}});native[1].emit({type:'message_end',message:{content:'B'}});
  assert.deepEqual(events.filter(e=>e.type==='message_end').map(e=>e.clientSessionId),['a','b']);
- await manager.request('a','abort_and_restore_queue');assert.equal(native[0].last,'abort_and_restore_queue');assert.equal(native[1].last,undefined);
+ const requests=[],request=native[0].request.bind(native[0]);native[0].request=(type,data)=>{requests.push(type);return request(type,data);};
+ await manager.request('a','abort_and_restore_queue');assert.deepEqual(requests,['abort_and_restore_queue','get_subagents','get_subagents']);assert.equal(native[1].last,undefined);
  native[1].emit({type:'extension_ui_request',method:'ask',id:'q'});assert.throws(()=>manager.respond('a',{id:'q'}),/不属于/);manager.respond('b',{id:'q'});assert.equal(native[1].frame.id,'q');
  await manager.close('a');assert.equal(manager.list().length,1);assert.equal(manager.list()[0].id,'b');await manager.closeAll();
 });

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{TITLE}}</title>
+<style>
+  :root{--paper:#fafaf8;--ink:#0a0a0a;--muted:#686868;--line:#d8d8d4;--soft:#f0f0ec;--accent:#002fa7;--accent-soft:#e8eefb}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{background:var(--paper)}
+  body{background:var(--paper);color:var(--ink);font-family:"Inter","PingFang SC","Noto Sans SC",system-ui,sans-serif;padding:30px 42px 22px;max-width:1600px;margin:0 auto;font-size:13px}
+  header{border-bottom:3px solid var(--ink);padding-bottom:16px;margin-bottom:14px}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.13em;color:var(--accent);text-transform:uppercase;margin-bottom:5px}
+  .title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+  h1{font-size:clamp(28px,3vw,46px);line-height:.98;font-weight:800;letter-spacing:-.04em}
+  .overview{color:var(--muted);font-size:13px;line-height:1.45;max-width:780px;margin-top:8px}
+  .mainline{margin-top:12px;padding:8px 12px;background:var(--soft);border-left:3px solid var(--accent);font-size:13px;line-height:1.4}
+  .mainline .tag{display:inline-block;background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:3px 6px;margin-right:8px;letter-spacing:.08em}
+  .quality-note{color:var(--muted);font-size:10px;line-height:1.35;margin-top:7px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .stat{background:var(--soft);padding:11px 13px;border-top:2px solid var(--accent);min-height:66px}
+  .stat .n{font-size:clamp(24px,2.3vw,36px);line-height:1;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+  .stat .l{font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:5px}
+  section{margin-bottom:17px}
+  h2{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:5px;margin-bottom:8px}
+  .themes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .theme{background:#fff;border:1px solid var(--line);border-top:2px solid var(--accent);padding:10px 11px;min-height:101px}
+  .theme-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+  .theme .t{font-weight:800;font-size:13px;line-height:1.15}
+  .theme .count{font-size:22px;line-height:1;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+  .theme-items{list-style:none}
+  .theme-items li{font-size:11px;color:#444;line-height:1.35}
+  .theme-items li:before{content:"✓";color:var(--accent);font-weight:800;margin-right:5px}
+  .focus{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .focus-project{background:#fff;border-left:3px solid var(--accent);padding:9px 12px}
+  .focus-project h3{font-size:14px;line-height:1.15;font-weight:800;color:var(--accent);margin-bottom:5px}
+  .focus-project ul{list-style:none}
+  .focus-project li{font-size:11px;line-height:1.35;padding:4px 0;border-bottom:1px solid var(--soft)}
+  .focus-project li:last-child{border-bottom:none}
+  .focus-project li:before{content:"→";color:var(--accent);font-weight:800;margin-right:6px}
+  .milestones{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px;border-left:0;padding:0;list-style:none}
+  .milestones li{list-style:none;border-top:2px solid var(--accent);padding:6px 4px 0;font-size:10px;line-height:1.35;min-width:0}
+  .ms-date{display:block;color:var(--accent);font-size:10px;font-weight:800;margin-bottom:3px;font-variant-numeric:tabular-nums}
+  .support-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}
+  .effort-table,.open-table{width:100%;border-collapse:collapse;font-size:10px}
+  .effort-table th{text-align:left;font-weight:800;color:var(--muted);font-size:9px;letter-spacing:.07em;text-transform:uppercase;padding:4px 5px;border-bottom:2px solid var(--accent)}
+  .effort-table td{padding:4px 5px;border-bottom:1px solid var(--soft);color:var(--ink);line-height:1.25}
+  .effort-table td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .effort-table .agg td{color:var(--muted);font-style:italic}
+  .open-table td{padding:4px 5px;border-bottom:1px solid var(--soft);line-height:1.3}
+  .open-table .blocker{color:var(--accent);font-size:10px}
+  .open-table .who{display:inline-block;min-width:120px;color:var(--muted);font-size:10px;padding-right:6px}
+  .caption{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.35}
+  .import-row{font-size:10px;color:var(--muted);padding:4px 5px;border-bottom:1px solid var(--soft);line-height:1.3}
+  footer{border-top:2px solid var(--ink);padding-top:7px;color:var(--muted);font-size:9px;line-height:1.35}
+  @media(max-width:1050px){body{padding:24px}.themes{grid-template-columns:repeat(2,minmax(0,1fr))}.milestones{grid-template-columns:repeat(3,minmax(0,1fr))}.support-grid{grid-template-columns:1fr}}
+  @media(max-width:680px){body{padding:18px 14px}.title-row{display:block}.stats{grid-template-columns:repeat(2,1fr)}.themes,.focus{grid-template-columns:1fr}.milestones{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media print{body{max-width:none;padding:12mm 14mm;background:#fff}.theme,.focus-project,.stat{break-inside:avoid}section{break-inside:avoid}header{margin-bottom:10px}.support-grid{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">工程工作月报 · Monthly Engineering Review</div>
+  <div class="title-row"><h1>{{TITLE}}</h1></div>
+  <p class="overview">{{OVERVIEW}}</p>
+  <div class="mainline"><span class="tag">主线</span>{{MAINLINE}}</div>
+  <p class="quality-note">{{QUALITY_NOTE}}</p>
+</header>
+<div class="stats">
+  <div class="stat"><div class="n">{{TOTAL}}</div><div class="l">输入文档</div></div>
+  <div class="stat"><div class="n">{{ACTIVE}}</div><div class="l">{{ACTIVE_LABEL}}</div></div>
+  <div class="stat"><div class="n">{{THEMES}}</div><div class="l">主题总数</div></div>
+  <div class="stat"><div class="n">{{REPORTS}}</div><div class="l">报告文档</div></div>
+</div>
+{{THEMES_SECTION}}
+{{FOCUS_SECTION}}
+{{MILESTONES_SECTION}}
+<div class="support-grid">
+  <div>{{SESSIONS_SECTION}}</div>
+  <div>{{OPEN_WORK_SECTION}}</div>
+</div>
+<footer>数据源为 Wiki 索引内 Markdown 文档；主题卡仅展示投入最高的命名主题，完整主题、文档与证据保存在同名 manifest。</footer>
+</body>
+</html>

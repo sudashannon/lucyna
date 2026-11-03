@@ -5,6 +5,12 @@ mod.filename=filename;mod.paths=Module._nodeModulePaths(path.dirname(filename));
 mod._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, filename);
 const {emptyView, projectEvent: step, restoreMessages, thinkingContent, textContent, answerContent, toolSummary} = mod.exports;
 const start = () => step(emptyView(), {type:'local_send',id:'optimistic',text:'Status?'}, 1000);
+test('waiting for approval is counted separately across repeated questions and frozen at settlement',()=>{
+ let v=start();v=step(v,{type:'local_input_wait',waiting:true},2000);v=step(v,{type:'local_input_wait',waiting:true},3000);
+ v=step(v,{type:'local_input_wait',waiting:false},5000);assert.equal(v.run.waitingMs,3000);
+ v=step(v,{type:'local_input_wait',waiting:true},6000);v=step(v,{type:'session_settled'},9000);
+ assert.equal(v.run.waitingMs,6000);assert.equal(v.run.waitingSince,undefined);assert.equal(v.run.endedAt-v.run.startedAt,8000);
+});
 test('tool-only period is presentation noise, while literal final/user periods and images remain visible',()=>{
   const {hasVisibleAnswer}=mod.exports;
   const message={id:'native-dot',role:'assistant',content:[{type:'text',text:'.'},{type:'toolCall',name:'bash',id:'tool',arguments:{}}]};

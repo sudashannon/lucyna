@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import time
+import uuid
 
 from capabilities import snapshot
 from evolution import specification
@@ -11,8 +12,10 @@ from storage import TERMINAL
 
 PROFILE_FIELDS = ('objective', 'acceptance', 'model', 'tokenBudget', 'wallSeconds', 'evolution')
 LABELS = {
+    'preparing': '正在自动准备评测', 'needs_input': '需要补充信息', 'preparation_failed': '评测准备未完成',
+    'preparation_limit': '今日评测准备次数已达上限',
     'waiting_agent': '等待本地 agent 就绪',
-    'needs_profile': '等待评测配置', 'disabled': '自动进化已关闭', 'waiting_idle': '等待 Work 空闲',
+    'needs_profile': '等待读取 Work 文档', 'disabled': '自动进化已关闭', 'waiting_idle': '等待 Work 空闲',
     'unknown_client': '等待客户端确认状态', 'stabilizing': '等待文件稳定', 'unchanged': '等待新的 Work 变化',
     'cooldown': '冷却中', 'daily_limit': '今日自动实验次数已达上限', 'running': '自动实验进行中',
     'review': '候选待你采纳', 'paused': '任务已暂停', 'blocked': '自动实验需要处理',
@@ -24,13 +27,22 @@ class Automatic:
     def __init__(self, runner, clock=time.time, idle_seconds=60, cooldown=1800, daily_limit=2):
         self.runner, self.store, self.clock = runner, runner.store, clock
         self.idle_seconds, self.cooldown, self.daily_limit = idle_seconds, cooldown, daily_limit
+        self.preparing = {}
+        for value in self.store.automation():
+            preparation=value.get('preparation',{})
+            if preparation.get('state') in ('reading','checking'):
+                preparation.update(state='failed',message='服务重启中断了评测准备；记录已保留，可重新准备',usedTokens=max(preparation.get('usedTokens',0),preparation['tokenBudget'] or 0),usageEstimated=True)
+                for attempt in value.get('preparationAttempts',[]):
+                    if attempt['id']==preparation['id']:
+                        attempt.update(usedTokens=preparation['usedTokens'],estimated=True,finishedAt=self.clock())
+                self.status(value,'preparation_failed',preparation['message'])
 
     def policy(self, root):
         rows = self.store.automation(root)
         if rows:
             return rows[0]
         value = {'root': root, 'enabled': True, 'profile': None, 'status': 'needs_profile',
-                 'message': '需要一次性指定优化文件、训练与留出检查；已有实验配置会自动复用。',
+                 'message': 'Work 空闲后由内嵌 agent 读取文档、准备并试跑评测；已有配置继续复用。',
                  'createdAt': self.clock(), 'lastFingerprint': None, 'idleSince': self.clock()}
         for run in self.store.list(root):
             if run.get('mode') == 'evolution' and run.get('request', {}).get('evolution'):
@@ -50,6 +62,7 @@ class Automatic:
         value.update(label=LABELS.get(value['status'], value['status']), idleSeconds=self.idle_seconds,
                      cooldownSeconds=self.cooldown, dailyLimit=self.daily_limit, adoption='manual')
         value['runsToday'] = sum(bool(r.get('automatic')) and r['createdAt'] > self.clock()-86400 for r in self.store.list(root))
+        value['preparationsToday'] = sum(a['startedAt'] > self.clock()-86400 for a in value.get('preparationAttempts',[]))
         return value
 
     def check_root(self, root):
@@ -93,12 +106,24 @@ class Automatic:
             from runner import text
             text(profile.get('objective'), '目标'); text(profile.get('acceptance'), '验收标准', 8000)
             budget, wall, model = profile.get('tokenBudget'), profile.get('wallSeconds'), profile.get('model')
-            if type(budget) is not int or not 1000 <= budget <= 200000 or type(wall) is not int or not 60 <= wall <= 43200:
+            if (budget is not None and (type(budget) is not int or not 1000 <= budget <= 200000)) or type(wall) is not int or not 60 <= wall <= 43200:
                 raise ValueError('无效自动实验预算')
             if not isinstance(model, str) or len(model) > 200 or any(c in model for c in '\0\r\n'):
                 raise ValueError('无效模型')
-            specification(profile.get('evolution'), root)
+            specification(profile.get('evolution'), root, self.runner.directory)
+            if root in self.preparing: self.preparing[root].cancel()
+            value.pop('preparation',None)
+            value.update(profileOrigin='manual',prepareRequested=False)
             value.update(profile=profile, observedFingerprint=None, idleSince=self.clock(), lastFingerprint=None)
+        if not value['enabled'] and root in self.preparing:
+            self.preparing[root].cancel()
+            # Cancellation can happen before the coroutine's first instruction.
+            # Persist the reservation and visible state here as well as its finally.
+            preparation=value.get('preparation',{})
+            preparation.update(state='paused',message='评测准备已暂停；已有记录保留',usageEstimated=True,usedTokens=max(preparation.get('usedTokens',0),preparation.get('tokenBudget') or 0))
+            for attempt in value.get('preparationAttempts',[]):
+                if attempt['id']==preparation.get('id'):
+                    attempt.update(estimated=True,finishedAt=self.clock())
         state = 'stabilizing' if value['enabled'] and value['profile'] else 'needs_profile' if value['enabled'] else 'disabled'
         active = next((run for run in self.store.list(root) if run['state'] not in TERMINAL), None)
         if value['enabled'] and active:
@@ -106,6 +131,56 @@ class Automatic:
             value['lastRunId'] = active['id']
         self.status(value, state, '结果由你确认采纳；不会自动覆盖 Work。' if state == 'review' else '空闲并检测到新变化后自动运行；结果由你确认采纳。')
         return self.view(root)
+
+    def request_preparation(self, request):
+        from runner import text
+        root=request['root'];self.check_root(root)
+        value=self.policy(root)
+        if any(r['state'] not in TERMINAL for r in self.store.list(root)):
+            raise ValueError('请先处理当前实验，再重新准备评测')
+        if root in self.preparing:
+            return self.view(root)
+        clarification=request.get('clarification','')
+        if clarification: clarification=text(clarification,'补充信息',4000)
+        elif not isinstance(clarification,str): raise ValueError('无效补充信息')
+        value.update(enabled=True,prepareRequested=True,clarification=clarification,idleSince=self.clock())
+        value.pop('preparationObserved',None)
+        self.status(value,'stabilizing','已安排内嵌 agent 读取 Work 文档，空闲后准备评测。')
+        return self.view(root)
+
+    async def shutdown(self):
+        tasks=list(self.preparing.values())
+        for task in tasks: task.cancel()
+        await asyncio.gather(*tasks,return_exceptions=True)
+
+    async def advance_preparation(self, value):
+        from preparation import document_snapshot, fingerprint, prepare, PREP_TOKENS
+        root=value['root'];now=self.clock()
+        if root in self.preparing: return
+        documents=await asyncio.to_thread(document_snapshot,root,value.get('profileDocuments',{}))
+        key=fingerprint(documents)
+        previous=value.get('preparation',{})
+        if previous.get('fingerprint')==key and previous.get('state') in ('failed','needs_input','paused') and not value.get('prepareRequested'):
+            state='needs_input' if previous['state']=='needs_input' else 'preparation_failed'
+            self.status(value,state,previous.get('message','请重新准备评测'));return
+        if not self.runner.auxiliary:
+            self.status(value,'waiting_agent','请在设置中配置辅助模型，内嵌 agent 将从 Work 文档自动准备评测。');return
+        if value.get('preparationObserved')!=key:
+            value.update(preparationObserved=key,idleSince=now)
+        if now<value['idleSince']+self.idle_seconds:
+            self.status(value,'stabilizing','等待 Work 空闲且文档稳定，再自动准备评测。');return
+        recent=[a for a in value.get('preparationAttempts',[]) if a['startedAt']>now-86400]
+        if len(recent)>=2:
+            self.status(value,'preparation_limit','每个 Work 滚动 24 小时最多准备 2 次；可以继续使用手动配置。',nextAt=min(a['startedAt'] for a in recent)+86400);return
+        if self.preparing or any(self.store.get(k).get('automatic') for k in self.runner.tasks):
+            self.status(value,'waiting_task','等待当前自动准备或实验完成。');return
+        budget=PREP_TOKENS
+        attempt=uuid.uuid4().hex
+        value['preparation']={'id':attempt,'state':'reading','fingerprint':key,'documents':documents,'tokenBudget':budget,'usedTokens':0,'startedAt':now,'sources':[],'clarification':value.get('clarification',''),'message':'正在读取 SESSION.md 与相关文档'}
+        value.update(prepareRequested=False,preparationAttempts=recent+[{'id':attempt,'startedAt':now,'usedTokens':budget or 0}])
+        self.status(value,'preparing',value['preparation']['message'])
+        task=asyncio.create_task(prepare(self,root,attempt));self.preparing[root]=task
+        task.add_done_callback(lambda completed:self.preparing.pop(root,None) if self.preparing.get(root) is completed else None)
 
     def remember(self, run):
         value = self.policy(run['root'])
@@ -117,7 +192,7 @@ class Automatic:
         self.store.save_automation(value)
 
     def fingerprint(self, value):
-        return hashlib.sha256(json.dumps({'files': snapshot(value['root']), 'profile': value['profile']}, sort_keys=True).encode()).hexdigest()
+        return hashlib.sha256(json.dumps({'files': snapshot(value['root'],value['profile']['evolution'].get('inputs')), 'profile': value['profile']}, sort_keys=True).encode()).hexdigest()
 
     def activity(self, root):
         for client in self.store.clients():
@@ -146,8 +221,6 @@ class Automatic:
             self.status(value,'waiting_idle','等待工作树管理操作结束。');return
         if not value['enabled']:
             self.status(value, 'disabled'); return
-        if not value['profile']:
-            self.status(value, 'needs_profile', '先配置一次优化对象与独立检查；之后自动复用，不用逐次启动。'); return
         if value.get('retryAt', 0) > now:
             return
         runs = self.store.list(root)
@@ -161,7 +234,7 @@ class Automatic:
                 if activity:
                     self.status(value, activity, '等待普通会话空闲后恢复隔离实验。', idleSince=now); return
                 retries = active.get('automaticRetries', 0)
-                if retries >= 2 or (active.get('usedTokens') or 0) >= active['tokenBudget'] or active['elapsedSeconds'] >= active['wallSeconds']:
+                if retries >= 2 or (active['tokenBudget'] is not None and (active.get('usedTokens') or 0) >= active['tokenBudget']) or active['elapsedSeconds'] >= active['wallSeconds']:
                     self.status(value, 'blocked', '自动恢复次数或原预算已到上限，请查看结果。'); return
                 retry_at = active.get('automaticRetryAt')
                 if retry_at is None:
@@ -175,8 +248,10 @@ class Automatic:
                     raise ValueError('旧实验进程仍存活，等待释放')
                 await self.runner.validate(active)
                 request_file = self.runner.directory/'runs'/active['id']/'evolution/request.json'
-                if request_file.exists() and snapshot(root) != json.loads(request_file.read_text())['hashes']:
-                    raise ValueError('Work 已变化，不能自动恢复旧快照；请查看或取消该实验')
+                if request_file.exists():
+                    saved=json.loads(request_file.read_text())
+                    if snapshot(root,saved.get('inputs')) != saved['hashes']:
+                        raise ValueError('Work 已变化，不能自动恢复旧快照；请查看或取消该实验')
                 active.update(state='queued', automaticRetries=retries+1, reason='')
                 active.pop('automaticRetryAt', None)
                 self.runner.save(active, 'auto_resumed', '自动恢复隔离实验，沿用原预算与候选记录')
@@ -190,6 +265,13 @@ class Automatic:
         if activity:
             self.status(value, activity, '普通会话结束本轮执行后再开始；不会中断你的会话。', idleSince=now); return
         self.check_root(root)
+        if root in self.preparing: return
+        needs_preparation=not value['profile'] or value.get('prepareRequested')
+        if value.get('profileOrigin')=='agent' and not needs_preparation:
+            from preparation import document_snapshot
+            needs_preparation=await asyncio.to_thread(document_snapshot,root,value.get('profileDocuments',{}))!=value.get('profileDocuments')
+        if needs_preparation:
+            await self.advance_preparation(value);return
         fingerprint = await asyncio.to_thread(self.fingerprint, value)
         if fingerprint == value.get('lastFingerprint'):
             self.status(value, 'unchanged', '当前文件版本已评估，不会重复消耗预算。'); return
@@ -201,11 +283,11 @@ class Automatic:
             self.status(value, 'daily_limit', f'每个 Work 在滚动 24 小时内最多自动运行 {self.daily_limit} 次。', nextAt=min(r['createdAt'] for r in recent)+86400); return
         if due > now:
             self.status(value, 'stabilizing' if now < value.get('idleSince', now)+self.idle_seconds else 'cooldown', '已保存触发意图，满足空闲与冷却条件后开始。', nextAt=due); return
-        if any(self.store.get(key).get('automatic') for key in self.runner.tasks):
+        if self.preparing or any(self.store.get(key).get('automatic') for key in self.runner.tasks):
             self.status(value, 'waiting_task', '另一个 Work 的自动实验正在运行，随后继续。'); return
         if not self.runner.auxiliary:
             self.status(value, 'waiting_agent', '请在 Lucyna 设置中配置辅助模型；自动运行和比较，采纳由你确认。'); return
-        specification(value['profile']['evolution'], root)
+        specification(value['profile']['evolution'], root, self.runner.directory)
         from evo_runtime import python, install
         try:
             python()

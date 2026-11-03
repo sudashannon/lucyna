@@ -1,8 +1,10 @@
+if(process.argv.includes('--knowledge-service')){require('./knowledge-host.cjs').main();return;}
 const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { spawn } = require('node:child_process');
-const { listWorks, wslUnc, steleCall, OmpSession, defaultOmp } = require('./backend.cjs');
+const { listWorks, wslUnc, OmpSession, defaultOmp } = require('./backend.cjs');
+const {requireWorkRoot}=require('./work-access.cjs');
 const { importSession, completeImportedFork, validateImportedSession, listWslSessions, listImportedSessions, validateNativeSession, listNativeSessions } = require('./history.cjs');
 const { prepare: prepareModel } = require('./windows-provider.cjs');
 const runtime=require('./runtime-config.cjs');
@@ -21,9 +23,10 @@ const {PetController}=require('./pet/controller.cjs');
 const {FeedbackController}=require('./feedback/controller.cjs');
 const {applicationIcon}=require('./app-icon.cjs');
 const windowChrome=require('./window-chrome.cjs');
-const { listDirectory, previewKind, IMAGE_MIME, within } = require('./file-browser.cjs');
+const { listDirectory } = require('./file-browser.cjs');
+const {readWorkspacePreview} = require('./workspace-preview.cjs');
 const {SettingsStore, checkSettings, validateSettings, historyLocations, sessionDirectory, windowsSessionPath} = require('./client-settings.cjs');
-const knowledge = require('./knowledge-service.cjs').createKnowledgeService();
+let knowledge;
 const workDetails = require('./work-details.cjs').createWorkDetails({listWorks});
 const {WorkRunner}=require('./work-runner.cjs');
 const {AuxiliarySettings}=require('./auxiliary-settings.cjs');
@@ -35,6 +38,7 @@ let window, sessions, pet, feedback, selectedHistory, listedHistory = new Map(),
 let windowsPreparation = Promise.resolve();
 let remote;
 configureAppIdentity(app);
+knowledge=require('./knowledge-managed.cjs').createManagedKnowledge({directory:path.join(app.getPath('userData'),'knowledge'),workAssets:require('./work-knowledge.cjs').createWorkKnowledge({listWorks,details:workDetails,wslUnc,distro:runtime.distro}),chooseDirectory:async()=>{const result=await dialog.showOpenDialog(window,{title:'导入知识库文件夹',properties:['openDirectory']});return result.canceled?null:result.filePaths[0];}});
 // Shortcut launches reveal the existing workbench instead of opening its
 // IndexedDB again, including while the companion keeps the client alive.
 if (!require('./single-instance.cjs').claimInstance(app, () => window)) return;
@@ -132,14 +136,15 @@ app.whenReady().then(async () => {
   handle('work:git', (root, member, action, options,hostId) => hostId?remote.workspaceCall(hostId,root,'workspace.git.read',{member,action,options}):workDetails(root, member, action, options));
   handle('workspace:git', (root,member,action,options,hostId)=>{
     require('./git-service.cjs').validate(root,member,action,options||{});
+    if(hostId&&(action==='disk'||options?.lfsMode!==undefined))throw Error('此功能当前仅支持本机 WSL 工作区');
     return hostId?remote.workspaceCall(hostId,root,'workspace.git',{member,action,options}):gitWorkspace(root,member,action,options);
   });
   handle('clipboard:write-text', async text => {
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 4 * 1024 * 1024) throw new Error('复制内容超过 4 MiB，请分段复制');
     await clipboard.writeText(text);
   });
-  handle('work:read', async (root,hostId) => { if(hostId)return remote.readWork(root,hostId);const works = await listWorks(); if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根'); return (await readBounded(path.join(wslUnc(root), 'SESSION.md'), 512 * 1024, 'SESSION.md')).toString('utf8'); });
-  handle('stele:context', query => { if (typeof query !== 'string' || !query.trim() || query.length > 2000) throw new Error('请输入查询内容'); return steleCall('wiki_context', { query: query.trim() }); });
+  handle('work:read', async (root,hostId) => { if(hostId)return remote.readWork(root,hostId);const works = await listWorks(); requireWorkRoot(works,root); return (await readBounded(path.join(wslUnc(root), 'SESSION.md'), 512 * 1024, 'SESSION.md')).toString('utf8'); });
+  handle('stele:context', async query => { if (typeof query !== 'string' || !query.trim() || query.length > 2000) throw new Error('请输入查询内容');const response=await knowledge.runtime.call('/mcp',{method:'POST',body:{jsonrpc:'2.0',id:require('node:crypto').randomUUID(),method:'tools/call',params:{name:'wiki_context',arguments:{query:query.trim()}}}});if(response.error||response.result?.isError)throw Error(response.error?.message||'知识上下文读取失败');return response.result; });
   handle('stele:knowledge', (kind,args) => knowledge(kind,args,event=>{if(window&&!window.isDestroyed())window.webContents.send('stele:knowledge-event',{requestId:args?.requestId,event});}));
   handle('stele:save-file', async (name,bytes) => {
     if(typeof name!=='string'||name.length>255||!(bytes instanceof Uint8Array)||bytes.length>64*1024*1024)throw Error('无效的知识导出内容');
@@ -158,7 +163,7 @@ app.whenReady().then(async () => {
     const settings={...defaults,runtime:options.resume&&['wsl','windows'].includes(options.runtime)?options.runtime:defaults.runtime};
     const locations=historyLocations(app.getPath('userData'),settings.runtime);
     const works = await listWorks();
-    if (!works.some(x => x.root === options.root && x.kind !== 'invalid')) throw new Error('无效工作根');
+    requireWorkRoot(works,options.root);
     const safe = { root: options.root, settings, model: typeof options.model === 'string' && options.model.length <= 200 ? options.model : settings.model || undefined };
     if(settings.runtime==='wsl'&&!options.resume&&!options.agentDir){
       // Let native OMP choose its cwd-derived bucket. Never override new WSL
@@ -195,7 +200,8 @@ app.whenReady().then(async () => {
     signal.throwIfAborted();
     progress('正在准备 Windows 配置');
     if(runtime.installWorkIntegration){
-      await installWorkSteleMcp(safe.agentDir);
+      const managed=await knowledge('libraryStatus');
+      await installWorkSteleMcp(safe.agentDir,{knowledgeClient:{command:managed.mcp.command,profile:knowledge.runtime.directory}});
       await installWorkSkillDirectory(safe.agentDir);
       await installWorkCommandMirrors(safe.agentDir);
     }
@@ -209,7 +215,8 @@ app.whenReady().then(async () => {
     },{root:options.root});
   });
   handle('omp:prepare-text', (id,files) => {if(remote.owns(id))throw Error('远端文本文件附件尚未接入，请使用内联文本；草稿已保留');return sessions.prepareTextAttachments(id,files);});
-  handle('omp:request', (type, data, id) => { if (!['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command'); return remote.owns(id)?remote.request(id,type,data):sessions.request(id,type,data); });
+  handle('omp:request', (type, data, id) => { if (!require('./task-rpc.cjs').validateTaskRequest(type,data) && !['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command'); return remote.owns(id)?remote.request(id,type,data):sessions.request(id,type,data); });
+  handle('omp:terminate',id=>remote.owns(id)?remote.close(id):sessions.terminate(id));
   handle('omp:ui-response', (data,id) => { if (!data || data.type !== 'extension_ui_response' || typeof data.id !== 'string') throw new Error('Invalid UI response'); return remote.owns(id)?remote.respond(id,data):sessions.respond(id,data); });
   handle('omp:close', id => remote.owns(id)?remote.close(id):sessions.close(id));
   handle('omp:list', () => [...sessions.list(),...remote.listConnections()]);
@@ -218,7 +225,7 @@ app.whenReady().then(async () => {
   handle('session:list', async (root,hostId) => {
     if(hostId)return remote.history(root,hostId);
     const works = await listWorks();
-    if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
+    requireWorkRoot(works,root);
     const settings=await settingsStore.get();
     const collect=async runtime=>{const p=historyLocations(app.getPath('userData'),runtime);return [...await listImportedSessions(p.historyDir,root),...await listNativeSessions(p.agentDir,root)].map(entry=>({...entry,runtime}));};
     const sources = await Promise.allSettled([listWslSessions(root,settings.wslAgentDir), collect('windows'), collect('wsl'),nativeWslHistory.list(root)]);
@@ -238,7 +245,7 @@ app.whenReady().then(async () => {
   const deletionPlan=async(source,root)=>{
     const listed=listedHistory.get(source);
     if(typeof source!=='string'||listed?.root!==root)throw Error('请从当前工作区的历史列表选择会话');
-    const works=await listWorks();if(!works.some(work=>work.root===root&&work.kind!=='invalid'))throw Error('无效工作根');
+    const works=await listWorks();requireWorkRoot(works,root);
     const settings=await settingsStore.get(),entry=listed.entry,locations=historyLocations(app.getPath('userData'),entry.runtime);
     if((await fs.lstat(windowsSessionPath(source))).isSymbolicLink())throw Error('不能删除符号链接指向的会话');
     let verified;
@@ -279,7 +286,7 @@ app.whenReady().then(async () => {
     if (!source || (source !== selectedHistory && listedHistory.get(source)?.root !== root)) throw new Error('请通过文件选择器或当前 work 的历史列表选择 session');
     selectedHistory = null;
     const works = await listWorks();
-    if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
+    requireWorkRoot(works,root);
     const settings=await settingsStore.get();
     const locations=historyLocations(app.getPath('userData'),settings.runtime);
     const sourceRuntime=listedHistory.get(source)?.runtime;
@@ -294,7 +301,7 @@ app.whenReady().then(async () => {
     await shell.openExternal(url.toString());
   };
   handle('external:open', openExternal);
-  handle('terminal:open', async root => { const works = await listWorks(); if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根'); const p = spawn('wsl.exe', [...runtime.wslPrefix, '--cd', root], { detached: true, stdio: 'ignore', windowsHide: false }); p.unref(); });
+  handle('terminal:open', async root => { const works = await listWorks(); requireWorkRoot(works,root); const p = spawn('wsl.exe', [...runtime.wslPrefix, '--cd', root], { detached: true, stdio: 'ignore', windowsHide: false }); p.unref(); });
   terminal = new TerminalManager({
     listWorks,
     send: event => { if (window && !window.isDestroyed()) window.webContents.send('terminal:event', event); },
@@ -312,13 +319,13 @@ app.whenReady().then(async () => {
   handle('preview:list', async (root, directory, options,hostId) => {
     if(hostId)return remote.workspaceCall(hostId,root,'workspace.files.list',{directory,options});
     const works = await listWorks();
-    if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
+    requireWorkRoot(works,root);
     const listing=await listDirectory(wslUnc(root), directory, options),base=await fs.realpath(wslUnc(root));
     return {...listing,entries:listing.entries.map(entry=>({...entry,path:path.relative(base,entry.path).split(path.sep).join('/')}))};
   });
   handle('preview:choose-file', async root => {
     const works = await listWorks();
-    if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
+    requireWorkRoot(works,root);
     const workPath = await fs.realpath(wslUnc(root));
     const result = await dialog.showOpenDialog(window, {
       title: '选择当前 work 根中的文件', defaultPath: workPath,
@@ -331,25 +338,8 @@ app.whenReady().then(async () => {
   async function readPreview(root, reference, basePath,hostId) {
     if(hostId)return remote.workspaceCall(hostId,root,'workspace.files.read',{reference,basePath});
     const works = await listWorks();
-    if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('无效工作根');
-    if (typeof reference !== 'string' || !reference || reference.includes('\0')) throw new Error('无效文件路径');
-    const workPath = await fs.realpath(wslUnc(root));
-    const candidate = path.resolve(basePath ? path.dirname(path.resolve(workPath, basePath)) : workPath, reference);
-    if (!within(workPath, candidate)) throw new Error('只能预览当前 work 根目录中的文件');
-    const selectedPath = await fs.realpath(candidate);
-    const relative = path.relative(workPath, selectedPath);
-    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error('只能预览当前 work 根目录中的文件');
-    const extension = path.extname(selectedPath).toLowerCase();
-    const kind = previewKind(selectedPath);
-    if (kind === 'markdown' || kind === 'text') {
-      const data = await readBounded(selectedPath, 1024 * 1024, kind === 'markdown' ? 'Markdown 文件' : '文本文件');
-      if (data.includes(0)) throw new Error('该文件包含二进制数据，无法作为文本预览');
-      return { kind, name: path.basename(selectedPath), path: relative.split(path.sep).join('/'), content: data.toString('utf8') };
-    }
-    const mime = IMAGE_MIME[extension];
-    if (!mime) throw new Error('此文件类型不支持预览');
-    const data = await readBounded(selectedPath, 10 * 1024 * 1024, '图片');
-    return { kind: 'image', name: path.basename(selectedPath), path: relative.split(path.sep).join('/'), dataUrl: `data:${mime};base64,${data.toString('base64')}` };
+    requireWorkRoot(works,root);
+    return readWorkspacePreview(wslUnc(root), reference, basePath, root);
   }
   handle('preview:read', readPreview);
   // Older renderers use this channel; keep the same system-browser behavior.

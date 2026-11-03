@@ -1,0 +1,1005 @@
+package wiki
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"stele/internal/todo"
+)
+
+// MCP JSON-RPC types
+
+type jsonRPCRequest struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      any             `json:"id,omitempty"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
+}
+
+type jsonRPCResponse struct {
+	JSONRPC string    `json:"jsonrpc"`
+	ID      any       `json:"id,omitempty"`
+	Result  any       `json:"result,omitempty"`
+	Error   *rpcError `json:"error,omitempty"`
+}
+
+type rpcError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+// MCP protocol types
+
+type mcpTool struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	InputSchema map[string]any `json:"inputSchema"`
+}
+
+type mcpContent struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type mcpToolResult struct {
+	Content []mcpContent `json:"content"`
+	IsError bool         `json:"isError,omitempty"`
+}
+
+var mcpTools = []mcpTool{
+	{
+		Name:        "wiki_search",
+		Description: "按统一混合排序搜索工程文档，返回命中原因；rank 是排序值，不是置信度。建议对结果调用 wiki_neighbors 查看图谱关联。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"query": map[string]any{"type": "string", "description": "搜索查询(中文/英文均可)"},
+			},
+			"required": []string{"query"},
+		},
+	},
+	{
+		Name:        "wiki_component",
+		Description: "查看某个组件的详细信息,包括类型、所属工作区、前向引用和反向引用。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id": map[string]any{"type": "string", "description": "组件 ID(绝对路径)"},
+			},
+			"required": []string{"id"},
+		},
+	},
+	{
+		Name:        "wiki_neighbors",
+		Description: "查看某个组件的2-hop图谱邻居(直接关联 + 间接关联),了解该组件在知识图谱中的位置。通常在 wiki_search 找到相关文档后使用,可以发现内容不相似但图谱上关联的文档。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id": map[string]any{"type": "string", "description": "组件 ID(绝对路径)"},
+			},
+			"required": []string{"id"},
+		},
+	},
+	{
+		Name:        "wiki_overview",
+		Description: "获取某个主题社区的AI生成综述(需要社区编号,可从 wiki_search 结果推断)。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"community": map[string]any{"type": "number", "description": "社区 ID"},
+			},
+			"required": []string{"community"},
+		},
+	},
+	{
+		Name:        "wiki_read",
+		Description: "读取指定路径的文档原始内容(markdown)。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{"type": "string", "description": "文件绝对路径"},
+			},
+			"required": []string{"path"},
+		},
+	},
+	{
+		Name:        "wiki_lint",
+		Description: "检查文档健康度:列出死链、孤儿节点、缺失验证报告等问题。",
+		InputSchema: map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		},
+	},
+	{
+		Name: "wiki_context",
+		Description: "任务开始前的单入口召回:给一个自然语言问题,返回紧凑 Markdown 上下文包" +
+			"——最相关的工程文档、动过这些文档的 agent 会话(含会话意图摘要),以及命中的 agent 记忆产物。" +
+			"比 wiki_search 更适合\"动手前先了解\",因为它把文档与历史会话的关系一起给出。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"query": map[string]any{"type": "string", "description": "自然语言问题(中/英文均可)"},
+				"limit": map[string]any{"type": "number", "description": "文档与会话各自返回条数上限,默认 5,上限 20"},
+			},
+			"required": []string{"query"},
+		},
+	},
+	{
+		Name:        "wiki_sessions",
+		Description: "列出已索引的 agent 会话摘要(标题、工作区、时间、工具调用统计、读/改过的文档)。不返回会话原始记录。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"workspace": map[string]any{"type": "string", "description": "按工作区别名筛选"},
+				"limit":     map[string]any{"type": "number", "description": "返回条数上限,默认 10,上限 50"},
+			},
+		},
+	},
+	{
+		Name:        "todo_list",
+		Description: "列出所有待办事项,可按状态/工作区/Change/Wiki组件/关键词(搜索标题和备注)筛选。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"status":          map[string]any{"type": "string", "enum": []string{"open", "in_progress", "done", "blocked", "dropped"}, "description": "筛选状态"},
+				"workspace":       map[string]any{"type": "string", "description": "按 Todo 所属工作区筛选"},
+				"change":          map[string]any{"type": "string", "description": "按关联 Change 名称筛选"},
+				"wikiComponentId": map[string]any{"type": "string", "description": "按关联的 Wiki 组件 ID 筛选"},
+				"q":               map[string]any{"type": "string", "description": "标题和备注关键词搜索"},
+			},
+		},
+	},
+	{
+		Name:        "todo_create",
+		Description: "创建新的待办事项。需要 loopback + Bearer token 鉴权。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"workspace": map[string]any{"type": "string", "description": "所属工作区别名(必填)"},
+				"title":     map[string]any{"type": "string", "description": "待办标题(必填)"},
+				"notes":     map[string]any{"type": "string", "description": "备注"},
+				"status":    map[string]any{"type": "string", "enum": []string{"open", "in_progress", "done", "blocked", "dropped"}, "description": "状态 (默认 open)"},
+				"priority":  map[string]any{"type": "string", "description": "优先级: urgent, high, normal, low (默认 normal)"},
+				"dueAt":     map[string]any{"type": "string", "description": "截止时间 RFC3339"},
+				"change":    map[string]any{"type": "object", "description": "关联 Change: {workspace, name}"},
+				"wikiRefs":  map[string]any{"type": "array", "description": "关联 Wiki 组件: [{componentId, workspace}]"},
+			},
+			"required": []string{"workspace", "title"},
+		},
+	},
+	{
+		Name:        "todo_update",
+		Description: "更新待办事项的部分字段。需要 loopback + Bearer token 鉴权。change 设为 null 清除关联; wikiRefs 设为 [] 清除列表。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id":        map[string]any{"type": "string", "description": "待办 ID(必填)"},
+				"workspace": map[string]any{"type": "string", "description": "新工作区"},
+				"title":     map[string]any{"type": "string", "description": "新标题"},
+				"notes":     map[string]any{"type": "string", "description": "新备注"},
+				"status":    map[string]any{"type": "string", "enum": []string{"open", "in_progress", "done", "blocked", "dropped"}, "description": "新状态"},
+				"priority":  map[string]any{"type": "string", "description": "新优先级"},
+				"dueAt":     map[string]any{"type": []string{"string", "null"}, "description": "新截止时间 RFC3339, null 清除"},
+				"change":    map[string]any{"type": []string{"object", "null"}, "description": "新 Change 关联 {workspace,name}, null 清除"},
+				"wikiRefs":  map[string]any{"type": "array", "description": "新 WikiRefs 列表 [{componentId,workspace}], 传 [] 清除"},
+			},
+			"required": []string{"id"},
+		},
+	},
+	{
+		Name:        "todo_delete",
+		Description: "删除待办事项。需要 loopback + Bearer token 鉴权。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id": map[string]any{"type": "string", "description": "待办 ID(必填)"},
+			},
+			"required": []string{"id"},
+		},
+	},
+	{
+		Name:        "todo_sync_omp",
+		Description: "原子同步一个 OMP 会话的完整 Todo 快照。仅供本机 OMP 扩展使用，需要 loopback + Bearer token 鉴权。",
+		InputSchema: map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"properties": map[string]any{
+				"workspace":   map[string]any{"type": "string"},
+				"sessionId":   map[string]any{"type": "string"},
+				"snapshotSeq": map[string]any{"type": "integer", "minimum": 0},
+				"mode":        map[string]any{"type": "string", "enum": []string{"upsert", "reconcile"}},
+				"todos": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type":                 "object",
+						"additionalProperties": false,
+						"properties": map[string]any{
+							"taskKey": map[string]any{"type": "string"},
+							"phase":   map[string]any{"type": "string"},
+							"title":   map[string]any{"type": "string"},
+							"status":  map[string]any{"type": "string", "enum": []string{"open", "in_progress", "done", "blocked", "dropped"}},
+							"blocker": map[string]any{"type": "string"},
+						},
+						"required": []string{"taskKey", "phase", "title", "status"},
+					},
+				},
+			},
+			"required": []string{"workspace", "sessionId", "snapshotSeq", "mode", "todos"},
+		},
+	},
+	{
+		Name:        "wiki_claim_search",
+		Description: "语义搜索已验证的工程断言(claim)。claim 是带版本化证据的一句话事实(结论、坑、决策、风险),比文档检索更细粒度。返回按相似度排序的断言列表(含工作区、类型、新鲜度状态)。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"query":     map[string]any{"type": "string", "description": "自然语言查询(中/英文均可)"},
+				"workspace": map[string]any{"type": "string", "description": "按工作区别名筛选"},
+				"kind":      map[string]any{"type": "string", "enum": []string{"fact", "decision", "pitfall", "constraint", "risk"}, "description": "按断言类型筛选"},
+				"limit":     map[string]any{"type": "number", "description": "返回条数上限,默认 5,上限 20"},
+			},
+			"required": []string{"query"},
+		},
+	},
+	{
+		Name: "wiki_claim_upsert",
+		Description: "幂等写入/更新工程断言(claim)。一条 claim = 一个带版本化证据的事实/决策/坑/约束/风险。" +
+			"evidence 资源格式: ws://<workspace>/<relpath>#L<from>-L<to>(代码行范围)、doc://<workspace>/<relpath>(文档)、" +
+			"session://<sessionID>(会话)。status 只接受 active(默认)/retracted; 过期(stale)由系统自动标记, 重新 upsert 同 id 即清除过期。" +
+			"需要 loopback + Bearer token 鉴权。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"workspace": map[string]any{"type": "string", "description": "所属工作区别名(必填, 必须在 workspaces.yaml 注册)"},
+				"claims": map[string]any{
+					"type":        "array",
+					"description": "断言列表(1..N 条), 逐条校验, 任一非法整体拒绝",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"id":          map[string]any{"type": "string", "description": "断言 ID(必填, claim. 前缀)"},
+							"docId":       map[string]any{"type": "string", "description": "可选, 关联文档 Component ID"},
+							"kind":        map[string]any{"type": "string", "enum": []string{"fact", "decision", "pitfall", "constraint", "risk"}, "description": "断言类型(必填)"},
+							"truth":       map[string]any{"type": "string", "enum": []string{"code_verified", "source_verified", "unknown"}, "description": "可信度(必填)"},
+							"intent":      map[string]any{"type": "string", "enum": []string{"intended", "accidental", "unknown"}, "description": "意图(必填)"},
+							"text":        map[string]any{"type": "string", "description": "断言正文(必填, 一句话一个事实)"},
+							"codeAnchors": map[string]any{"type": "array", "description": "导航用代码路径(不验证版本)"},
+							"evidence":    map[string]any{"type": "array", "description": "版本化证据 [{resource}]"},
+							"tags":        map[string]any{"type": "array", "description": "标签"},
+							"status":      map[string]any{"type": "string", "enum": []string{"active", "retracted"}, "description": "状态(默认 active)"},
+						},
+						"required": []string{"id", "kind", "truth", "intent", "text"},
+					},
+				},
+			},
+			"required": []string{"workspace", "claims"},
+		},
+	},
+	{
+		Name:        "wiki_claim_get",
+		Description: "查看一条断言的完整内容,包括证据(ws:// 代码行范围、doc:// 文档、session:// 会话)及其最后验证的版本状态。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id": map[string]any{"type": "string", "description": "断言 ID(claim. 前缀)"},
+			},
+			"required": []string{"id"},
+		},
+	},
+	{
+		Name:        "wiki_claims",
+		Description: "列出断言,可按工作区/状态/类型/关联文档筛选。status=stale 用于查看已过期待重新验证的断言。",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"workspace": map[string]any{"type": "string", "description": "按工作区别名筛选"},
+				"status":    map[string]any{"type": "string", "enum": []string{"active", "stale", "retracted"}, "description": "按状态筛选"},
+				"kind":      map[string]any{"type": "string", "enum": []string{"fact", "decision", "pitfall", "constraint", "risk"}, "description": "按断言类型筛选"},
+				"doc":       map[string]any{"type": "string", "description": "按关联文档(Component ID)筛选"},
+				"limit":     map[string]any{"type": "number", "description": "返回条数上限,默认 20,上限 100"},
+			},
+		},
+	},
+}
+
+// HandleMCP is the MCP Streamable HTTP endpoint. It accepts POST JSON-RPC
+// 2.0 requests (initialize / notifications/initialized / tools/list /
+// tools/call). GET (the SSE half of the Streamable HTTP transport, used for
+// server-initiated notifications) is not implemented since none of these
+// tools push async server events — every response is a synchronous reply to
+// a client request.
+func (a *API) HandleMCP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		http.Error(w, "SSE not implemented", 405)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "read error", 400)
+		return
+	}
+
+	var req jsonRPCRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		writeRPCError(w, nil, -32700, "parse error")
+		return
+	}
+
+	switch req.Method {
+	case "initialize":
+		a.mcpInitialize(w, req)
+	case "notifications/initialized":
+		// Client confirms initialization; per spec this is a notification
+		// (no id), so no JSON-RPC response body is sent — just 202
+		// Accepted to close out the HTTP request cleanly.
+		w.WriteHeader(http.StatusAccepted)
+	case "tools/list":
+		a.mcpToolsList(w, req)
+	case "tools/call":
+		a.mcpToolsCall(w, r, req)
+	default:
+		writeRPCError(w, req.ID, -32601, "method not found: "+req.Method)
+	}
+}
+
+func (a *API) mcpInitialize(w http.ResponseWriter, req jsonRPCRequest) {
+	writeRPCResult(w, req.ID, map[string]any{
+		"protocolVersion": "2025-03-26",
+		"capabilities": map[string]any{
+			"tools": map[string]any{},
+		},
+		"serverInfo": map[string]any{
+			"name":    "stele-wiki",
+			"version": "1.0.0",
+		},
+	})
+}
+
+func (a *API) mcpToolsList(w http.ResponseWriter, req jsonRPCRequest) {
+	writeRPCResult(w, req.ID, map[string]any{
+		"tools": mcpTools,
+	})
+}
+
+func (a *API) mcpToolsCall(w http.ResponseWriter, r *http.Request, req jsonRPCRequest) {
+	var params struct {
+		Name      string         `json:"name"`
+		Arguments map[string]any `json:"arguments"`
+	}
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		writeRPCError(w, req.ID, -32602, "invalid params")
+		return
+	}
+
+	var result mcpToolResult
+	switch params.Name {
+	case "wiki_search":
+		result = a.mcpWikiSearch(params.Arguments)
+	case "wiki_component":
+		result = a.mcpWikiComponent(params.Arguments)
+	case "wiki_neighbors":
+		result = a.mcpWikiNeighbors(params.Arguments)
+	case "wiki_overview":
+		result = a.mcpWikiOverview(params.Arguments)
+	case "wiki_read":
+		result = a.mcpWikiRead(params.Arguments)
+	case "wiki_lint":
+		result = a.mcpWikiLint(params.Arguments)
+	case "wiki_context":
+		result = a.mcpWikiContext(params.Arguments)
+	case "wiki_sessions":
+		result = a.mcpWikiSessions(params.Arguments)
+	case "todo_list":
+		result = a.mcpTodoList(params.Arguments)
+	case "todo_create":
+		result = a.mcpTodoCreate(r, params.Arguments)
+	case "todo_update":
+		result = a.mcpTodoUpdate(r, params.Arguments)
+	case "todo_delete":
+		result = a.mcpTodoDelete(r, params.Arguments)
+	case "todo_sync_omp":
+		result = a.mcpTodoSyncOMP(r, params.Arguments)
+	case "wiki_claim_search":
+		result = a.mcpClaimSearch(params.Arguments)
+	case "wiki_claim_get":
+		result = a.mcpClaimGet(params.Arguments)
+	case "wiki_claims":
+		result = a.mcpClaimsList(params.Arguments)
+	case "wiki_claim_upsert":
+		result = a.mcpClaimUpsert(r, params.Arguments)
+	case "wiki_review_list", "wiki_review_action", "wiki_candidate_list", "wiki_candidate_create", "wiki_candidate_action":
+		result = a.mcpReviewOperation(r, params.Name, params.Arguments)
+	default:
+		result = mcpToolResult{
+			Content: []mcpContent{{Type: "text", Text: "unknown tool: " + params.Name}},
+			IsError: true,
+		}
+	}
+
+	writeRPCResult(w, req.ID, result)
+}
+
+// Tool implementations
+
+func (a *API) mcpWikiSearch(args map[string]any) mcpToolResult {
+	query, _ := args["query"].(string)
+	if strings.TrimSpace(query) == "" {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "query is required"}}, IsError: true}
+	}
+	requiredTags, query := parseTagFilters(query)
+	var queryVec []float32
+	queryComps := []Component{{ID: "__query__", Title: query}}
+	if query != "" {
+		embedResult, err := ComputeEmbeddings(queryComps, findEmbedScript())
+		if err == nil {
+			queryVec = embedResult["__query__"]
+		}
+	}
+	a.mu.RLock()
+	components, embeddings := cloneSearchSnapshot(a.graph.Components(), a.graph.Embeddings())
+	a.mu.RUnlock()
+	taxonomy := LoadTaxonomy()
+	ranked, evidence := a.rankDocumentSearch(query, requiredTags, queryVec, components, embeddings, taxonomy)
+	if len(ranked) > 20 {
+		ranked = ranked[:20]
+	}
+	a.selectedEvidence(query, ranked, components, evidence)
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Found %d results for %q:\n\n", len(ranked), query)
+	for i, hit := range ranked {
+		component := components[hit.id]
+		reasons := semanticMatchReasons(query, requiredTags, hit, EffectiveComponentTags(component, taxonomy))
+		fmt.Fprintf(&sb, "%d. [%s] %s (workspace: %s)\n   rank: %.3f; reasons: %s\n   path: %s\n",
+			i+1, component.Type, component.Title, component.Workspace, hit.score, strings.Join(reasons, ", "), component.Path)
+		if reference, ok := evidence[hit.id]; ok {
+			fmt.Fprintf(&sb, "   snapshot: %s lines %d-%d (%s)\n   %s\n", reference.Version, reference.LineStart, reference.LineEnd, strings.Join(reference.Reasons, ", "), reference.Excerpt)
+		}
+		sb.WriteString("\n")
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: sb.String()}}}
+}
+
+func (a *API) mcpWikiComponent(args map[string]any) mcpToolResult {
+	id, _ := args["id"].(string)
+	if id == "" {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "id is required"}}, IsError: true}
+	}
+
+	a.mu.RLock()
+	c, ok := a.graph.Component(id)
+	forward := a.graph.Forward(id)
+	backlinks := a.graph.Backlinks(id)
+	a.mu.RUnlock()
+
+	if !ok {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "component not found: " + id}}, IsError: true}
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "## %s\n\nType: %s\nWorkspace: %s\nPath: %s\n\n", c.Title, c.Type, c.Workspace, c.Path)
+	if len(forward) > 0 {
+		sb.WriteString("### Forward references:\n")
+		for _, e := range forward {
+			fmt.Fprintf(&sb, "- [%s] → %s\n", e.Kind, e.To)
+		}
+	}
+	if len(backlinks) > 0 {
+		sb.WriteString("\n### Backlinks (referenced by):\n")
+		for _, e := range backlinks {
+			fmt.Fprintf(&sb, "- [%s] ← %s\n", e.Kind, e.From)
+		}
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: sb.String()}}}
+}
+
+func (a *API) mcpWikiNeighbors(args map[string]any) mcpToolResult {
+	id, _ := args["id"].(string)
+	if id == "" {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "id is required"}}, IsError: true}
+	}
+
+	a.mu.RLock()
+	components := a.graph.Components()
+	forward := a.graph.Forward(id)
+	backlinks := a.graph.Backlinks(id)
+	a.mu.RUnlock()
+
+	seen := map[string]bool{id: true}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "2-hop neighbors of: %s\n\n", id)
+
+	// 1-hop
+	sb.WriteString("### Direct (1-hop):\n")
+	var firstHopIDs []string
+	for _, e := range forward {
+		if !seen[e.To] {
+			if c, ok := components[e.To]; ok {
+				fmt.Fprintf(&sb, "- [%s] → %s (%s)\n", e.Kind, c.Title, c.Type)
+				firstHopIDs = append(firstHopIDs, e.To)
+				seen[e.To] = true
+			}
+		}
+	}
+	for _, e := range backlinks {
+		if !seen[e.From] {
+			if c, ok := components[e.From]; ok {
+				fmt.Fprintf(&sb, "- [%s] ← %s (%s)\n", e.Kind, c.Title, c.Type)
+				firstHopIDs = append(firstHopIDs, e.From)
+				seen[e.From] = true
+			}
+		}
+	}
+
+	// 2-hop
+	sb.WriteString("\n### Indirect (2-hop):\n")
+	count := 0
+	for _, nid := range firstHopIDs {
+		a.mu.RLock()
+		nf := a.graph.Forward(nid)
+		a.mu.RUnlock()
+		for _, e := range nf {
+			if !seen[e.To] {
+				if c, ok := components[e.To]; ok {
+					fmt.Fprintf(&sb, "- %s (%s)\n", c.Title, c.Type)
+					seen[e.To] = true
+					count++
+					if count >= 20 {
+						break
+					}
+				}
+			}
+		}
+		if count >= 20 {
+			break
+		}
+	}
+	if count == 0 {
+		sb.WriteString("(none)\n")
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: sb.String()}}}
+}
+
+func (a *API) mcpWikiOverview(args map[string]any) mcpToolResult {
+	communityF, _ := args["community"].(float64) // JSON numbers decode as float64
+	communityID := int(communityF)
+
+	a.mu.RLock()
+	communities := a.graph.Communities()
+	components, _ := cloneSearchSnapshot(a.graph.Components(), nil)
+	a.mu.RUnlock()
+
+	var members []Component
+	for id, cid := range communities {
+		if cid == communityID {
+			if c, ok := components[id]; ok {
+				members = append(members, c)
+			}
+		}
+	}
+
+	if len(members) < 3 {
+		return mcpToolResult{
+			Content: []mcpContent{{Type: "text", Text: fmt.Sprintf("community %d has fewer than 3 members", communityID)}},
+			IsError: true,
+		}
+	}
+
+	key, err := a.overviewCacheKeyForMembers(members)
+	if err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: err.Error()}}, IsError: true}
+	}
+	cacheDir := filepath.Join(a.indexCacheDir, "overviews")
+	data, err := os.ReadFile(overviewCachePath(cacheDir, communityID, key))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: err.Error()}}, IsError: true}
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "## Community %d (%d members)\n\n", communityID, len(members))
+	if err == nil && len(data) > 0 {
+		sb.Write(data)
+	} else {
+		sb.WriteString("(no cached overview yet)\n\nMembers:\n")
+		for _, m := range members {
+			fmt.Fprintf(&sb, "- [%s] %s (workspace: %s)\n", m.Type, m.Title, m.Workspace)
+		}
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: sb.String()}}}
+}
+
+func (a *API) mcpWikiRead(args map[string]any) mcpToolResult {
+	path, _ := args["path"].(string)
+	if path == "" {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "path is required"}}, IsError: true}
+	}
+
+	// Security: only allow reading files that are indexed components —
+	// either by ID (the common case, since Component.ID is the absolute
+	// path) or by Path field, mirroring how other components are keyed.
+	a.mu.RLock()
+	_, found := a.graph.Component(path)
+	if !found {
+		for _, c := range a.graph.Components() {
+			if c.Path == path {
+				found = true
+				break
+			}
+		}
+	}
+	a.mu.RUnlock()
+	if !found {
+		return mcpToolResult{
+			Content: []mcpContent{{Type: "text", Text: "file not in wiki index (security: only indexed files can be read)"}},
+			IsError: true,
+		}
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "read error: " + err.Error()}}, IsError: true}
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: string(content)}}}
+}
+
+func (a *API) mcpWikiLint(args map[string]any) mcpToolResult {
+	a.mu.RLock()
+	issues := a.graph.Lint()
+	a.mu.RUnlock()
+
+	// Claims freshness runs outside the graph lock (see HandleLint).
+	issues, err := a.claimLintIssues(issues)
+	if err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "failed to persist claim freshness: " + err.Error()}}, IsError: true}
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%d lint issues:\n\n", len(issues))
+
+	grouped := map[string][]LintIssue{}
+	var rules []string
+	for _, i := range issues {
+		if _, ok := grouped[i.Rule]; !ok {
+			rules = append(rules, i.Rule)
+		}
+		grouped[i.Rule] = append(grouped[i.Rule], i)
+	}
+	sort.Strings(rules)
+	for _, rule := range rules {
+		items := grouped[rule]
+		fmt.Fprintf(&sb, "### %s (%d)\n", rule, len(items))
+		shown := items
+		if len(shown) > 10 {
+			shown = shown[:10]
+			fmt.Fprintf(&sb, "  (showing first 10 of %d)\n", len(items))
+		}
+		for _, item := range shown {
+			fmt.Fprintf(&sb, "- %s\n", item.Detail)
+		}
+		sb.WriteString("\n")
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: sb.String()}}}
+}
+
+// mcpAuth checks loopback + Bearer token against the provided token bytes.
+func (a *API) mcpAuth(r *http.Request, tokenBytes []byte) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return false
+	}
+	if !net.ParseIP(host).IsLoopback() {
+		return false
+	}
+	auth := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	if !strings.HasPrefix(auth, prefix) {
+		return false
+	}
+	return todo.EqualToken([]byte(auth[len(prefix):]), tokenBytes)
+}
+
+// resolveMCPWikiTitles resolves WikiRef titles from the live graph, matching
+// the REST behavior. Does not hold graph locks across Store ops.
+func (a *API) resolveMCPWikiTitles(refs []todo.WikiRef) []todo.WikiRef {
+	if len(refs) == 0 {
+		return nil
+	}
+	out := make([]todo.WikiRef, len(refs))
+	copy(out, refs)
+	a.mu.RLock()
+	for i := range out {
+		c, ok := a.graph.Component(out[i].ComponentID)
+		if ok {
+			if c.Title != "" {
+				out[i].TitleSnapshot = c.Title
+			}
+			if c.Workspace != "" {
+				out[i].Workspace = c.Workspace
+			}
+		}
+	}
+	a.mu.RUnlock()
+	return out
+}
+
+// --- Todo MCP tools ---
+
+func (a *API) mcpTodoList(args map[string]any) mcpToolResult {
+	store, _ := a.TodoStoreSnapshot()
+	if store == nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "todo store not available"}}, IsError: true}
+	}
+	f := todo.Filter{
+		Status:          todo.Status(stringArg(args, "status")),
+		Workspace:       stringArg(args, "workspace"),
+		Change:          stringArg(args, "change"),
+		WikiComponentID: stringArg(args, "wikiComponentId"),
+		Q:               stringArg(args, "q"),
+	}
+	items, counts, revision := store.List(f)
+
+	// Resolve current Wiki titles.
+	for i := range items {
+		items[i].WikiRefs = a.resolveMCPWikiTitles(items[i].WikiRefs)
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "# Todos (%d total, %d open, %d in_progress, %d done, %d blocked, %d dropped) revision %d\n\n", counts.Total, counts.Open, counts.InProgress, counts.Done, counts.Blocked, counts.Dropped, revision)
+	if len(items) == 0 {
+		sb.WriteString("(no items)\n")
+	} else {
+		for _, item := range items {
+			dueStr := ""
+			if item.DueAt != "" {
+				dueStr = " due:" + item.DueAt
+			}
+			changeStr := ""
+			if item.Change != nil {
+				changeStr = fmt.Sprintf(" change:%s/%s", item.Change.Workspace, item.Change.Name)
+			}
+			wikiStr := ""
+			if len(item.WikiRefs) > 0 {
+				wikiStr = fmt.Sprintf(" wiki:%d", len(item.WikiRefs))
+			}
+			notesStr := ""
+			if item.Notes != "" {
+				notesStr = " notes:" + item.Notes
+			}
+			originStr := ""
+			if item.ExternalRef != nil {
+				originStr = fmt.Sprintf(" external:%s/%s/%s", item.ExternalRef.System, item.ExternalRef.SessionID, item.ExternalRef.TaskKey)
+			}
+			fmt.Fprintf(&sb, "- [%s] %s (%s/%s/%s)%s%s%s%s%s\n", item.ID[:8], item.Title, item.Workspace, item.Status, item.Priority, dueStr, changeStr, wikiStr, notesStr, originStr)
+		}
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: sb.String()}}}
+}
+
+func (a *API) mcpTodoCreate(r *http.Request, args map[string]any) mcpToolResult {
+	store, token := a.TodoStoreSnapshot()
+	if store == nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "todo store not available"}}, IsError: true}
+	}
+	if !a.mcpAuth(r, token) {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "write access denied: loopback + Bearer token required"}}, IsError: true}
+	}
+
+	in := todo.CreateInput{
+		Workspace: stringArg(args, "workspace"),
+		Title:     stringArg(args, "title"),
+		Notes:     stringArg(args, "notes"),
+		Status:    todo.Status(stringArg(args, "status")),
+		Priority:  todo.Priority(stringArg(args, "priority")),
+		DueAt:     stringArg(args, "dueAt"),
+		Metadata:  todo.Metadata{Source: todo.SourceMCP},
+	}
+	if v, ok := args["change"]; ok && v != nil {
+		ch, ok := v.(map[string]any)
+		if !ok {
+			return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "change must be an object with workspace and name"}}, IsError: true}
+		}
+		in.Change = &todo.ChangeRef{
+			Workspace: fmt.Sprint(ch["workspace"]),
+			Name:      fmt.Sprint(ch["name"]),
+		}
+	}
+	if v, ok := args["wikiRefs"]; ok && v != nil {
+		refs, ok := v.([]any)
+		if !ok {
+			return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "wikiRefs must be an array"}}, IsError: true}
+		}
+		for _, r := range refs {
+			rm, ok := r.(map[string]any)
+			if !ok {
+				return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "each wikiRefs entry must be an object with componentId and workspace"}}, IsError: true}
+			}
+			in.WikiRefs = append(in.WikiRefs, todo.WikiRef{
+				ComponentID: fmt.Sprint(rm["componentId"]),
+				Workspace:   fmt.Sprint(rm["workspace"]),
+			})
+		}
+	}
+
+	item, err := store.Create(in)
+	if err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "create failed: " + err.Error()}}, IsError: true}
+	}
+	item.WikiRefs = a.resolveMCPWikiTitles(item.WikiRefs)
+	data, _ := json.MarshalIndent(item, "", "  ")
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: string(data)}}}
+}
+
+func (a *API) mcpTodoUpdate(r *http.Request, args map[string]any) mcpToolResult {
+	store, token := a.TodoStoreSnapshot()
+	if store == nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "todo store not available"}}, IsError: true}
+	}
+	if !a.mcpAuth(r, token) {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "write access denied: loopback + Bearer token required"}}, IsError: true}
+	}
+
+	id := stringArg(args, "id")
+	if id == "" {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "id is required"}}, IsError: true}
+	}
+
+	var in todo.UpdateInput
+	if v, ok := args["workspace"]; ok {
+		s := fmt.Sprint(v)
+		in.Workspace = &s
+	}
+	if v, ok := args["title"]; ok {
+		s := fmt.Sprint(v)
+		in.Title = &s
+	}
+	if v, ok := args["notes"]; ok {
+		s := fmt.Sprint(v)
+		in.Notes = &s
+	}
+	if v, ok := args["status"]; ok {
+		s := todo.Status(fmt.Sprint(v))
+		in.Status = &s
+	}
+	if v, ok := args["priority"]; ok {
+		s := todo.Priority(fmt.Sprint(v))
+		in.Priority = &s
+	}
+	if v, exists := args["dueAt"]; exists {
+		in.DueAtSet = true
+		if v != nil {
+			s := fmt.Sprint(v)
+			in.DueAt = &s
+		}
+		// v == nil clears dueAt.
+	}
+	// change: absent = no-op, null = clear, object = replace.
+	if v, exists := args["change"]; exists {
+		in.ChangeSet = true
+		if v != nil {
+			ch, ok := v.(map[string]any)
+			if !ok {
+				return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "change must be an object {workspace,name} or null"}}, IsError: true}
+			}
+			in.Change = &todo.ChangeRef{
+				Workspace: fmt.Sprint(ch["workspace"]),
+				Name:      fmt.Sprint(ch["name"]),
+			}
+		}
+	}
+	if v, exists := args["wikiRefs"]; exists {
+		in.WikiRefsSet = true
+		if v != nil {
+			refs, ok := v.([]any)
+			if !ok {
+				return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "wikiRefs must be an array"}}, IsError: true}
+			}
+			var wr []todo.WikiRef
+			for _, r := range refs {
+				rm, ok := r.(map[string]any)
+				if !ok {
+					return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "each wikiRefs entry must be an object with componentId and workspace"}}, IsError: true}
+				}
+				wr = append(wr, todo.WikiRef{
+					ComponentID: fmt.Sprint(rm["componentId"]),
+					Workspace:   fmt.Sprint(rm["workspace"]),
+				})
+			}
+			in.WikiRefs = wr
+		}
+	}
+
+	item, err := store.Update(id, in)
+	if err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "update failed: " + err.Error()}}, IsError: true}
+	}
+	item.WikiRefs = a.resolveMCPWikiTitles(item.WikiRefs)
+	data, _ := json.MarshalIndent(item, "", "  ")
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: string(data)}}}
+}
+
+func (a *API) mcpTodoDelete(r *http.Request, args map[string]any) mcpToolResult {
+	store, token := a.TodoStoreSnapshot()
+	if store == nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "todo store not available"}}, IsError: true}
+	}
+	if !a.mcpAuth(r, token) {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "write access denied: loopback + Bearer token required"}}, IsError: true}
+	}
+
+	id := stringArg(args, "id")
+	if id == "" {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "id is required"}}, IsError: true}
+	}
+
+	if err := store.Delete(id); err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "delete failed: " + err.Error()}}, IsError: true}
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "deleted " + id}}}
+}
+
+func (a *API) mcpTodoSyncOMP(r *http.Request, args map[string]any) mcpToolResult {
+	store, token := a.TodoStoreSnapshot()
+	if store == nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "todo store not available"}}, IsError: true}
+	}
+	if !a.mcpAuth(r, token) {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "write access denied: loopback + Bearer token required"}}, IsError: true}
+	}
+
+	data, err := json.Marshal(args)
+	if err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "invalid sync arguments: " + err.Error()}}, IsError: true}
+	}
+	var in todo.OMPSyncInput
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "invalid sync arguments: " + err.Error()}}, IsError: true}
+	}
+	result, err := store.SyncOMP(in)
+	if err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "sync failed: " + err.Error()}}, IsError: true}
+	}
+	output, err := json.Marshal(result)
+	if err != nil {
+		return mcpToolResult{Content: []mcpContent{{Type: "text", Text: "sync response failed: " + err.Error()}}, IsError: true}
+	}
+	return mcpToolResult{Content: []mcpContent{{Type: "text", Text: string(output)}}}
+}
+
+func stringArg(args map[string]any, key string) string {
+	v, _ := args[key].(string)
+	return v
+}
+
+// Helpers
+
+func writeRPCResult(w http.ResponseWriter, id any, result any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(jsonRPCResponse{
+		JSONRPC: "2.0",
+		ID:      id,
+		Result:  result,
+	})
+}
+
+func writeRPCError(w http.ResponseWriter, id any, code int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(jsonRPCResponse{
+		JSONRPC: "2.0",
+		ID:      id,
+		Error:   &rpcError{Code: code, Message: message},
+	})
+}

@@ -2,6 +2,9 @@ node_modules/
 dist/
 .runtime/
 resources/remote-host/*
+resources/knowledge-engine/*
+!third_party/stele/web/dist/
+!third_party/stele/web/dist/index.html
 *.log
 __pycache__/
 work/
@@ -45,6 +48,9 @@ docs/*
 !docs/screenshots/
 !docs/screenshots/**
 !docs/git-workspace-design.md
+!docs/stele-integration-design.md
+!docs/knowledge-managed-engine.md
+!docs/work-evolution-preparation.md
 !docs/design/
 docs/design/*
 !docs/design/git-workspace/
@@ -67,12 +73,15 @@ test/*
 !test/work_runner_test.py
 !test/work_evolution_test.py
 !test/work_automatic_test.py
+!test/work_preparation_test.py
+!test/work-preparation-desktop.cjs
 !test/ssh_host_test.py
 !test/ssh_host_native.py
 !test/ssh_host_sandbox.py
 !test/ssh_sessions_test.py
 !test/ssh-host-desktop.cjs
 !test/work-details-ui.cjs
+!test/work-history-access-desktop.cjs
 !test/fixtures/
 !test/fixtures/**
 !test/renderer-behavior.cjs
@@ -102,6 +111,10 @@ test/*
 !test/history-native-desktop.cjs
 !test/knowledge-native-desktop.cjs
 !test/knowledge-native-preload.cjs
+!test/knowledge-managed-native.cjs
+!test/knowledge-managed-desktop.cjs
+!test/work-knowledge-desktop.cjs
+!test/memory-markdown-desktop.cjs
 
 # Superseded local harness and unused intermediate artwork.
 test/renderer-behavior.cjs
@@ -123,3 +136,8 @@ src/pet/assets/companions-atlas-v2.png
 !test/workspace-git-desktop.cjs
 !test/workspace-git-preload.cjs
 !test/workspace_ui_native.py
+!test/stop-recovery-desktop.cjs
+!test/terminate_wsl_test.py
+!test/session-tasks-desktop.cjs
+!docs/omp-task-monitoring.md
+!test/chat-images-desktop.cjs

@@ -74,7 +74,7 @@ async def work_tool(run, spec, name, arguments):
     raise ValueError('实验工具未开放')
 
 
-async def iterate(agent, request, tool, update):
+async def iterate(agent, request, tool, update, tools=None):
     # No interactive shell or OMP credential loading. All children share the worker's
     # process group, so pause/cancel/service shutdown also terminates model requests.
     parent=os.getpid()
@@ -110,8 +110,8 @@ async def iterate(agent, request, tool, update):
                 raise ValueError('本地 agent 协议无效')
         raise ValueError('本地 agent 意外退出，未创建 OMP 会话')
     try:
-        await send({'config': agent['config'], 'request': dict(request, tools=AGENT_TOOLS)})
-        return await asyncio.wait_for(receive(), 12*120+30)
+        await send({'config': agent['config'], 'request': dict(request, tools=AGENT_TOOLS if tools is None else tools)})
+        return await asyncio.wait_for(receive(), 30*60+30 if request.get('mode')=='prepare' or request.get('tokenBudget') is None else 12*120+30)
     finally:
         process.stdin.close()
         if process.returncode is None:

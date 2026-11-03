@@ -38,9 +38,13 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
-def specification(value, root):
-    if not isinstance(value,dict) or set(value)-{'targets','training','validation','iterations'}:
+def specification(value, root, directory=None):
+    if not isinstance(value,dict) or set(value)-{'targets','training','validation','iterations','inputs','prepared'}:
         raise ValueError('无效进化实验配置')
+    if value.get('prepared'):
+        if directory is None: raise ValueError('自动评测需要 Work 服务校验')
+        from preparation import read_prepared
+        return read_prepared(directory,root,value)
     targets=value.get('targets')
     iterations=value.get('iterations',2)
     if not isinstance(targets,list) or not 1<=len(targets)<=10 or len(set(targets))!=len(targets):
@@ -55,8 +59,13 @@ def specification(value, root):
         if name in ('SESSION.md','work.json') or name.startswith('SESSION-') or name in train_hash or name in val_hash:
             raise ValueError('优化对象不能是 Work 状态、会话日志或评分器')
         bounded_file(local_path(root,name),256*1024).decode('utf-8')
+    inputs=value.get('inputs')
+    if inputs is not None:
+        snapshot(root,inputs)
+        if (set(targets)|set(train_hash)|set(val_hash)) - set(inputs):
+            raise ValueError('实验输入必须包含优化文件与全部检查文件')
     return {'targets':targets,'iterations':iterations,'training':train,'validation':val,
-        'trainFrozen':train_hash,'validationFrozen':val_hash,'frozen':{**train_hash,**val_hash}}
+        'trainFrozen':train_hash,'validationFrozen':val_hash,'frozen':{**train_hash,**val_hash},**({'inputs':inputs} if inputs is not None else {})}
 
 
 async def run_worker(runner, key):
@@ -66,15 +75,18 @@ async def run_worker(runner, key):
     folder.mkdir(parents=True,exist_ok=True)
     request_file=folder/'request.json'
     if not request_file.exists():
-        hashes=await asyncio.to_thread(snapshot,run['root'])
+        inputs=run['evolutionSpec'].get('inputs')
+        hashes=await asyncio.to_thread(snapshot,run['root'],inputs)
         initial=folder/'initial';initial.mkdir(exist_ok=True)
         for name in hashes:
             target=initial/name;target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copy2(local_path(run['root'],name),target)
-        if snapshot(str(initial))!=hashes or snapshot(run['root'])!=hashes:
+        if snapshot(str(initial),inputs)!=hashes or snapshot(run['root'],inputs)!=hashes:
             raise ValueError('快照期间 Work 发生变化，请重新创建实验')
+        for name,content in run['evolutionSpec'].get('generated',{}).items():
+            target=local_path(initial,name);target.parent.mkdir(parents=True,exist_ok=True);target.write_text(content)
         atomic_json(request_file,{'root':run['root'],'objective':run['objective'],'acceptance':run['acceptance'],
-            'spec':run['evolutionSpec'],'hashes':hashes,'model':run['model'],'tokenBudget':run['tokenBudget']})
+            'spec':run['evolutionSpec'],'hashes':hashes,'inputs':inputs,'model':run['model'],'tokenBudget':run['tokenBudget']})
     run.update(state='running',phase='baseline')
     runner.save(run,'evolution_started','AntOmniEvo 已启动，调用本地 agent 迭代 Work 副本')
     from runner import child_setup, identity
@@ -144,7 +156,7 @@ def promote(runner, run, rollback=False):
         else:
             if run['state']!='waiting_review' or not result.get('eligible'):
                 raise ValueError('尚无可采纳候选')
-            if snapshot(run['root'])!=request['hashes']:
+            if snapshot(run['root'],request.get('inputs'))!=request['hashes']:
                 raise ValueError('Work 已变化，未覆盖当前修改；请重新评估')
             promotion={'state':'applying','candidateId':result['bestCandidate'],'files':result['changes']}
             atomic_json(transaction,promotion)
@@ -153,7 +165,7 @@ def promote(runner, run, rollback=False):
     if not candidate.resolve().is_relative_to(folder.resolve()):
         raise ValueError('候选路径异常')
     if not rollback:
-        current_snapshot=snapshot(run['root'])
+        current_snapshot=snapshot(run['root'],request.get('inputs'))
         changed={item['path'] for item in promotion['files']}
         if {k:v for k,v in current_snapshot.items() if k not in changed}!={k:v for k,v in request['hashes'].items() if k not in changed}:
             raise ValueError('Work 依赖已变化，未继续采纳')

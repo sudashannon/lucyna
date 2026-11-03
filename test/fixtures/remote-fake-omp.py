@@ -66,6 +66,12 @@ for line in sys.stdin:
         data = dict(messages=list(messages), totalMessages=len(messages))
     elif kind == 'get_available_commands':
         data = dict(commands=[])
+    elif kind == 'get_subagents':
+        data = dict(subagents=[dict(id='fixture-child', status='running')])
+    elif kind == 'cancel_subagent':
+        with (root/'cancellations.txt').open('a') as stream:
+            stream.write(frame['subagentId']+'\n')
+        data = dict(cancelled=True)
     elif kind == 'get_available_models':
         data = dict(models=[])
     elif kind == 'prompt':

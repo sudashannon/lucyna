@@ -72,10 +72,12 @@ function createKnowledgeReader(fetchImpl = fetch, {origin = 'http://127.0.0.1:18
       case 'image': {
         const doc = await component(args.id), src = args.src;
         if (typeof src !== 'string' || src.length > 4096 || /^(?:[a-z]+:|\/\/)/i.test(src)) throw new Error('只读取文档内的本地图片');
-        const image = path.posix.resolve(path.posix.dirname(doc.path), decodeURIComponent(src).split(/[?#]/)[0]);
+        const paths=/^[a-z]:[\\/]/i.test(doc.path)?path.win32:path.posix;
+        const image = paths.resolve(paths.dirname(doc.path), decodeURIComponent(src).split(/[?#]/)[0]);
         const workspace = (await getCatalog()).workspaces.find(space => space.alias === doc.workspace);
-        const root = workspace?.path?.replace(/\/$/, '');
-        if (!root || !image.startsWith(root + '/') || !/\.(png|jpe?g|webp|gif)$/i.test(image)) throw new Error('图片不在文档的知识库来源内');
+        const root = workspace?.path;
+        const relative=root?paths.relative(root,image):'..';
+        if (!root || relative==='..'||relative.startsWith('..'+paths.sep)||paths.isAbsolute(relative)||!/\.(png|jpe?g|webp|gif)$/i.test(image)) throw new Error('图片不在文档的知识库来源内');
         return read('/api/artifact', {path: image, workspace: doc.workspace}, 'image', 10 * 1024 * 1024);
       }
       default: throw new Error('不支持的知识库操作');

@@ -5,7 +5,7 @@ import { Input } from '@cindy/components/ui/input';
 import { Spinner } from '@cindy/components/ui/spinner';
 import { api } from '../api';
 import type { FilePreview, Work, WorkEvent } from '../types';
-import { documentHeadings, parseMemory, plainText, workOutline } from '../panel-data';
+import { documentHeadings, memoryPreviewMarkdown, parseMemory, plainText, workOutline } from '../panel-data';
 import { Document } from './Document';
 import { Modal } from './Modal';
 import { FileBrowser } from './FileBrowser';
@@ -23,14 +23,14 @@ export function MemoryResults({text, onQuote, canQuote, onError}: {text: string;
   return <div className="memory-results">
     {parsed.hits.length > 0 && <p className="results-caption">{parsed.hits.length} 条知识 · 引用后可在输入框编辑</p>}
     {parsed.extra.some(s => s.stale) && <p className="memory-warning">部分关联知识已标记过期，使用前请展开下方核实提示。</p>}
-    {parsed.hits.map((hit, i) => <article className="memory-card" key={`${hit.source}-${i}`}>
+    {parsed.hits.map((hit, i) => {const preview=memoryPreviewMarkdown(hit.excerpt);return <article className="memory-card" key={`${hit.source}-${i}`}>
       <h3>{hit.title}</h3><div className="memory-tags">{hit.tags.slice(0, 4).map(tag => <span key={tag}>{tag}</span>)}{hit.tags.length > 4 && <span>+{hit.tags.length - 4}</span>}</div>
-      <p className="memory-excerpt">{hit.excerpt ? plainText(hit.excerpt) : '此结果仅返回文档元数据，可引用来源让 OMP 读取全文。'}</p>
+      {hit.excerpt?<div className="memory-excerpt">{preview.tableFragment&&<p className="memory-fragment-note">表格摘录未包含完整表头，仅展示返回的数据行。</p>}<Document content={preview.content} onError={onError}/></div>:<p className="memory-empty-excerpt">此结果仅返回文档元数据，可引用来源让 OMP 读取全文。</p>}
       {hit.source && <p className="memory-source" title={hit.source}>{hit.source.split(/[\\/]/).slice(-2).join('/')}</p>}
       <div className="result-actions"><Button variant="secondary" compact disabled={!canQuote} onClick={() => onQuote(`参考 Stele 知识：${hit.title}\n来源：${hit.source || hit.kind}${hit.excerpt ? `\n摘录：${plainText(hit.excerpt).slice(0, 1600)}` : ''}${parsed.extra.some(s => s.stale) ? '\n注意：此检索包含过期知识提示，引用前请核实来源。' : ''}`)}><ArrowUpRight size={13}/>引用到聊天</Button></div>
-      <details className="source-details"><summary>来源与检索详情</summary><p>{hit.source}</p><pre>{hit.metadata}</pre>{hit.excerpt && <Document content={hit.excerpt} onError={onError}/>}</details>
-    </article>)}
-    {parsed.fallback && <div className="plain-result">{parsed.fallback}</div>}
+      <details className="source-details"><summary>来源与检索详情</summary><p>{hit.source}</p><pre>{hit.metadata}</pre>{hit.excerpt&&<pre aria-label="原始检索摘录">{hit.excerpt}</pre>}</details>
+    </article>;})}
+    {parsed.fallback && <div className="memory-excerpt"><Document content={parsed.fallback} onError={onError}/></div>}
     {parsed.extra.map((section, i) => <details key={i} className={`source-details ${section.stale ? 'stale-details' : ''}`}><summary>{section.stale ? '需重新核实的知识' : /Sessions/.test(section.title) ? '相关历史会话' : section.title}</summary><pre>{section.text}</pre></details>)}
   </div>;
 }

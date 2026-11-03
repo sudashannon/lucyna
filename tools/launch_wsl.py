@@ -6,6 +6,7 @@ in process memory; arguments are passed literally, not interpolated into a shell
 """
 import os
 import pwd
+import re
 import subprocess
 import sys
 
@@ -32,7 +33,13 @@ def main():
     environment = interactive_environment()
     environment['PI_CODING_AGENT_DIR'] = sys.argv[2]
     environment['OMP_PROFILE'] = ''
-    os.execvpe(sys.argv[3], sys.argv[3:], environment)
+    command = sys.argv[3:]
+    if command[0] == '--session-token':
+        if len(command) < 3 or not re.fullmatch(r'[a-f0-9-]{36}', command[1]):
+            raise ValueError('Invalid session token')
+        environment['LUCYNA_SESSION_TOKEN'] = command[1]
+        command = command[2:]
+    os.execvpe(command[0], command, environment)
 
 
 if __name__ == '__main__':

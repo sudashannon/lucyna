@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('desktop', {
   request: (type, data = {}, id) => ipcRenderer.invoke('omp:request', type, data, id),
   respond: (data,id) => ipcRenderer.invoke('omp:ui-response', data,id),
   close: id => ipcRenderer.invoke('omp:close',id),
+  forceStop: id => ipcRenderer.invoke('omp:terminate',id),
   listConnections: () => ipcRenderer.invoke('omp:list'),
   chooseSession: () => ipcRenderer.invoke('session:choose'),
   listHistory: (root,hostId) => ipcRenderer.invoke('session:list', root,hostId),

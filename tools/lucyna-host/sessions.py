@@ -22,10 +22,13 @@ MAX_FRAME = 1024*1024
 REPLAY_BYTES = 32*1024*1024
 REQUESTS = {'get_state', 'get_messages', 'get_messages_page', 'get_available_models',
             'get_available_commands', 'set_ask_dialog', 'abort_and_restore_queue', 'remove_queued_message',
+            'get_subagents', 'cancel_subagent', 'set_subagent_subscription', 'get_subagent_messages',
+            'get_background_tasks', 'get_background_task_output', 'cancel_background_task',
             'get_session_stats', 'get_commands', 'get_last_assistant_text', 'get_session_name',
             'prompt', 'steer', 'follow_up', 'abort', 'set_model', 'set_thinking_level',
             'set_session_name', 'set_steering_mode', 'set_follow_up_mode',
             'extension_ui_response', 'compact'}
+OBSERVATIONS = {'get_subagents', 'get_subagent_messages', 'get_background_tasks', 'get_background_task_output'}
 
 
 def encode(value):
@@ -402,6 +405,16 @@ class SessionManager:
                 frame = args.get('frame')
                 if not isinstance(frame, dict) or frame.get('type') not in REQUESTS:
                     raise ValueError('unsupported_omp_request')
+                if frame['type'] in OBSERVATIONS:
+                    outgoing = dict(frame, id='observation-'+key)
+                    if len(encode(outgoing))+1 > MAX_FRAME:
+                        raise ValueError('request_too_large')
+                    if session.closed:
+                        raise ValueError('session_not_live')
+                    # Read polling has no write recovery record. Cancels still
+                    # use the durable, at-most-once operations path below.
+                    session.send(outgoing)
+                    return dict(operationId=key, status='dispatched', replayed=False)
                 fingerprint = hashlib.sha256(encode(dict(sessionId=session.record['id'], generation=session.record['generation'], frame=frame))).hexdigest()
                 row = self.db.execute('SELECT fingerprint,status FROM operations WHERE id=?', (key,)).fetchone()
                 if row:

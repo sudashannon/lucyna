@@ -37,7 +37,7 @@ function toWslPath(windowsPath) {
   return `/mnt/${drive[0].toLowerCase()}${tail}`;
 }
 
-function workSteleServerDefinition({ projectRoot = DEFAULT_PROJECT_ROOT, distro = DEFAULT_DISTRO, wslUser = DEFAULT_WSL_USER } = {}) {
+function workSteleServerDefinition({ projectRoot = DEFAULT_PROJECT_ROOT, distro = DEFAULT_DISTRO, wslUser = DEFAULT_WSL_USER, knowledgeClient } = {}) {
   if (typeof distro !== 'string' || !/^[A-Za-z0-9._-]+$/.test(distro)) {
     throw new TypeError('Invalid WSL distribution name');
   }
@@ -46,7 +46,7 @@ function workSteleServerDefinition({ projectRoot = DEFAULT_PROJECT_ROOT, distro 
   return {
     type: 'stdio',
     command: 'wsl.exe',
-    args: ['-d', distro, '-u', DEFAULT_WSL_USER, '--', 'python3', toWslPath(scriptPath)],
+    args: ['-d', distro, '-u', DEFAULT_WSL_USER, '--', 'python3', toWslPath(scriptPath),...(knowledgeClient?['--knowledge-client',toWslPath(knowledgeClient.command),'--knowledge-data',knowledgeClient.profile.replaceAll('\\','/')]:[])],
   };
 }
 
@@ -123,6 +123,7 @@ function mergeWorkSteleMcpConfig(config, serverDefinition) {
   if (
     previousStele !== undefined &&
     !jsonEqual(previousStele, LEGACY_STELE_HTTP) &&
+    !jsonEqual(previousStele, workSteleServerDefinition()) &&
     !jsonEqual(previousStele, serverDefinition)
   ) {
     throw new Error('An existing Stele MCP config differs from the known entry and was preserved');

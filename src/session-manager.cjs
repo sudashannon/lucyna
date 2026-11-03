@@ -3,6 +3,7 @@ const {windowsSessionPath,wslSessionPath} = require('./client-settings.cjs');
 const {validatePrompt}=require('./prompt-input.cjs');
 const {resultExcerpt}=require('./result-excerpt.cjs');
 const {waitForStartup}=require('./startup-control.cjs');
+const {stopSession}=require('./session-stop.cjs');
 const {validateAttachments,writeTextAttachments,restoreTextAttachments}=require('./text-attachments.cjs');
 const sessionKey = value => {const normalized=windowsSessionPath(value);return /^\\\\(?:wsl\.localhost|wsl\$)\\/i.test(normalized)?'wsl:'+wslSessionPath(normalized):path.resolve(normalized).toLowerCase();};
 function clientId(value = 'legacy') {
@@ -48,7 +49,7 @@ class SessionManager {
     const timer=setTimeout(()=>controller.abort(Error(`会话启动超时：${phase}，请重试`)),this.startTimeout);
     record.session=this.create(event=>{
       if(this.records.get(id)!==record)return;
-      if(event.type==='agent_start')record.busy=true;
+      if(event.type==='agent_start'){record.busy=true;record.activityRevision=(record.activityRevision||0)+1;}
       if(event.type==='session_settled'||event.type==='process_exit')record.busy=false;
       if(event.type==='extension_ui_request') {
         if(['confirm','select','input','editor','ask'].includes(event.method))record.questions.set(event.id,event);
@@ -80,13 +81,15 @@ class SessionManager {
   async request(id,type,data) {
     if(type==='prompt')validatePrompt(data);
     const record=this.get(id);
+    const stateRevision=record.activityRevision||0;
     const titleRevision=type==='get_messages'?this.titles?.revision(record):undefined;
     if(['prompt','set_session_name','abort','abort_and_restore_queue'].includes(type))this.titles?.cancel(record);
     const prompt=type==='prompt',wasBusy=record.busy;
+    if(prompt)record.activityRevision=(record.activityRevision||0)+1;
     if(prompt&&!wasBusy)this.emit(record,{type:'client_prompt',titleHint:resultExcerpt(data.message,120)||(data.images?.length?'图片任务':'')});
     if(['abort','abort_and_restore_queue'].includes(type))this.emit(record,{type:'client_stopping'});
     let result;
-    try{result=type==='get_messages'?await record.session.messages():await record.session.request(type,data);}
+    try{result=type==='get_messages'?await record.session.messages():['abort','abort_and_restore_queue'].includes(type)?await stopSession(record.session,type,data):await record.session.request(type,data);}
     catch(error){if(prompt&&!wasBusy)this.emit(record,{type:'client_prompt_failed'});throw error;}
     if(prompt&&!wasBusy&&result?.agentInvoked===false)this.emit(record,{type:'client_command_complete'});
     if(type==='get_state'&&result?.sessionFile){
@@ -94,7 +97,7 @@ class SessionManager {
       this.ownIdentity(record,result.sessionId);this.ownFile(record,result.sessionFile);result.sessionFile=record.sessionFile;await this.onState(record);record.expectedResume=undefined;
       if(record.settings.runtime==='windows'&&record.attachmentsRestored!==record.sessionFile){await this.restoreAttachments({sessionFile:record.sessionFile,sessionId:record.nativeId,runtime:'windows'});record.attachmentsRestored=record.sessionFile;}
     }
-    if(type==='get_state')this.emit(record,{type:'session_state',sessionName:result?.sessionName||'',isSettled:result?.isSettled});
+    if(type==='get_state'){if(stateRevision!==(record.activityRevision||0))result={...result,isSettled:undefined};if(result?.isSettled===true)record.busy=false;this.emit(record,{type:'session_state',sessionName:result?.sessionName||'',isSettled:result?.isSettled});}
     if(type==='get_messages'){
       this.titles?.restore(record,result?.messages,this,titleRevision);
       const first=result?.messages?.find(m=>m.role==='user');
@@ -114,6 +117,7 @@ class SessionManager {
   }
   respond(id,data){const record=this.get(id);if(!record.questions.has(data.id))throw new Error('该问题不属于当前会话或已结束');record.session.sendFrame(data);record.questions.delete(data.id);this.emit(record,{type:'question_resolved',id:data.id});}
   close(id){const record=this.records.get(clientId(id));if(record){this.titles?.cancel(record);record.controller.abort(Error('会话启动已取消'));this.emit(record,{type:'client_closing'});}return record?record.session.close():Promise.resolve();}
+  terminate(id){const record=this.get(id);this.titles?.cancel(record);this.emit(record,{type:'client_closing'});return record.session.terminate();}
   list(){return [...this.records.values()].filter(r=>r.session.child).map(r=>({id:r.id,root:r.root,agentDir:r.agentDir,sessionFile:r.sessionFile,runtime:r.settings.runtime,ready:r.session.ready,busy:r.busy,questions:[...r.questions.values()]}));}
   async closeAll(){await Promise.allSettled([...this.records.values()].map(r=>this.close(r.id)));}
 }

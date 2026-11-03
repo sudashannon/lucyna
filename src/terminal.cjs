@@ -1,4 +1,5 @@
 const {randomUUID} = require('node:crypto');
+const {requireWorkRoot}=require('./work-access.cjs');
 
 // Own one terminal from admission through actual exit, including cancellable
 // work discovery. A superseded start must never spawn a hidden WSL shell.
@@ -17,7 +18,7 @@ class TerminalSession {
     try {
       const works = await this.listWorks();
       if (this.record !== record) throw new Error('终端启动已取消');
-      if (!works.some(work => work.root === root && work.kind !== 'invalid')) throw new Error('无效工作根');
+      requireWorkRoot(works,root);
       const cols = Number.isInteger(dimensions.cols) ? Math.max(20, Math.min(300, dimensions.cols)) : 100;
       const rows = Number.isInteger(dimensions.rows) ? Math.max(5, Math.min(120, dimensions.rows)) : 28;
       const proc = record.process = this.createPty(root, {cols, rows});

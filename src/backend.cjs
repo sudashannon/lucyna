@@ -6,6 +6,7 @@ const path = require('node:path');
 const {wslArgs, wslSessionPath, toWslPath} = require('./client-settings.cjs');
 const {FrameDecoder, readMessages} = require('./native-rpc.cjs');
 const runtime=require('./runtime-config.cjs');
+const {requireWorkRoot}=require('./work-access.cjs');
 const {boundedExec:execFileAsync}=require('./bounded-exec.cjs');
 
 const WORK_ROOT = runtime.workRoot;
@@ -44,14 +45,14 @@ function steleCall(name, args) {
 }
 
 class OmpSession {
-  constructor(send, executable = defaultOmp) { this.send = send; this.executable = executable; this.pending = new Map(); this.child = null; this.ready = false; }
+  constructor(send, executable = defaultOmp, {executeTermination=execFileAsync}={}) { this.send = send; this.executable = executable; this.executeTermination=executeTermination; this.pending = new Map(); this.child = null; this.ready = false; }
   async start({ root, executionRoot, resume, fork, model, agentDir, env: extraEnv, settings, sessionDir, signal }) {
     signal?.throwIfAborted();
     if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
     const works = await listWorks();
     signal?.throwIfAborted();
     if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
-    if (!works.some(x => x.root === root && x.kind !== 'invalid')) throw new Error('工作根不存在、无效或不在已发现的 work 列表中');
+    requireWorkRoot(works,root);
     if (executionRoot && executionRoot !== root && !executionRoot.startsWith(root + '/')) throw new Error('会话工作目录不属于所选 work');
     const isWsl = settings?.runtime === 'wsl';
     const cwd = isWsl ? executionRoot || root : wslUnc(executionRoot || root);
@@ -64,7 +65,8 @@ class OmpSession {
     const env = { ...process.env, ...(extraEnv || {}) };
     if (agentDir && !isWsl) { env.PI_CODING_AGENT_DIR = agentDir; env.OMP_PROFILE = ''; }
     if (isWsl) {delete env.PI_CODING_AGENT_DIR; delete env.OMP_PROFILE;}
-    this.child = spawn(isWsl ? 'wsl.exe' : settings?.windowsExecutable || this.executable, isWsl ? wslArgs(settings,args) : args, { cwd: isWsl ? path.resolve(__dirname,'..') : cwd, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+    this.sessionToken=randomUUID();this.processRuntime=isWsl?'wsl':'windows';
+    this.child = spawn(isWsl ? 'wsl.exe' : settings?.windowsExecutable || this.executable, isWsl ? wslArgs(settings,args,undefined,this.sessionToken) : args, { cwd: isWsl ? path.resolve(__dirname,'..') : cwd, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     const proc = this.child;
     const decoder=new FrameDecoder();
     readline.createInterface({ input: proc.stdout }).on('line', line => {
@@ -90,11 +92,28 @@ class OmpSession {
     proc.stderr.on('data', b => this.send({ type: 'stderr', message: b.toString('utf8').slice(-3000) }));
     proc.stdin.on('error',e=>{for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(e);}this.pending.clear();this.send({type:'diagnostic',message:'OMP 输入连接已关闭：'+e.message});});
     proc.on('error', e => this.send({ type: 'process_error', message: e.message }));
-    proc.on('close', (code, signal) => { if (this.child === proc) this.child = null; this.ready = false; for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error('OMP 进程已退出')); } this.pending.clear(); this.send({ type: 'process_exit', code, signal }); });
+    proc.on('close', (code, signal) => { if (this.child === proc) this.child = null; this.ready = false; for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error('OMP 进程已退出')); } this.pending.clear(); this.send({ type: 'process_exit', code, signal, stopped:this.forcedProcess===proc }); });
     return { cwd, pid: proc.pid, runtime: isWsl ? 'wsl' : 'windows' };
   }
   sendFrame(frame) { if (!this.child || !this.child.stdin.writable) throw new Error('OMP 尚未启动'); this.child.stdin.write(JSON.stringify(frame) + '\n'); }
   messages() {return readMessages((type,data)=>this.request(type,data));}
+  async terminate() {
+    const child=this.child;
+    if(!child)return;
+    this.forcedProcess=child;
+    // Capture this process object and token before awaiting anything. Never kill
+    // all OMP/WSL processes, or acknowledge exit while the journal writer lives.
+    let timer,closed;
+    const exited=new Promise((resolve,reject)=>{
+      closed=resolve;child.once('close',closed);
+      timer=setTimeout(()=>reject(Error('OMP 尚未退出，请重试强制停止')),12000);
+    });
+    const terminate=this.processRuntime==='wsl'
+      ?this.executeTermination('wsl.exe',[...runtime.wslPrefix,'--','python3',toWslPath(path.resolve(__dirname,'../tools/terminate_wsl.py')),this.sessionToken],{timeout:10000})
+      :child.exitCode!==null?Promise.resolve():this.executeTermination('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{timeout:10000});
+    try{await Promise.all([exited,terminate]);}
+    finally{clearTimeout(timer);child.removeListener('close',closed);}
+  }
   request(type, extra = {}, timeoutMs = 30000) { const id = randomUUID(); return new Promise((resolve, reject) => { const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`${type} 超时`)); }, timeoutMs); this.pending.set(id, { resolve, reject, timer }); try { this.sendFrame({ ...extra, id, type }); } catch (e) { clearTimeout(timer); this.pending.delete(id); reject(e); } }); }
   close() {
     const child = this.child;

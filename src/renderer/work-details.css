@@ -17,6 +17,7 @@
 .wd-goal { font-size:var(--font-size-body); line-height:1.75; margin:18px 0 12px; }
 .wd-section { border-top:1px solid var(--soft-border); padding-top:16px; margin:20px 0; }
 .wd-section h3, .wd-member h3 { font-size:var(--font-size-ui); font-weight:600; margin:0 0 10px; }
+.wd-section h3>.wd-caption { margin-inline-start:6px; }
 .wd-section p, .wd-record p { line-height:1.8; overflow-wrap:anywhere; margin:6px 0 10px; }
 .wd-section ul { padding-left:20px; list-style:disc; }
 .wd-section li { margin:8px 0; }

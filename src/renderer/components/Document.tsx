@@ -1,12 +1,17 @@
-import { Streamdown, defaultRehypePlugins, type Components, type DiagramPlugin, type MermaidErrorComponentProps } from 'streamdown';
+import { Streamdown, defaultComponents, defaultRehypePlugins, type Components, type DiagramPlugin, type MermaidErrorComponentProps } from 'streamdown';
 import { code } from '@streamdown/code';
 import { cjk } from '@streamdown/cjk';
 import { createMathPlugin } from '@streamdown/math';
 import 'katex/dist/katex.min.css';
 import { api } from '../api';
-import { createElement, memo, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { createElement, memo, useEffect, useMemo, useState, useSyncExternalStore, type ComponentProps } from 'react';
 import { documentHeadings } from '../panel-data';
 import { markdownTranslations } from '../markdown-config';
+import {isWorkspaceReference, mediaErrorText} from '../workspace-media';
+
+export type DocumentMedia = {onNavigate?: (href: string) => void | Promise<void>; resolveImage?: (src: string) => Promise<string>; onImage?: (src: string) => void};
+const DefaultImage = defaultComponents.img;
+const DefaultParagraph = defaultComponents.p;
 
 // The official Shiki plugin uses a JavaScript regex engine: no eval/WASM CSP exception.
 // Very large tool dumps keep their complete text without scheduling expensive highlighting.
@@ -30,7 +35,7 @@ const readTheme = () => document.documentElement.dataset.theme === 'dark';
 function DiagramError({chart, retry}: MermaidErrorComponentProps) {
   return <div className="markdown-diagram-error" role="status"><p>图表暂时无法渲染，原始内容已保留。</p><button type="button" onClick={retry}>重试图表</button><details><summary>查看 Mermaid 源码</summary><pre>{chart}</pre></details></div>;
 }
-export const Document = memo(function Document({content, onError, onNavigate, resolveImage, streaming = false}: {content: string; onError: (e: unknown) => void; onNavigate?: (href: string) => void; resolveImage?: (src: string) => Promise<string>; streaming?: boolean}) {
+export const Document = memo(function Document({content, onError, onNavigate, resolveImage, onImage, streaming = false}: DocumentMedia & {content: string; onError: (e: unknown) => void; streaming?: boolean}) {
   const [expanded,setExpanded]=useState(false);
   const [diagram,setDiagram]=useState(() => loadedDiagram);
   const needsDiagram = /^\s*(?:`{3,}|~{3,})mermaid\b/im.test(content);
@@ -46,9 +51,12 @@ export const Document = memo(function Document({content, onError, onNavigate, re
     return {
     // Static documents retain line-based outline IDs; streaming blocks have local positions.
     ...(!streaming ? {h1: heading(1), h2: heading(2), h3: heading(3), h4: heading(4), h5: heading(5), h6: heading(6)} : {}),
-    a: ({href, children, ...props}) => <a href={href} id={props.id} title={props.title} aria-label={props['aria-label']} onClick={event => {event.preventDefault(); if (!href) return; try {if (href.startsWith('#')) {event.currentTarget.closest('.markdown')?.querySelector(`[id="${CSS.escape(decodeURIComponent(href.slice(1)))}"]`)?.scrollIntoView({block: 'start'});} else if (/^https?:\/\//i.test(href)) void api.openExternal(href).catch(onError); else if (!/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href) && onNavigate) onNavigate(href); else onError('此链接无法在当前文档中打开。');} catch (e) {onError(e);}}}>{children}</a>,
-    img: ({alt, src}) => <LocalImage src={src} alt={alt} resolve={resolveImage}/>,
-  };}, [headingSource, streaming, onNavigate, onError, resolveImage]);
+    a: props => <DocumentLink {...props} onNavigate={onNavigate} onError={onError}/>,
+    // Streamdown's image wrapper is a div, including for images mixed with text.
+    // Keep that content out of a p so the resulting DOM remains valid.
+    p: props => containsImage(props.node) ? <div className="markdown-image-paragraph">{props.children}</div> : <DefaultParagraph {...props}/>,
+    img: ({alt, src}) => <LocalImage src={src} alt={alt} resolve={resolveImage} onImage={onImage}/>,
+  };}, [headingSource, streaming, onNavigate, onError, resolveImage, onImage]);
   const mermaid = useMemo(() => ({config: {theme: dark ? 'dark' : 'neutral', fontFamily: 'Source Han Sans SC, Microsoft YaHei, sans-serif', securityLevel: 'strict', htmlLabels: false}, errorComponent: DiagramError}), [dark]);
   const controls = useMemo(() => ({code: {copy: {onError}, download: false}, mermaid: {copy: {onError}, download: true, fullscreen: true, panZoom: true}, table: {copy: true, fullscreen: true, download: true}, image: false}), [onError]);
   return <div className="markdown markdown-engine" data-markdown-streaming={streaming || undefined}>
@@ -56,10 +64,39 @@ export const Document = memo(function Document({content, onError, onNavigate, re
     {limited && <div className="markdown-long-notice"><p>{content.length.toLocaleString()} 字符 · 已展示开头，按需加载完整排版。</p><button type="button" onClick={()=>setExpanded(true)}>加载完整文档</button></div>}
   </div>;
 });
-function LocalImage({src, alt, resolve}: {src?: string; alt?: string; resolve?: (src: string) => Promise<string>}) {
-  const [url, setUrl] = useState(''), [failed, setFailed] = useState(false);
-  useEffect(() => {let active = true; setUrl(''); setFailed(false); if (src && resolve && !/^(?:[a-z]+:|\/\/)/i.test(src)) void resolve(src).then(value => {if (active) setUrl(value);}).catch(() => {if (active) setFailed(true);}); return () => {active = false;};}, [src, resolve]);
-  return url ? <img src={url} alt={alt || '文档图片'} loading="lazy"/> : <span className="attachment-note">{alt || '图片'} · {failed ? '图片无法读取' : resolve && src && !/^(?:[a-z]+:|\/\/)/i.test(src) ? '读取中…' : '外部图片未加载'}</span>;
+function containsImage(node: {type: string; tagName?: string; children?: readonly unknown[]} | undefined): boolean {
+  return !!node && (node.tagName === 'img' || !!node.children?.some(child => containsImage(child as typeof node)));
+}
+function DocumentLink({href, children, id, title, onNavigate, onError, ...props}: Omit<ComponentProps<'a'>, 'onError'> & {onNavigate?: DocumentMedia['onNavigate']; onError: (error: unknown) => void}) {
+  const [busy, setBusy] = useState(false);
+  return <a href={href} id={id} title={title} aria-label={props['aria-label']} aria-busy={busy || undefined} onClick={async event => {
+    event.preventDefault(); if (!href || busy) return;
+    const element = event.currentTarget;
+    try {
+      if (href.startsWith('#')) element.closest('.markdown')?.querySelector(`[id="${CSS.escape(decodeURIComponent(href.slice(1)))}"]`)?.scrollIntoView({block: 'start'});
+      else if (/^https?:\/\//i.test(href)) await api.openExternal(href);
+      else if (isWorkspaceReference(href) && onNavigate) {setBusy(true); await onNavigate(href);}
+      else throw Error('此链接无法在当前文档中打开。');
+    } catch (error) {onError(mediaErrorText(error));} finally {setBusy(false);}
+  }}>{children}{busy && <span className="attachment-note" role="status"> · 读取中…</span>}</a>;
+}
+function LocalImage({src, alt, resolve, onImage}: {src?: string; alt?: string; resolve?: DocumentMedia['resolveImage']; onImage?: DocumentMedia['onImage']}) {
+  const [attempt, setAttempt] = useState(0);
+  const [result, setResult] = useState<{src?: string; resolve?: DocumentMedia['resolveImage']; attempt: number; url?: string; error?: string}>();
+  const local = !!src && isWorkspaceReference(src), canRead = local && !!resolve;
+  useEffect(() => {
+    let active = true;
+    if (canRead) void resolve!(src!).then(url => {if (active) setResult({src, resolve, attempt, url});}, error => {if (active) setResult({src, resolve, attempt, error: mediaErrorText(error)});});
+    return () => {active = false;};
+  }, [src, resolve, attempt, canRead]);
+  const current = result?.src === src && result?.resolve === resolve && result?.attempt === attempt ? result : undefined;
+  if (current?.url) return <DefaultImage key={`${src}:${attempt}`} src={current.url} alt={alt || '文档图片'} loading="lazy" className={onImage ? 'markdown-workspace-image' : undefined}
+    role={onImage ? 'button' : undefined} tabIndex={onImage ? 0 : undefined} aria-label={onImage ? `放大图片：${alt || '文档图片'}` : undefined} title={onImage ? '点击放大图片' : undefined}
+    onClick={onImage ? event => {event.preventDefault(); event.stopPropagation(); onImage(current.url!);} : undefined}
+    onKeyDown={onImage ? event => {if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); event.stopPropagation(); onImage(current.url!);}} : undefined}
+    onError={() => setResult({src, resolve, attempt, error: '图片数据无法解码，请重试'})}/>;
+  const message = current?.error || (canRead ? '读取图片中…' : local ? '未关联工作区，无法读取图片' : /^https?:|^\/\//i.test(src || '') ? '网络图片暂不支持内嵌预览' : '图片地址尚未完整或格式不支持');
+  return <span className="markdown-image-status attachment-note" role="status"><span>{alt || '图片'} · {message}</span>{current?.error && canRead && <button type="button" onClick={() => setAttempt(value => value + 1)}>重试图片</button>}</span>;
 }
 export function imageData(block: any): string | null {
   const mime = block.mimeType || block.mime_type || block.source?.media_type || block.contentType;
@@ -70,11 +107,11 @@ export function imageData(block: any): string | null {
   try { if (atob(encoded).length > 10 * 1024 * 1024) return null; } catch { return null; }
   return `data:${mime};base64,${encoded}`;
 }
-export function MessageContent({content, onError, onImage, streaming = false}: {content: any; onError: (e: unknown) => void; onImage: (url: string) => void; streaming?: boolean}) {
-  if (typeof content === 'string') return <Document content={content} onError={onError} streaming={streaming}/>;
+export function MessageContent({content, onError, onImage, streaming = false, ...media}: DocumentMedia & {content: any; onError: (e: unknown) => void; onImage: (url: string) => void; streaming?: boolean}) {
+  if (typeof content === 'string') return <Document content={content} onError={onError} streaming={streaming} onImage={onImage} {...media}/>;
   if (!Array.isArray(content)) return <pre>{JSON.stringify(content, null, 2)}</pre>;
   return <>{content.map((block, i) => {
-    if (typeof block === 'string' || typeof block?.text === 'string') return <Document key={i} content={typeof block === 'string' ? block : block.text} onError={onError} streaming={streaming}/>;
+    if (typeof block === 'string' || typeof block?.text === 'string') return <Document key={i} content={typeof block === 'string' ? block : block.text} onError={onError} streaming={streaming} onImage={onImage} {...media}/>;
     if (block?.type === 'image') { const src = imageData(block); return src ? <button key={i} className="message-image" onClick={() => onImage(src)} aria-label="放大消息图片"><img src={src} alt="消息附件" loading="lazy"/></button> : <p key={i} className="muted">图片数据缺失或格式不支持</p>; }
     if (block?.type === 'toolCall') return <p key={i} className="muted">调用 {block.name || '工具'}</p>;
     return null;

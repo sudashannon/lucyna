@@ -98,6 +98,8 @@
 .wf-sync input,.wf-management-form input{max-width:220px}
 .wf-sync p,.wf-write-section>p{width:100%;margin:0;color:var(--muted-readable);line-height:1.6}
 .wf-write-section,.wf-operation-history{padding:0 16px 8px}
+.wf-management-form>label{display:flex;align-items:center;gap:8px}
+.wf-disk-members{margin:8px 0;padding-inline-start:20px;color:var(--muted-readable);line-height:1.6;overflow-wrap:anywhere}
 .wf-file-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0}
 .wf-file-actions>span{flex:1;min-width:120px;overflow-wrap:anywhere;color:var(--muted-readable)}
 .wf-file-actions>button:not(.cindy-button),.wf-management-form>button:not(.cindy-button),.wf-operation button{color:var(--accent-emphasis);text-decoration:underline;text-underline-offset:3px}

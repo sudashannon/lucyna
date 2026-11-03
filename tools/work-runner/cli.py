@@ -53,6 +53,17 @@ def control(*args):
     return subprocess.run(['systemctl', '--user', *args], env=env, capture_output=True, text=True, timeout=25)
 
 
+def preparing(directory):
+    database = Path(directory)/'runs.sqlite3'
+    if not database.exists():
+        return False
+    with sqlite3.connect(database.as_uri()+'?mode=ro', uri=True) as connection:
+        if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='automation'").fetchone():
+            return False
+        return any(json.loads(row[0]).get('preparation',{}).get('state') in ('reading','checking')
+                   for row in connection.execute('SELECT data FROM automation'))
+
+
 def unit_arg(value):
     # systemd ExecStart has its own escaping, not shell quoting.
     return '"'+str(value).replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%').replace('$', '$$')+'"'
@@ -92,6 +103,8 @@ def install(config):
     active = control('is-active', UNIT).returncode == 0
     if changed and any(run['state'] not in ('completed', 'cancelled', 'failed') for run in inspect(directory)):
         raise ValueError('存在未结束任务，先暂停并取消或完成后才能升级后台服务')
+    if changed and active and preparing(directory):
+        raise ValueError('正在准备 Work 评测，请等待完成或暂停准备后再升级后台服务')
     release.mkdir(parents=True, exist_ok=True, mode=0o700)
     for name, data in files.items():
         target = release/name

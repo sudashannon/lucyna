@@ -10,7 +10,10 @@
 .wr-auto-flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; list-style:none; margin:16px 0; padding:0; counter-reset:automatic; }
 .wr-auto-flow li { min-width:0; font-size:var(--font-size-caption); color:var(--muted-readable); display:flex; flex-direction:column; gap:6px; border-top:2px solid var(--soft-border); padding-top:8px; }
 .wr-auto-flow li:before { counter-increment:automatic; content:'0' counter(automatic); font-variant-numeric:tabular-nums; }
-.wr-auto-running .wr-auto-flow li:nth-child(2),.wr-auto-review .wr-auto-flow li:last-child { border-color:#368769; color:var(--text-primary); }
+.wr-auto-flow li[aria-current=step] { border-color:var(--accent-emphasis); color:var(--text-primary); }
+.wr-preparation blockquote { margin:12px 0; padding:0; overflow-wrap:anywhere; }
+.wr-preparation cite { font-size:var(--font-size-caption); color:var(--muted-readable); font-style:normal; }
+.wr-preparation progress { width:100%; accent-color:var(--accent-emphasis); }
 .wr-auto-targets { color:var(--muted-readable); }
 .wr-auto-origin { padding:8px 10px; border-radius:6px; background:#36876912; font-size:var(--font-size-small); line-height:1.7; }
 .wr-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
@@ -30,7 +33,7 @@
 .wr-budget { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
 .wr-heading { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:20px; }
 .wr-heading span { color:var(--muted-readable); font-size:var(--font-size-caption); overflow-wrap:anywhere; }
-.wr-run h3 { font-size:14px; margin:12px 0; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+.work-runs .wr-run h3 { max-width:none; font-size:14px; margin:12px 0; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
 .work-runs details { margin:14px 0; border-top:1px solid var(--soft-border); padding-top:12px; }
 .work-runs summary { cursor:pointer; font-size:var(--font-size-small); }
 .wr-result,.wr-question p { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.7; font-size:var(--font-size-small); }

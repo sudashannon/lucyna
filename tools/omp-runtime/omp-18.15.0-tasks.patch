@@ -1,0 +1,1367 @@
+diff --git a/packages/coding-agent/CHANGELOG.md b/packages/coding-agent/CHANGELOG.md
+index f3412e4..b1caf7a 100644
+--- a/packages/coding-agent/CHANGELOG.md
++++ b/packages/coding-agent/CHANGELOG.md
+@@ -2,6 +2,10 @@
+ 
+ ## [Unreleased]
+ 
++### Added
++
++- Hosts can inspect background tasks and stop an individual task instance through RPC.
++
+ ## [18.15.0] - 2026-11-01
+ 
+ ### Added
+diff --git a/packages/coding-agent/src/launch/broker.ts b/packages/coding-agent/src/launch/broker.ts
+index 8be85c2..217d56e 100644
+--- a/packages/coding-agent/src/launch/broker.ts
++++ b/packages/coding-agent/src/launch/broker.ts
+@@ -643,7 +643,7 @@ class DaemonBroker {
+ 	async #dispatch(operation: DaemonOperation, socket: IpcConnection, signal?: AbortSignal): Promise<DaemonRpcResult> {
+ 		switch (operation.op) {
+ 			case "ping":
+-				return { op: "ping", projectDir: this.#projectDir };
++				return { op: "ping", projectDir: this.#projectDir, taskInstanceControl: true };
+ 			case "start":
+ 				return this.#start(operation.spec, operation.owner, operation.replace, operation.awaitReady);
+ 			case "list": {
+diff --git a/packages/coding-agent/src/launch/client.ts b/packages/coding-agent/src/launch/client.ts
+index f3c8019..01a9c67 100644
+--- a/packages/coding-agent/src/launch/client.ts
++++ b/packages/coding-agent/src/launch/client.ts
+@@ -40,6 +40,7 @@ interface PendingRequest {
+ 
+ /** Broker location and lifecycle overrides used by smoke tests and isolated consumers. */
+ export interface DaemonBrokerClientOptions {
++	existingOnly?: boolean;
+ 	/** Runtime directory override; defaults to the project-scoped config path. */
+ 	runtimeDir?: string;
+ 	/** Last-client shutdown grace override in milliseconds. */
+@@ -114,6 +115,7 @@ function requestTimeoutMs(operation: DaemonOperation): number {
+ class SocketDaemonClient implements DaemonBrokerClient {
+ 	readonly projectDir: string;
+ 	readonly #runtimeDir: string;
++	readonly #existingOnly: boolean;
+ 	readonly #endpoint: string;
+ 	#token: string;
+ 	readonly #seenCompletionIds = new Set<string>();
+@@ -136,6 +138,7 @@ class SocketDaemonClient implements DaemonBrokerClient {
+ 		this.#endpoint = daemonBrokerEndpoint(runtimeDir);
+ 		this.#token = token;
+ 		this.#idleGraceMs = options.idleGraceMs;
++		this.#existingOnly = options.existingOnly === true;
+ 	}
+ 
+ 	async request(operation: DaemonOperation, signal?: AbortSignal): Promise<DaemonRpcResult> {
+@@ -275,7 +278,9 @@ class SocketDaemonClient implements DaemonBrokerClient {
+ 		// The broker authenticates against the token file it read at startup. A
+ 		// replacement broker may have started from a different file, or a deleted
+ 		// runtime dir may need a fresh one before any broker can start.
+-		this.#token = await readOrCreateToken(this.#runtimeDir);
++		this.#token = this.#existingOnly
++			? await Bun.file(path.join(this.#runtimeDir, TOKEN_FILE)).text()
++			: await readOrCreateToken(this.#runtimeDir);
+ 		try {
+ 			this.#bindSocket(await IpcConnection.connect(this.#endpoint, { framing: "lines", timeoutMs: 250 }));
+ 			return;
+@@ -284,6 +289,7 @@ class SocketDaemonClient implements DaemonBrokerClient {
+ 			// process-owned lease selects one winner before any candidate touches
+ 			// the socket.
+ 		}
++		if (this.#existingOnly) throw Object.assign(new Error("No existing daemon broker"), { code: "BROKER_ABSENT" });
+ 		this.#spawnBroker();
+ 		const deadline = Date.now() + CONNECT_TIMEOUT_MS;
+ 		let lastError: Error | undefined;
+@@ -459,7 +465,9 @@ export async function createDaemonBrokerClient(
+ ): Promise<DaemonBrokerClient> {
+ 	const canonical = await canonicalProjectDir(projectDir);
+ 	const runtimeDir = options.runtimeDir ?? daemonRuntimeDir(canonical);
+-	const token = await readOrCreateToken(runtimeDir);
++	const token = options.existingOnly
++		? await Bun.file(path.join(runtimeDir, TOKEN_FILE)).text()
++		: await readOrCreateToken(runtimeDir);
+ 	return new SocketDaemonClient(canonical, runtimeDir, token, options);
+ }
+ 
+diff --git a/packages/coding-agent/src/launch/protocol.ts b/packages/coding-agent/src/launch/protocol.ts
+index 890c501..2c6ce13 100644
+--- a/packages/coding-agent/src/launch/protocol.ts
++++ b/packages/coding-agent/src/launch/protocol.ts
+@@ -68,7 +68,7 @@ export type DaemonOperation =
+ 
+ /** Typed broker result decoded before it reaches tool code. */
+ export type DaemonRpcResult =
+-	| { op: "ping"; projectDir: string }
++	| { op: "ping"; projectDir: string; taskInstanceControl?: boolean }
+ 	| { op: "start"; daemon: DaemonSnapshot; readyTimedOut: boolean }
+ 	| { op: "list"; daemons: DaemonSnapshot[] }
+ 	| {
+@@ -390,7 +390,11 @@ export function parseDaemonRpcResult(operation: DaemonOperation, value: unknown)
+ 	const source = record(value, `${operation.op} result`);
+ 	switch (operation.op) {
+ 		case "ping":
+-			return { op: "ping", projectDir: stringValue(source.projectDir, "result.projectDir") };
++			return {
++				op: "ping",
++				projectDir: stringValue(source.projectDir, "result.projectDir"),
++				taskInstanceControl: source.taskInstanceControl === true,
++			};
+ 		case "start":
+ 			return {
+ 				op: "start",
+diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
+index 5a2c6cc..22126c5 100644
+--- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
++++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
+@@ -14,6 +14,7 @@
+ import * as fs from "node:fs";
+ import * as path from "node:path";
+ import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
++import { RpcBackgroundTasks } from "./rpc-background-tasks";
+ import type { Model } from "@oh-my-pi/pi-ai";
+ import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
+ import type { ImageContent } from "@oh-my-pi/pi-ai";
+@@ -431,6 +432,10 @@ export function dispatchRpcControlFrame(parsed: unknown, deps: RpcInputFrameDeps
+  * A Set, not a Record: `type` is untrusted input and must not hit prototype keys.
+  */
+ const BACKGROUND_COMMANDS: ReadonlySet<string> = new Set<RpcCommand["type"]>([
++	"get_background_tasks",
++	"get_background_task_output",
++	"cancel_background_task",
++	"cancel_subagent",
+ 	"bash",
+ 	"predict_word",
+ 	"live_start",
+@@ -1387,6 +1392,7 @@ export interface RpcModeOptions {
+  * Listens for JSON commands on stdin, outputs events and responses on stdout.
+  */
+ export async function runRpcMode(session: AgentSession, options: RpcModeOptions = {}): Promise<never> {
++	const backgroundTasks = new RpcBackgroundTasks(session);
+ 	const {
+ 		setToolUIContext,
+ 		headless = false,
+@@ -2460,6 +2466,12 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions
+ 				});
+ 			}
+ 
++			case "get_background_tasks":
++				return success(id, command.type, await backgroundTasks.snapshot());
++			case "get_background_task_output":
++				return success(id, command.type, await backgroundTasks.output(command));
++			case "cancel_background_task":
++				return success(id, command.type, await backgroundTasks.cancel(command));
+ 			case "get_subagents": {
+ 				if (!subagentRegistry) {
+ 					return error(id, "get_subagents", "Subagent event bus is unavailable");
+@@ -2476,6 +2488,8 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions
+ 						return error(id, "get_subagent_messages", "fromByte must be a finite number");
+ 					}
+ 					const sessionFile = subagentRegistry.resolveSessionFile(command);
++					if (command.expectedSessionFile !== undefined && sessionFile !== command.expectedSessionFile)
++						throw new Error("Subagent transcript instance changed");
+ 					const transcript = await readRpcSubagentTranscript(sessionFile, command.fromByte);
+ 					return success(id, "get_subagent_messages", transcript);
+ 				} catch (err) {
+@@ -2491,6 +2505,15 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions
+ 					return error(id, "cancel_subagent", "`subagentId` must be a non-empty string.");
+ 				}
+ 				try {
++					const selected = subagentRegistry.getSubagents().find(child => child.id === command.subagentId);
++					if (
++						selected &&
++						((command.expectedSessionFile !== undefined &&
++							selected.sessionFile !== command.expectedSessionFile) ||
++							(command.expectedParentToolCallId !== undefined &&
++								selected.parentToolCallId !== command.expectedParentToolCallId))
++					)
++						throw new Error("Subagent instance changed");
+ 					const cancelled = await handleRpcCancelSubagent(subagentRegistry, command.subagentId);
+ 					return success(id, "cancel_subagent", { cancelled });
+ 				} catch (err) {
+diff --git a/packages/coding-agent/src/modes/rpc/rpc-subagents.ts b/packages/coding-agent/src/modes/rpc/rpc-subagents.ts
+index 9071d81..af830c3 100644
+--- a/packages/coding-agent/src/modes/rpc/rpc-subagents.ts
++++ b/packages/coding-agent/src/modes/rpc/rpc-subagents.ts
+@@ -90,7 +90,10 @@ export async function readRpcSubagentTranscript(sessionFile: string, fromByte =
+ 		reset = true;
+ 	}
+ 
+-	const text = startByte >= size ? "" : await file.slice(startByte).text();
++	const pageBytes = 1024 * 1024;
++	const text = startByte >= size ? "" : await file.slice(startByte, startByte + pageBytes).text();
++	if (!text.includes("\n") && size - startByte >= pageBytes)
++		throw new Error("Subagent transcript record exceeds the 1 MiB preview limit");
+ 	const lastNewline = text.lastIndexOf("\n");
+ 	const completeText = lastNewline >= 0 ? text.slice(0, lastNewline + 1) : "";
+ 	const entries = completeText.length > 0 ? parseSessionEntries(completeText) : [];
+diff --git a/packages/coding-agent/src/modes/rpc/rpc-types.ts b/packages/coding-agent/src/modes/rpc/rpc-types.ts
+index e0a14da..c8986d7 100644
+--- a/packages/coding-agent/src/modes/rpc/rpc-types.ts
++++ b/packages/coding-agent/src/modes/rpc/rpc-types.ts
+@@ -45,7 +45,12 @@ import type { BtwHistoryRecord } from "../../session/btw-history";
+  */
+ export type RpcMessageUpdates = "full" | "delta";
+ 
++import type { BackgroundTask, BackgroundTaskSelector } from "./rpc-background-tasks";
++
+ export type RpcCommand =
++	| ({ id?: string; type: "cancel_background_task" } & BackgroundTaskSelector)
++	| { id?: string; type: "get_background_tasks" }
++	| ({ id?: string; type: "get_background_task_output" } & BackgroundTaskSelector)
+ 	// Protocol
+ 	| { id?: string; type: "negotiate_protocol"; protocolVersion: number }
+ 
+@@ -82,8 +87,21 @@ export type RpcCommand =
+ 	| { id?: string; type: "set_subagent_subscription"; level: RpcSubagentSubscriptionLevel }
+ 	| { id?: string; type: "set_event_filter"; events: string[] | null; messageUpdates?: RpcMessageUpdates }
+ 	| { id?: string; type: "get_subagents" }
+-	| { id?: string; type: "get_subagent_messages"; subagentId?: string; sessionFile?: string; fromByte?: number }
+-	| { id?: string; type: "cancel_subagent"; subagentId: string }
++	| {
++			id?: string;
++			type: "get_subagent_messages";
++			subagentId?: string;
++			sessionFile?: string;
++			fromByte?: number;
++			expectedSessionFile?: string;
++	  }
++	| {
++			id?: string;
++			type: "cancel_subagent";
++			subagentId: string;
++			expectedSessionFile?: string;
++			expectedParentToolCallId?: string;
++	  }
+ 	| { id?: string; type: "steer_subagent"; subagentId: string; message: string }
+ 	// Live voice (GPT live bound to this session)
+ 	| { id?: string; type: "live_start"; voice?: string; instructions?: string }
+@@ -426,6 +444,21 @@ export interface RpcSubagentMessagesResult {
+ 
+ // Success responses with data
+ export type RpcResponse =
++	| {
++			id?: string;
++			type: "response";
++			command: "get_background_tasks";
++			success: true;
++			data: { tasks: BackgroundTask[]; warning?: string };
++	  }
++	| {
++			id?: string;
++			type: "response";
++			command: "get_background_task_output";
++			success: true;
++			data: { output: string; exitCode?: number };
++	  }
++	| { id?: string; type: "response"; command: "cancel_background_task"; success: true; data: { accepted: boolean } }
+ 	// Protocol
+ 	| {
+ 			id?: string;
+diff --git a/packages/coding-agent/src/modes/rpc/wire/commands.ts b/packages/coding-agent/src/modes/rpc/wire/commands.ts
+index b363009..8c6393f 100644
+--- a/packages/coding-agent/src/modes/rpc/wire/commands.ts
++++ b/packages/coding-agent/src/modes/rpc/wire/commands.ts
+@@ -32,6 +32,23 @@ export interface RpcCommandSpec {
+ const IMAGES = doc("ImageContent[]", "Images attached to the message.");
+ 
+ export const rpcCommands: readonly RpcCommandSpec[] = [
++	{
++		name: "get_background_tasks",
++		doc: "Inspect background jobs and services without consuming results.",
++		result: { tasks: "BackgroundTask[]", "warning?": "string" },
++	},
++	{
++		name: "get_background_task_output",
++		doc: "Read bounded output of one owned task instance.",
++		params: { taskId: "string", kind: "'job' | 'daemon'", startedAt: "number" },
++		result: { output: "string", "exitCode?": "number" },
++	},
++	{
++		name: "cancel_background_task",
++		doc: "Request cancellation of one owned task instance.",
++		params: { taskId: "string", kind: "'job' | 'daemon'", startedAt: "number" },
++		result: { accepted: "boolean" },
++	},
+ 	{
+ 		name: "negotiate_protocol",
+ 		doc: "Switch the connection to a protocol version advertised by `ready`.",
+@@ -169,13 +186,18 @@ export const rpcCommands: readonly RpcCommandSpec[] = [
+ 	{
+ 		name: "get_subagent_messages",
+ 		doc: "Read a subagent transcript by id or registered session file (`subagentId` wins).",
+-		params: { "subagentId?": "string", "sessionFile?": "string", "fromByte?": "number.integer" },
++		params: {
++			"subagentId?": "string",
++			"sessionFile?": "string",
++			"fromByte?": "number.integer",
++			"expectedSessionFile?": "string",
++		},
+ 		result: "SubagentMessages",
+ 	},
+ 	{
+ 		name: "cancel_subagent",
+ 		doc: "Hard-kill one running subagent; false when it is not running.",
+-		params: { subagentId: "string" },
++		params: { subagentId: "string", "expectedSessionFile?": "string", "expectedParentToolCallId?": "string" },
+ 		result: { cancelled: "boolean" },
+ 		unwrap: "cancelled",
+ 	},
+diff --git a/packages/coding-agent/src/modes/rpc/wire/rpc-wire.generated.ts b/packages/coding-agent/src/modes/rpc/wire/rpc-wire.generated.ts
+index fc7f70d..388518f 100644
+--- a/packages/coding-agent/src/modes/rpc/wire/rpc-wire.generated.ts
++++ b/packages/coding-agent/src/modes/rpc/wire/rpc-wire.generated.ts
+@@ -368,6 +368,23 @@ export interface ModelInfo {
+ 	compat?: Record<string, unknown>;
+ }
+ 
++export interface BackgroundTask {
++	id: string;
++	kind: "job" | "daemon";
++	title: string;
++	status: string;
++	startedAt: number;
++	detail: string;
++	cancellable: boolean;
++	endedAt?: number;
++	command?: string;
++	cwd?: string;
++	ownerId?: string;
++	agentId?: string;
++	exitCode?: number;
++	output?: string;
++}
++
+ export type QueueMode = "all" | "one-at-a-time";
+ 
+ export type InterruptMode = "immediate" | "wait";
+@@ -1513,6 +1530,32 @@ export type RpcNotification = ReadyEvent | PromptResultEvent | SessionSettledEve
+ /** Any frame the server writes to stdout (after reassembling `rpc_chunk` sequences), discriminated by `type`. */
+ export type RpcServerFrame = RpcResponse | RpcHostRequest | RpcNotification;
+ 
++export interface GetBackgroundTasksResult {
++	tasks: BackgroundTask[];
++	warning?: string;
++}
++
++export interface GetBackgroundTaskOutputParams {
++	taskId: string;
++	kind: "job" | "daemon";
++	startedAt: number;
++}
++
++export interface GetBackgroundTaskOutputResult {
++	output: string;
++	exitCode?: number;
++}
++
++export interface CancelBackgroundTaskParams {
++	taskId: string;
++	kind: "job" | "daemon";
++	startedAt: number;
++}
++
++export interface CancelBackgroundTaskResult {
++	accepted: boolean;
++}
++
+ export interface NegotiateProtocolParams {
+ 	protocolVersion: number;
+ }
+@@ -1649,10 +1692,13 @@ export interface GetSubagentMessagesParams {
+ 	subagentId?: string;
+ 	sessionFile?: string;
+ 	fromByte?: number;
++	expectedSessionFile?: string;
+ }
+ 
+ export interface CancelSubagentParams {
+ 	subagentId: string;
++	expectedSessionFile?: string;
++	expectedParentToolCallId?: string;
+ }
+ 
+ export interface CancelSubagentResult {
+@@ -1890,6 +1936,9 @@ export interface GetBtwHistoryResult {
+ 
+ /** Every RPC command's parameters and successful response `data`. */
+ export interface RpcWireCommands {
++	get_background_tasks: { params: undefined; result: GetBackgroundTasksResult };
++	get_background_task_output: { params: GetBackgroundTaskOutputParams; result: GetBackgroundTaskOutputResult };
++	cancel_background_task: { params: CancelBackgroundTaskParams; result: CancelBackgroundTaskResult };
+ 	negotiate_protocol: { params: NegotiateProtocolParams; result: NegotiateProtocolResult };
+ 	prompt: { params: PromptParams; result: PromptAck };
+ 	steer: { params: SteerParams; result: undefined };
+diff --git a/packages/coding-agent/src/modes/rpc/wire/rpc-wire.schema.json b/packages/coding-agent/src/modes/rpc/wire/rpc-wire.schema.json
+index 5594d2f..79086c5 100644
+--- a/packages/coding-agent/src/modes/rpc/wire/rpc-wire.schema.json
++++ b/packages/coding-agent/src/modes/rpc/wire/rpc-wire.schema.json
+@@ -9,6 +9,39 @@
+ 		"serverFrame": "RpcServerFrame",
+ 		"inbound": "RpcInbound",
+ 		"commands": [
++			{
++				"name": "get_background_tasks",
++				"doc": "Inspect background jobs and services without consuming results.",
++				"params": null,
++				"result": "GetBackgroundTasksResult",
++				"nullable": false,
++				"unwrap": null,
++				"timeoutMs": null,
++				"completion": null,
++				"clientOmit": []
++			},
++			{
++				"name": "get_background_task_output",
++				"doc": "Read bounded output of one owned task instance.",
++				"params": "GetBackgroundTaskOutputParams",
++				"result": "GetBackgroundTaskOutputResult",
++				"nullable": false,
++				"unwrap": null,
++				"timeoutMs": null,
++				"completion": null,
++				"clientOmit": []
++			},
++			{
++				"name": "cancel_background_task",
++				"doc": "Request cancellation of one owned task instance.",
++				"params": "CancelBackgroundTaskParams",
++				"result": "CancelBackgroundTaskResult",
++				"nullable": false,
++				"unwrap": null,
++				"timeoutMs": null,
++				"completion": null,
++				"clientOmit": []
++			},
+ 			{
+ 				"name": "negotiate_protocol",
+ 				"doc": "Switch the connection to a protocol version advertised by `ready`.",
+@@ -2225,6 +2258,66 @@
+ 			],
+ 			"description": "Model descriptor: the client-relevant subset of the server's model record."
+ 		},
++		"BackgroundTask": {
++			"type": "object",
++			"properties": {
++				"id": {
++					"type": "string"
++				},
++				"kind": {
++					"enum": [
++						"job",
++						"daemon"
++					],
++					"type": "string"
++				},
++				"title": {
++					"type": "string"
++				},
++				"status": {
++					"type": "string"
++				},
++				"startedAt": {
++					"type": "number"
++				},
++				"detail": {
++					"type": "string"
++				},
++				"cancellable": {
++					"type": "boolean"
++				},
++				"endedAt": {
++					"type": "number"
++				},
++				"command": {
++					"type": "string"
++				},
++				"cwd": {
++					"type": "string"
++				},
++				"ownerId": {
++					"type": "string"
++				},
++				"agentId": {
++					"type": "string"
++				},
++				"exitCode": {
++					"type": "number"
++				},
++				"output": {
++					"type": "string"
++				}
++			},
++			"required": [
++				"id",
++				"kind",
++				"title",
++				"status",
++				"startedAt",
++				"detail",
++				"cancellable"
++			]
++		},
+ 		"QueueMode": {
+ 			"enum": [
+ 				"all",
+@@ -6044,6 +6137,94 @@
+ 			],
+ 			"description": "Any frame the server writes to stdout (after reassembling `rpc_chunk` sequences), discriminated by `type`."
+ 		},
++		"GetBackgroundTasksResult": {
++			"type": "object",
++			"properties": {
++				"tasks": {
++					"type": "array",
++					"items": {
++						"$ref": "#/$defs/BackgroundTask"
++					}
++				},
++				"warning": {
++					"type": "string"
++				}
++			},
++			"required": [
++				"tasks"
++			]
++		},
++		"GetBackgroundTaskOutputParams": {
++			"type": "object",
++			"properties": {
++				"taskId": {
++					"type": "string"
++				},
++				"kind": {
++					"enum": [
++						"job",
++						"daemon"
++					],
++					"type": "string"
++				},
++				"startedAt": {
++					"type": "number"
++				}
++			},
++			"required": [
++				"taskId",
++				"kind",
++				"startedAt"
++			]
++		},
++		"GetBackgroundTaskOutputResult": {
++			"type": "object",
++			"properties": {
++				"output": {
++					"type": "string"
++				},
++				"exitCode": {
++					"type": "number"
++				}
++			},
++			"required": [
++				"output"
++			]
++		},
++		"CancelBackgroundTaskParams": {
++			"type": "object",
++			"properties": {
++				"taskId": {
++					"type": "string"
++				},
++				"kind": {
++					"enum": [
++						"job",
++						"daemon"
++					],
++					"type": "string"
++				},
++				"startedAt": {
++					"type": "number"
++				}
++			},
++			"required": [
++				"taskId",
++				"kind",
++				"startedAt"
++			]
++		},
++		"CancelBackgroundTaskResult": {
++			"type": "object",
++			"properties": {
++				"accepted": {
++					"type": "boolean"
++				}
++			},
++			"required": [
++				"accepted"
++			]
++		},
+ 		"NegotiateProtocolParams": {
+ 			"type": "object",
+ 			"properties": {
+@@ -6465,6 +6646,9 @@
+ 				},
+ 				"fromByte": {
+ 					"type": "integer"
++				},
++				"expectedSessionFile": {
++					"type": "string"
+ 				}
+ 			}
+ 		},
+@@ -6473,6 +6657,12 @@
+ 			"properties": {
+ 				"subagentId": {
+ 					"type": "string"
++				},
++				"expectedSessionFile": {
++					"type": "string"
++				},
++				"expectedParentToolCallId": {
++					"type": "string"
+ 				}
+ 			},
+ 			"required": [
+diff --git a/packages/coding-agent/src/modes/rpc/wire/state.ts b/packages/coding-agent/src/modes/rpc/wire/state.ts
+index 70156bf..d9a228d 100644
+--- a/packages/coding-agent/src/modes/rpc/wire/state.ts
++++ b/packages/coding-agent/src/modes/rpc/wire/state.ts
+@@ -10,6 +10,22 @@ import { absentAs, doc, type WireDefs } from "./dsl";
+ const JSON_OBJECT = "Record<string, unknown>";
+ 
+ export const stateDefs = {
++	BackgroundTask: {
++		id: "string",
++		kind: "'job' | 'daemon'",
++		title: "string",
++		status: "string",
++		startedAt: "number",
++		"endedAt?": "number",
++		"command?": "string",
++		"cwd?": "string",
++		"ownerId?": "string",
++		"agentId?": "string",
++		detail: "string",
++		cancellable: "boolean",
++		"exitCode?": "number",
++		"output?": "string",
++	},
+ 	QueueMode: "'all' | 'one-at-a-time'",
+ 	InterruptMode: "'immediate' | 'wait'",
+ 	StreamingBehavior: "'steer' | 'followUp'",
+diff --git a/sdk/go/omp-rpc/wire.go b/sdk/go/omp-rpc/wire.go
+index 30b274d..5c4af86 100644
+--- a/sdk/go/omp-rpc/wire.go
++++ b/sdk/go/omp-rpc/wire.go
+@@ -1851,6 +1851,71 @@ func (v *ModelInfo) decodeFrom(raw map[string]json.RawMessage) error {
+ 	return nil
+ }
+ 
++type BackgroundTask struct {
++	ID          string             `json:"id"`
++	Kind        BackgroundTaskKind `json:"kind"`
++	Title       string             `json:"title"`
++	Status      string             `json:"status"`
++	StartedAt   float64            `json:"startedAt"`
++	Detail      string             `json:"detail"`
++	Cancellable bool               `json:"cancellable"`
++	EndedAt     *float64           `json:"endedAt,omitempty"`
++	Command     *string            `json:"command,omitempty"`
++	Cwd         *string            `json:"cwd,omitempty"`
++	OwnerID     *string            `json:"ownerId,omitempty"`
++	AgentID     *string            `json:"agentId,omitempty"`
++	ExitCode    *float64           `json:"exitCode,omitempty"`
++	Output      *string            `json:"output,omitempty"`
++}
++
++func (v *BackgroundTask) UnmarshalJSON(data []byte) error {
++	return decodeWith(data, "BackgroundTask", v.decodeFrom)
++}
++
++func (v *BackgroundTask) decodeFrom(raw map[string]json.RawMessage) error {
++	var out BackgroundTask
++	d := fieldDecoder{raw: raw, owner: "BackgroundTask"}
++	d.required("id", &out.ID)
++	d.required("kind", &out.Kind)
++	d.required("title", &out.Title)
++	d.required("status", &out.Status)
++	d.required("startedAt", &out.StartedAt)
++	d.required("detail", &out.Detail)
++	d.required("cancellable", &out.Cancellable)
++	d.optional("endedAt", &out.EndedAt)
++	d.optional("command", &out.Command)
++	d.optional("cwd", &out.Cwd)
++	d.optional("ownerId", &out.OwnerID)
++	d.optional("agentId", &out.AgentID)
++	d.optional("exitCode", &out.ExitCode)
++	d.optional("output", &out.Output)
++	if d.err != nil {
++		return d.err
++	}
++	*v = out
++	return nil
++}
++
++type BackgroundTaskKind string
++
++const (
++	BackgroundTaskKindJob    BackgroundTaskKind = "job"
++	BackgroundTaskKindDaemon BackgroundTaskKind = "daemon"
++)
++
++func (v *BackgroundTaskKind) UnmarshalJSON(data []byte) error {
++	s, err := decodeString(data, "BackgroundTaskKind")
++	if err != nil {
++		return err
++	}
++	switch value := BackgroundTaskKind(s); value {
++	case BackgroundTaskKindJob, BackgroundTaskKindDaemon:
++		*v = value
++		return nil
++	}
++	return unknownValue("BackgroundTaskKind", s)
++}
++
+ type QueueMode string
+ 
+ const (
+@@ -7076,6 +7141,67 @@ func (v *RpcServerFrame) UnmarshalJSON(data []byte) error {
+ 	return nil
+ }
+ 
++type GetBackgroundTasksResult struct {
++	Tasks   []BackgroundTask `json:"tasks"`
++	Warning *string          `json:"warning,omitempty"`
++}
++
++func (v *GetBackgroundTasksResult) UnmarshalJSON(data []byte) error {
++	return decodeWith(data, "GetBackgroundTasksResult", v.decodeFrom)
++}
++
++func (v *GetBackgroundTasksResult) decodeFrom(raw map[string]json.RawMessage) error {
++	var out GetBackgroundTasksResult
++	d := fieldDecoder{raw: raw, owner: "GetBackgroundTasksResult"}
++	d.required("tasks", &out.Tasks)
++	d.optional("warning", &out.Warning)
++	if d.err != nil {
++		return d.err
++	}
++	*v = out
++	return nil
++}
++
++type GetBackgroundTaskOutputResult struct {
++	Output   string   `json:"output"`
++	ExitCode *float64 `json:"exitCode,omitempty"`
++}
++
++func (v *GetBackgroundTaskOutputResult) UnmarshalJSON(data []byte) error {
++	return decodeWith(data, "GetBackgroundTaskOutputResult", v.decodeFrom)
++}
++
++func (v *GetBackgroundTaskOutputResult) decodeFrom(raw map[string]json.RawMessage) error {
++	var out GetBackgroundTaskOutputResult
++	d := fieldDecoder{raw: raw, owner: "GetBackgroundTaskOutputResult"}
++	d.required("output", &out.Output)
++	d.optional("exitCode", &out.ExitCode)
++	if d.err != nil {
++		return d.err
++	}
++	*v = out
++	return nil
++}
++
++type CancelBackgroundTaskResult struct {
++	Accepted bool `json:"accepted"`
++}
++
++func (v *CancelBackgroundTaskResult) UnmarshalJSON(data []byte) error {
++	return decodeWith(data, "CancelBackgroundTaskResult", v.decodeFrom)
++}
++
++func (v *CancelBackgroundTaskResult) decodeFrom(raw map[string]json.RawMessage) error {
++	var out CancelBackgroundTaskResult
++	d := fieldDecoder{raw: raw, owner: "CancelBackgroundTaskResult"}
++	d.required("accepted", &out.Accepted)
++	if d.err != nil {
++		return d.err
++	}
++	*v = out
++	return nil
++}
++
+ type NegotiateProtocolResult struct {
+ 	ProtocolVersion int64 `json:"protocolVersion"`
+ }
+@@ -7671,6 +7797,81 @@ func (v *GetBtwHistoryResult) decodeFrom(raw map[string]json.RawMessage) error {
+ 	return nil
+ }
+ 
++// GetBackgroundTasks sends "get_background_tasks": Inspect background jobs and services without consuming results.
++func (c Commands) GetBackgroundTasks(ctx context.Context) (GetBackgroundTasksResult, error) {
++	var out GetBackgroundTasksResult
++	err := c.call(ctx, "get_background_tasks", nil, 0, &out)
++	return out, err
++}
++
++// GetBackgroundTaskOutputCommand holds the parameters of "get_background_task_output".
++type GetBackgroundTaskOutputCommand struct {
++	TaskID    string                             `json:"taskId"`
++	Kind      GetBackgroundTaskOutputCommandKind `json:"kind"`
++	StartedAt float64                            `json:"startedAt"`
++}
++
++// GetBackgroundTaskOutput sends "get_background_task_output": Read bounded output of one owned task instance.
++func (c Commands) GetBackgroundTaskOutput(ctx context.Context, p GetBackgroundTaskOutputCommand) (GetBackgroundTaskOutputResult, error) {
++	var out GetBackgroundTaskOutputResult
++	err := c.call(ctx, "get_background_task_output", p, 0, &out)
++	return out, err
++}
++
++type GetBackgroundTaskOutputCommandKind string
++
++const (
++	GetBackgroundTaskOutputCommandKindJob    GetBackgroundTaskOutputCommandKind = "job"
++	GetBackgroundTaskOutputCommandKindDaemon GetBackgroundTaskOutputCommandKind = "daemon"
++)
++
++func (v *GetBackgroundTaskOutputCommandKind) UnmarshalJSON(data []byte) error {
++	s, err := decodeString(data, "GetBackgroundTaskOutputCommandKind")
++	if err != nil {
++		return err
++	}
++	switch value := GetBackgroundTaskOutputCommandKind(s); value {
++	case GetBackgroundTaskOutputCommandKindJob, GetBackgroundTaskOutputCommandKindDaemon:
++		*v = value
++		return nil
++	}
++	return unknownValue("GetBackgroundTaskOutputCommandKind", s)
++}
++
++// CancelBackgroundTaskCommand holds the parameters of "cancel_background_task".
++type CancelBackgroundTaskCommand struct {
++	TaskID    string                          `json:"taskId"`
++	Kind      CancelBackgroundTaskCommandKind `json:"kind"`
++	StartedAt float64                         `json:"startedAt"`
++}
++
++// CancelBackgroundTask sends "cancel_background_task": Request cancellation of one owned task instance.
++func (c Commands) CancelBackgroundTask(ctx context.Context, p CancelBackgroundTaskCommand) (CancelBackgroundTaskResult, error) {
++	var out CancelBackgroundTaskResult
++	err := c.call(ctx, "cancel_background_task", p, 0, &out)
++	return out, err
++}
++
++type CancelBackgroundTaskCommandKind string
++
++const (
++	CancelBackgroundTaskCommandKindJob    CancelBackgroundTaskCommandKind = "job"
++	CancelBackgroundTaskCommandKindDaemon CancelBackgroundTaskCommandKind = "daemon"
++)
++
++func (v *CancelBackgroundTaskCommandKind) UnmarshalJSON(data []byte) error {
++	s, err := decodeString(data, "CancelBackgroundTaskCommandKind")
++	if err != nil {
++		return err
++	}
++	switch value := CancelBackgroundTaskCommandKind(s); value {
++	case CancelBackgroundTaskCommandKindJob, CancelBackgroundTaskCommandKindDaemon:
++		*v = value
++		return nil
++	}
++	return unknownValue("CancelBackgroundTaskCommandKind", s)
++}
++
+ // NegotiateProtocolCommand holds the parameters of "negotiate_protocol".
+ type NegotiateProtocolCommand struct {
+ 	ProtocolVersion int64 `json:"protocolVersion"`
+@@ -7951,9 +8152,10 @@ func (c Commands) GetSubagents(ctx context.Context) ([]SubagentSnapshot, error)
+ 
+ // GetSubagentMessagesCommand holds the parameters of "get_subagent_messages".
+ type GetSubagentMessagesCommand struct {
+-	SubagentID  *string `json:"subagentId,omitempty"`
+-	SessionFile *string `json:"sessionFile,omitempty"`
+-	FromByte    *int64  `json:"fromByte,omitempty"`
++	SubagentID          *string `json:"subagentId,omitempty"`
++	SessionFile         *string `json:"sessionFile,omitempty"`
++	FromByte            *int64  `json:"fromByte,omitempty"`
++	ExpectedSessionFile *string `json:"expectedSessionFile,omitempty"`
+ }
+ 
+ // GetSubagentMessages sends "get_subagent_messages": Read a subagent transcript by id or registered session file (`subagentId` wins).
+@@ -7965,7 +8167,9 @@ func (c Commands) GetSubagentMessages(ctx context.Context, p GetSubagentMessages
+ 
+ // CancelSubagentCommand holds the parameters of "cancel_subagent".
+ type CancelSubagentCommand struct {
+-	SubagentID string `json:"subagentId"`
++	SubagentID               string  `json:"subagentId"`
++	ExpectedSessionFile      *string `json:"expectedSessionFile,omitempty"`
++	ExpectedParentToolCallID *string `json:"expectedParentToolCallId,omitempty"`
+ }
+ 
+ // CancelSubagent sends "cancel_subagent": Hard-kill one running subagent; false when it is not running.
+diff --git a/sdk/python/omp-rpc/src/omp_rpc/_wire.py b/sdk/python/omp-rpc/src/omp_rpc/_wire.py
+index c671845..3b2022e 100644
+--- a/sdk/python/omp-rpc/src/omp_rpc/_wire.py
++++ b/sdk/python/omp-rpc/src/omp_rpc/_wire.py
+@@ -548,6 +548,24 @@ class ModelInfo:
+     compat: JsonObject | None = None
+ 
+ 
++@dataclass(slots=True, frozen=True, kw_only=True)
++class BackgroundTask:
++    id: str
++    kind: Literal["job", "daemon"]
++    title: str
++    status: str
++    started_at: float
++    detail: str
++    cancellable: bool
++    ended_at: float | None = None
++    command: str | None = None
++    cwd: str | None = None
++    owner_id: str | None = None
++    agent_id: str | None = None
++    exit_code: float | None = None
++    output: str | None = None
++
++
+ @dataclass(slots=True, frozen=True, kw_only=True)
+ class TodoItem:
+     content: str
+@@ -1643,6 +1661,23 @@ class HostUriSchemeDefinition:
+     immutable: bool | None = None
+ 
+ 
++@dataclass(slots=True, frozen=True, kw_only=True)
++class GetBackgroundTasksResult:
++    tasks: tuple[BackgroundTask, ...]
++    warning: str | None = None
++
++
++@dataclass(slots=True, frozen=True, kw_only=True)
++class GetBackgroundTaskOutputResult:
++    output: str
++    exit_code: float | None = None
++
++
++@dataclass(slots=True, frozen=True, kw_only=True)
++class CancelBackgroundTaskResult:
++    accepted: bool
++
++
+ @dataclass(slots=True, frozen=True, kw_only=True)
+ class NegotiateProtocolResult:
+     protocol_version: int
+@@ -1900,6 +1935,26 @@ def parse_model_info(value: object, path: str = "ModelInfo") -> ModelInfo:
+     )
+ 
+ 
++def parse_background_task(value: object, path: str = "BackgroundTask") -> BackgroundTask:
++    payload = expect_object(value, path)
++    return BackgroundTask(
++        id=required(payload, "id", decode_str, path),
++        kind=required(payload, "kind", cast('Decoder[Literal["job", "daemon"]]', literal(frozenset({"job", "daemon"}))), path),
++        title=required(payload, "title", decode_str, path),
++        status=required(payload, "status", decode_str, path),
++        started_at=required(payload, "startedAt", decode_float, path),
++        detail=required(payload, "detail", decode_str, path),
++        cancellable=required(payload, "cancellable", decode_bool, path),
++        ended_at=optional(payload, "endedAt", decode_float, path),
++        command=optional(payload, "command", decode_str, path),
++        cwd=optional(payload, "cwd", decode_str, path),
++        owner_id=optional(payload, "ownerId", decode_str, path),
++        agent_id=optional(payload, "agentId", decode_str, path),
++        exit_code=optional(payload, "exitCode", decode_float, path),
++        output=optional(payload, "output", decode_str, path),
++    )
++
++
+ def parse_todo_item(value: object, path: str = "TodoItem") -> TodoItem:
+     payload = expect_object(value, path)
+     return TodoItem(
+@@ -3127,6 +3182,29 @@ def parse_host_uri_scheme_definition(value: object, path: str = "HostUriSchemeDe
+     )
+ 
+ 
++def parse_get_background_tasks_result(value: object, path: str = "GetBackgroundTasksResult") -> GetBackgroundTasksResult:
++    payload = expect_object(value, path)
++    return GetBackgroundTasksResult(
++        tasks=required(payload, "tasks", array(parse_background_task), path),
++        warning=optional(payload, "warning", decode_str, path),
++    )
++
++
++def parse_get_background_task_output_result(value: object, path: str = "GetBackgroundTaskOutputResult") -> GetBackgroundTaskOutputResult:
++    payload = expect_object(value, path)
++    return GetBackgroundTaskOutputResult(
++        output=required(payload, "output", decode_str, path),
++        exit_code=optional(payload, "exitCode", decode_float, path),
++    )
++
++
++def parse_cancel_background_task_result(value: object, path: str = "CancelBackgroundTaskResult") -> CancelBackgroundTaskResult:
++    payload = expect_object(value, path)
++    return CancelBackgroundTaskResult(
++        accepted=required(payload, "accepted", decode_bool, path),
++    )
++
++
+ def parse_negotiate_protocol_result(value: object, path: str = "NegotiateProtocolResult") -> NegotiateProtocolResult:
+     payload = expect_object(value, path)
+     return NegotiateProtocolResult(
+@@ -3287,6 +3365,27 @@ class WireClient:
+     def _listen(self, frame_type: str, listener: Callable[..., None]) -> Callable[[], None]:
+         raise NotImplementedError
+ 
++    def get_background_tasks(self) -> GetBackgroundTasksResult:
++        """Inspect background jobs and services without consuming results."""
++        params: dict[str, object] = {}
++        return parse_get_background_tasks_result(self._command("get_background_tasks", params), "get_background_tasks")
++
++    def get_background_task_output(self, task_id: str, kind: Literal["job", "daemon"], started_at: float) -> GetBackgroundTaskOutputResult:
++        """Read bounded output of one owned task instance."""
++        params: dict[str, object] = {}
++        params["taskId"] = task_id
++        params["kind"] = kind
++        params["startedAt"] = started_at
++        return parse_get_background_task_output_result(self._command("get_background_task_output", params), "get_background_task_output")
++
++    def cancel_background_task(self, task_id: str, kind: Literal["job", "daemon"], started_at: float) -> CancelBackgroundTaskResult:
++        """Request cancellation of one owned task instance."""
++        params: dict[str, object] = {}
++        params["taskId"] = task_id
++        params["kind"] = kind
++        params["startedAt"] = started_at
++        return parse_cancel_background_task_result(self._command("cancel_background_task", params), "cancel_background_task")
++
+     def steer(self, message: str, *, images: Sequence[ImageContent] | None = None) -> None:
+         """Queue a steering message."""
+         params: dict[str, object] = {}
+@@ -3410,7 +3509,7 @@ class WireClient:
+         params: dict[str, object] = {}
+         return required(expect_object(self._command("get_subagents", params), "get_subagents"), "subagents", array(parse_subagent_snapshot), "get_subagents")
+ 
+-    def get_subagent_messages(self, *, subagent_id: str | None = None, session_file: str | None = None, from_byte: int | None = None) -> SubagentMessages:
++    def get_subagent_messages(self, *, subagent_id: str | None = None, session_file: str | None = None, from_byte: int | None = None, expected_session_file: str | None = None) -> SubagentMessages:
+         """Read a subagent transcript by id or registered session file (`subagentId` wins)."""
+         params: dict[str, object] = {}
+         if subagent_id is not None:
+@@ -3419,12 +3518,18 @@ class WireClient:
+             params["sessionFile"] = session_file
+         if from_byte is not None:
+             params["fromByte"] = from_byte
++        if expected_session_file is not None:
++            params["expectedSessionFile"] = expected_session_file
+         return parse_subagent_messages(self._command("get_subagent_messages", params), "get_subagent_messages")
+ 
+-    def cancel_subagent(self, subagent_id: str) -> bool:
++    def cancel_subagent(self, subagent_id: str, *, expected_session_file: str | None = None, expected_parent_tool_call_id: str | None = None) -> bool:
+         """Hard-kill one running subagent; false when it is not running."""
+         params: dict[str, object] = {}
+         params["subagentId"] = subagent_id
++        if expected_session_file is not None:
++            params["expectedSessionFile"] = expected_session_file
++        if expected_parent_tool_call_id is not None:
++            params["expectedParentToolCallId"] = expected_parent_tool_call_id
+         return required(expect_object(self._command("cancel_subagent", params), "cancel_subagent"), "cancelled", decode_bool, "cancel_subagent")
+ 
+     def steer_subagent(self, subagent_id: str, message: str) -> None:
+@@ -3986,6 +4091,7 @@ __all__ = [
+     "AutoRetryStartEvent",
+     "AvailableCommandsUpdateEvent",
+     "AvailableSlashCommand",
++    "BackgroundTask",
+     "BashExecutionMessage",
+     "BashResult",
+     "BranchMessage",
+@@ -4001,6 +4107,7 @@ __all__ = [
+     "CacheWarmingOutcome",
+     "CacheWarmingPhase",
+     "CacheWarmingStartEvent",
++    "CancelBackgroundTaskResult",
+     "CancelUiRequest",
+     "CancellationResult",
+     "CommandOutputEvent",
+@@ -4025,6 +4132,8 @@ __all__ = [
+     "FastModeResult",
+     "FileMentionItem",
+     "FileMentionMessage",
++    "GetBackgroundTaskOutputResult",
++    "GetBackgroundTasksResult",
+     "GetSessionLeaseResult",
+     "Goal",
+     "GoalModeState",
+@@ -4182,6 +4291,7 @@ __all__ = [
+     "parse_auto_retry_start_event",
+     "parse_available_commands_update_event",
+     "parse_available_slash_command",
++    "parse_background_task",
+     "parse_bash_execution_message",
+     "parse_bash_result",
+     "parse_branch_message",
+@@ -4193,6 +4303,7 @@ __all__ = [
+     "parse_btw_record_event",
+     "parse_cache_warming_end_event",
+     "parse_cache_warming_start_event",
++    "parse_cancel_background_task_result",
+     "parse_cancel_ui_request",
+     "parse_cancellation_result",
+     "parse_command_output_event",
+@@ -4214,6 +4325,8 @@ __all__ = [
+     "parse_fast_mode_result",
+     "parse_file_mention_item",
+     "parse_file_mention_message",
++    "parse_get_background_task_output_result",
++    "parse_get_background_tasks_result",
+     "parse_get_session_lease_result",
+     "parse_goal",
+     "parse_goal_mode_state",
+diff --git a/sdk/rust/omp-rpc/src/wire.rs b/sdk/rust/omp-rpc/src/wire.rs
+index 6cce921..51a0239 100644
+--- a/sdk/rust/omp-rpc/src/wire.rs
++++ b/sdk/rust/omp-rpc/src/wire.rs
+@@ -2587,6 +2587,32 @@ pub struct ModelInfo {
+ 	pub compat: Option<Map<String, Value>>,
+ }
+ 
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct BackgroundTask {
++	pub id: String,
++	pub kind: BackgroundTaskKind,
++	pub title: String,
++	pub status: String,
++	#[serde(rename = "startedAt")]
++	pub started_at: f64,
++	pub detail: String,
++	pub cancellable: bool,
++	#[serde(rename = "endedAt", default, skip_serializing_if = "Option::is_none")]
++	pub ended_at: Option<f64>,
++	#[serde(default, skip_serializing_if = "Option::is_none")]
++	pub command: Option<String>,
++	#[serde(default, skip_serializing_if = "Option::is_none")]
++	pub cwd: Option<String>,
++	#[serde(rename = "ownerId", default, skip_serializing_if = "Option::is_none")]
++	pub owner_id: Option<String>,
++	#[serde(rename = "agentId", default, skip_serializing_if = "Option::is_none")]
++	pub agent_id: Option<String>,
++	#[serde(rename = "exitCode", default, skip_serializing_if = "Option::is_none")]
++	pub exit_code: Option<f64>,
++	#[serde(default, skip_serializing_if = "Option::is_none")]
++	pub output: Option<String>,
++}
++
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+ pub enum QueueMode {
+ 	#[serde(rename = "all")]
+@@ -5130,6 +5156,43 @@ impl<'de> Deserialize<'de> for RpcServerFrame {
+ 	}
+ }
+ 
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct GetBackgroundTasksResult {
++	pub tasks: Vec<BackgroundTask>,
++	#[serde(default, skip_serializing_if = "Option::is_none")]
++	pub warning: Option<String>,
++}
++
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct GetBackgroundTaskOutputParams {
++	#[serde(rename = "taskId")]
++	pub task_id: String,
++	pub kind: GetBackgroundTaskOutputParamsKind,
++	#[serde(rename = "startedAt")]
++	pub started_at: f64,
++}
++
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct GetBackgroundTaskOutputResult {
++	pub output: String,
++	#[serde(rename = "exitCode", default, skip_serializing_if = "Option::is_none")]
++	pub exit_code: Option<f64>,
++}
++
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct CancelBackgroundTaskParams {
++	#[serde(rename = "taskId")]
++	pub task_id: String,
++	pub kind: CancelBackgroundTaskParamsKind,
++	#[serde(rename = "startedAt")]
++	pub started_at: f64,
++}
++
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct CancelBackgroundTaskResult {
++	pub accepted: bool,
++}
++
+ #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+ pub struct NegotiateProtocolParams {
+ 	#[serde(rename = "protocolVersion")]
+@@ -5319,12 +5382,18 @@ pub struct GetSubagentMessagesParams {
+ 	pub session_file: Option<String>,
+ 	#[serde(rename = "fromByte", default, skip_serializing_if = "Option::is_none")]
+ 	pub from_byte: Option<i64>,
++	#[serde(rename = "expectedSessionFile", default, skip_serializing_if = "Option::is_none")]
++	pub expected_session_file: Option<String>,
+ }
+ 
+ #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+ pub struct CancelSubagentParams {
+ 	#[serde(rename = "subagentId")]
+ 	pub subagent_id: String,
++	#[serde(rename = "expectedSessionFile", default, skip_serializing_if = "Option::is_none")]
++	pub expected_session_file: Option<String>,
++	#[serde(rename = "expectedParentToolCallId", default, skip_serializing_if = "Option::is_none")]
++	pub expected_parent_tool_call_id: Option<String>,
+ }
+ 
+ #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+@@ -5835,6 +5904,24 @@ impl AssistantErrorEventReason {
+ 	}
+ }
+ 
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
++pub enum BackgroundTaskKind {
++	#[serde(rename = "job")]
++	Job,
++	#[serde(rename = "daemon")]
++	Daemon,
++}
++
++impl BackgroundTaskKind {
++	/// Wire value.
++	pub fn as_str(self) -> &'static str {
++		match self {
++			Self::Job => "job",
++			Self::Daemon => "daemon",
++		}
++	}
++}
++
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+ pub enum GoalModeStateMode {
+ 	#[serde(rename = "active")]
+@@ -5976,6 +6063,42 @@ impl HostUriResultContentType {
+ 	}
+ }
+ 
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
++pub enum GetBackgroundTaskOutputParamsKind {
++	#[serde(rename = "job")]
++	Job,
++	#[serde(rename = "daemon")]
++	Daemon,
++}
++
++impl GetBackgroundTaskOutputParamsKind {
++	/// Wire value.
++	pub fn as_str(self) -> &'static str {
++		match self {
++			Self::Job => "job",
++			Self::Daemon => "daemon",
++		}
++	}
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
++pub enum CancelBackgroundTaskParamsKind {
++	#[serde(rename = "job")]
++	Job,
++	#[serde(rename = "daemon")]
++	Daemon,
++}
++
++impl CancelBackgroundTaskParamsKind {
++	/// Wire value.
++	pub fn as_str(self) -> &'static str {
++		match self {
++			Self::Job => "job",
++			Self::Daemon => "daemon",
++		}
++	}
++}
++
+ fn default_queued_messages_state_live_steered() -> i64 {
+ 	serde_json::from_str("0").expect("valid wire default")
+ }
+@@ -6076,6 +6199,60 @@ fn default_ask_question_multi() -> bool {
+ 	serde_json::from_str("false").expect("valid wire default")
+ }
+ 
++/// Inspect background jobs and services without consuming results.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
++pub struct GetBackgroundTasksCommand {}
++
++impl Command for GetBackgroundTasksCommand {
++	const NAME: &'static str = "get_background_tasks";
++	const TIMEOUT_MS: Option<u64> = None;
++	type Output = GetBackgroundTasksResult;
++
++	fn decode(data: Option<Value>) -> Result<Self::Output, serde_json::Error> {
++		serde_json::from_value::<GetBackgroundTasksResult>(data.unwrap_or_else(|| Value::Object(Map::new())))
++	}
++}
++
++/// Read bounded output of one owned task instance.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct GetBackgroundTaskOutputCommand {
++	#[serde(rename = "taskId")]
++	pub task_id: String,
++	pub kind: GetBackgroundTaskOutputParamsKind,
++	#[serde(rename = "startedAt")]
++	pub started_at: f64,
++}
++
++impl Command for GetBackgroundTaskOutputCommand {
++	const NAME: &'static str = "get_background_task_output";
++	const TIMEOUT_MS: Option<u64> = None;
++	type Output = GetBackgroundTaskOutputResult;
++
++	fn decode(data: Option<Value>) -> Result<Self::Output, serde_json::Error> {
++		serde_json::from_value::<GetBackgroundTaskOutputResult>(data.unwrap_or_else(|| Value::Object(Map::new())))
++	}
++}
++
++/// Request cancellation of one owned task instance.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct CancelBackgroundTaskCommand {
++	#[serde(rename = "taskId")]
++	pub task_id: String,
++	pub kind: CancelBackgroundTaskParamsKind,
++	#[serde(rename = "startedAt")]
++	pub started_at: f64,
++}
++
++impl Command for CancelBackgroundTaskCommand {
++	const NAME: &'static str = "cancel_background_task";
++	const TIMEOUT_MS: Option<u64> = None;
++	type Output = CancelBackgroundTaskResult;
++
++	fn decode(data: Option<Value>) -> Result<Self::Output, serde_json::Error> {
++		serde_json::from_value::<CancelBackgroundTaskResult>(data.unwrap_or_else(|| Value::Object(Map::new())))
++	}
++}
++
+ /// Switch the connection to a protocol version advertised by `ready`.
+ #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+ pub struct NegotiateProtocolCommand {
+@@ -6511,6 +6688,8 @@ pub struct GetSubagentMessagesCommand {
+ 	pub session_file: Option<String>,
+ 	#[serde(rename = "fromByte", default, skip_serializing_if = "Option::is_none")]
+ 	pub from_byte: Option<i64>,
++	#[serde(rename = "expectedSessionFile", default, skip_serializing_if = "Option::is_none")]
++	pub expected_session_file: Option<String>,
+ }
+ 
+ impl Command for GetSubagentMessagesCommand {
+@@ -6528,6 +6707,10 @@ impl Command for GetSubagentMessagesCommand {
+ pub struct CancelSubagentCommand {
+ 	#[serde(rename = "subagentId")]
+ 	pub subagent_id: String,
++	#[serde(rename = "expectedSessionFile", default, skip_serializing_if = "Option::is_none")]
++	pub expected_session_file: Option<String>,
++	#[serde(rename = "expectedParentToolCallId", default, skip_serializing_if = "Option::is_none")]
++	pub expected_parent_tool_call_id: Option<String>,
+ }
+ 
+ impl Command for CancelSubagentCommand {

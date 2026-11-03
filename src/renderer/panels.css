@@ -36,13 +36,18 @@
 .memory-card h3 { font-size: 14px; line-height: 1.6; font-weight: 550; letter-spacing: 0; text-wrap: pretty; max-width: none; overflow-wrap: anywhere; }
 .memory-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
 .memory-tags span { padding: 2px 6px; border-radius: 4px; font-size: var(--font-size-caption); color: var(--muted-readable); background: var(--surface-hover-soft); overflow-wrap: anywhere; max-width: 100%; }
-.memory-excerpt, .summary-excerpt { font-size: var(--font-size-small); line-height: 1.8; color: var(--muted-readable); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; white-space: pre-line; }
+.summary-excerpt { font-size: var(--font-size-small); line-height: 1.8; color: var(--muted-readable); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; white-space: pre-line; }
+.memory-excerpt { min-width:0; max-width:100%; margin-top:10px; overflow-wrap:anywhere; }
+.memory-excerpt .markdown { font-size:var(--font-size-small); line-height:1.8; white-space:normal; }
+.memory-excerpt .markdown table { width:max-content; min-width:100%; }
+.memory-excerpt .markdown thead:has(th):not(:has(th:not(:empty))) { display:none; }
+.memory-empty-excerpt, .memory-fragment-note { font-size:var(--font-size-caption); line-height:1.7; color:var(--muted-readable); }
 .memory-source { font-size: var(--font-size-caption); color: var(--muted-readable); margin: 10px 0 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .source-details { margin-top: 12px; font-size: var(--font-size-caption); color: var(--muted-readable); overflow-wrap: anywhere; }
 .source-details summary { cursor: pointer; padding: 5px 0; }
 .source-details pre, .plain-result { font: var(--font-size-code)/1.8 var(--font-code); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 8px; }
 .source-details pre { max-height: 360px; overflow: auto; padding: 10px; border: 1px solid var(--soft-border); border-radius: 6px; }
-.memory-warning { font-size: var(--font-size-small); line-height: 1.7; border-left: 2px solid var(--text-danger); padding: 8px 12px; margin: 10px 0 16px; }
+.memory-warning { font-size: var(--font-size-small); line-height: 1.7; border-left: 1px solid var(--text-danger); padding: 8px 12px; margin: 10px 0 16px; }
 .stale-details>summary { color: var(--text-primary); }
 .summary-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
 .summary-meta+.text-action { display: inline-flex; gap: 5px; align-items: center; margin-bottom: 12px; }

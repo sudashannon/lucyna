@@ -32,7 +32,8 @@ flowchart LR
 - `src/backend.cjs` 与 `src/work-inventory.py` 提供只读工作区诊断；警告与不可恢复的路径错误分别显示。
 - `src/renderer/` 是 React 界面；`vendor/cindy` 是保留许可证的 Cindy UI 组件。Markdown 采用 Streamdown 及 code、math、mermaid、cjk 插件。
 - `src/pet/` 管理独立透明窗口、状态聚合和动画，不运行另一套 agent。
-- `tools/work-stele/server.py` 是受限的 stdio MCP 桥接；可用工具来自 allowlist，凭证留在 WSL。
+- `tools/work-stele/server.py` 是受限的 stdio MCP 桥接；可用工具来自 allowlist。受管模式调用内置原生 MCP 客户端，凭据由服务宿主处理；旧 WSL HTTP 连接保留为兼容模式。
+- `knowledge-runtime.cjs` 管理独立的无窗口知识宿主；`knowledge-host.cjs` 启动经过摘要校验的 Windows Stele 和 Node/WASM 向量 worker。`knowledge-library.cjs` 在真实 userData 下管理 SQLite 目录、正文投影、修订和导入任务，UI 与 MCP 共用版本写入。
 - `src/knowledge-service.cjs` 将固定 IPC 操作映射到本地 Stele API。渲染器不能指定任意 URL 或 HTTP 方法；上传采用限额 multipart，编辑携带强 ETag，候选/复核携带输入版本。问答通过受限 IPC 转发真实 SSE，提前结束不作为成功。
 - `KnowledgeWorkspace` 复用原有文档阅读器，提供探索、来源、维护和工具视图。Cytoscape 按需加载并使用 Stele 返回的社区和关系数据，默认折叠社区，会话节点按需显示；知识仍由 Stele 管理。
 - `src/runtime-config.cjs` 与 `tools/runtime_config.py` 读取本地机器配置。公共代码不依赖开发者用户名或 provider 认证。

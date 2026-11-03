@@ -1,7 +1,7 @@
 import type {KnowledgeCatalog, KnowledgeDetail, KnowledgeCandidate, KnowledgeReview} from './knowledge-types';
 import type {WorkDetail, GitInspection, GitReadOptions} from './work-detail-data';
 export interface WorkIssue {code: string; severity: 'error' | 'warning' | 'info'; message: string; member?: string; actual?: string; expected?: string}
-export interface Work { name: string; root: string; kind: string; hostId?:string;hostName?:string;hostStatus?:string;state?: string; error?: string; health?: 'ok' | 'warning' | 'error'; issues?: WorkIssue[] }
+export interface Work { name: string; root: string; kind: string; rootAvailable?:boolean; hostId?:string;hostName?:string;hostStatus?:string;state?: string; error?: string; health?: 'ok' | 'warning' | 'error'; issues?: WorkIssue[] }
 export interface HistoryEntry { title?: string; id?: string; path?: string; cwd?: string; sessionFile?: string; agentDir?: string; modified?: string; modifiedAt?: string; importedAt?: string; sourceKind?: string; runtime?: 'windows' | 'wsl' | 'ssh';hostId?:string;remoteSessionId?:string;status?:string }
 export interface SshHost {id:string;name:string;root:string;omp:string;agentDir:string;ssh:{destination:string;port?:number;user?:string;configFile?:string;identityFile?:string;executor:{kind:'windows-openssh'|'wsl-openssh';distro?:string;user?:string}};phase?:string;installed?:boolean;error?:string}
 export interface ClientSettings {version:1; runtime:'windows'|'wsl'; windowsExecutable:string; wslExecutable:string; wslAgentDir:string; model:string; thinking:string}
@@ -61,6 +61,7 @@ export interface Desktop {
   prepareTextAttachments(id:string,files:{id:string;text:string}[]):Promise<import('./text-attachments').PreparedTextAttachment[]>;
   request(type: string, data?: OmpEvent, id?: string): Promise<OmpEvent>; respond(data: OmpEvent,id?:string): Promise<unknown>; close(id?:string): Promise<unknown>;
   listConnections?(): Promise<OmpEvent[]>;
+  forceStop?(id:string):Promise<unknown>;
   chooseSession(): Promise<string | null>; listHistory(root: string,hostId?:string): Promise<History>;
   previewHistoryDeletion(source:string,root:string):Promise<HistoryDeletionPlan>;
   deleteHistory(source:string,root:string,token:string):Promise<string>;

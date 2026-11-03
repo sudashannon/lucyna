@@ -90,7 +90,7 @@ class Runner:
     async def dispatch(self, request):
         operation = request.get('op')
         if operation == 'status':
-            return {'installed': True, 'version': 4, 'workspaceLock':True, 'scope': 'work-tools', 'automaticEvolution': True, 'evolutionAgent': 'auxiliary', 'workRoot': self.config['workRoot'], 'tools':[t['name'] for t in TOOLS+EXTRA_TOOLS]}
+            return {'installed': True, 'version': 5, 'workspaceLock':True, 'scope': 'work-tools', 'automaticEvolution': True, 'automaticPreparation': True, 'evolutionAgent': 'auxiliary', 'workRoot': self.config['workRoot'], 'tools':[t['name'] for t in TOOLS+EXTRA_TOOLS]}
         if operation == 'list':
             return self.store.list(request.get('root'))
         if operation == 'get':
@@ -119,6 +119,8 @@ class Runner:
                 return self.automatic.view(request['root'])
             if operation == 'automatic-configure':
                 return self.automatic.configure(request)
+            if operation == 'automatic-prepare':
+                return self.automatic.request_preparation(request)
             if operation == 'create':
                 return await self.create(request)
             run = self.store.get(request.get('runId'))
@@ -139,7 +141,7 @@ class Runner:
                     raise ValueError('原执行进程仍存活，不能启动第二个 writer')
                 if run.get('mode')!='evolution' and (not run.get('sessionFile') or not Path(run['sessionFile']).is_file()):
                     raise ValueError('尚无可恢复 journal。请检查已有改动，取消本任务后重新创建')
-                if run.get('usedTokens', 0) is not None and run.get('usedTokens', 0) >= run['tokenBudget']:
+                if run['tokenBudget'] is not None and run.get('usedTokens', 0) is not None and run.get('usedTokens', 0) >= run['tokenBudget']:
                     raise ValueError('Token 预算已用完，请检查结果后创建新任务')
                 if run.get('elapsedSeconds', 0) >= run['wallSeconds'] or run['attempts'] >= 5:
                     raise ValueError('执行时间或恢复次数已到上限')
@@ -196,7 +198,8 @@ class Runner:
                 raise ValueError('同一请求标识不能用于不同任务')
             return existing
         token_budget, wall = request.get('tokenBudget', 100000), request.get('wallSeconds', 1800)
-        if type(token_budget) is not int or not 1000 <= token_budget <= 200000 or type(wall) is not int or not 60 <= wall <= 43200:
+        unlimited=request.get('mode')=='evolution' and token_budget is None
+        if (not unlimited and (type(token_budget) is not int or not 1000 <= token_budget <= 200000)) or type(wall) is not int or not 60 <= wall <= 43200:
             raise ValueError('预算超出范围：1000–200000 tokens，1 分钟–12 小时')
         model = request.get('model', '')
         if not isinstance(model, str) or len(model) > 200 or any(c in model for c in '\0\r\n'):
@@ -213,7 +216,7 @@ class Runner:
             self.require_auxiliary()
             from evo_runtime import python as evolution_python
             evolution_python()
-            evolution_spec=evolution_specification(request.get('evolution'),root)
+            evolution_spec=evolution_specification(request.get('evolution'),root,self.directory)
             frozen=evolution_spec['frozen']
         run = {'id': str(uuid.uuid4()), 'requestKey': key, 'root': root, 'objective': objective,
             'acceptance': acceptance, 'state': 'queued', 'reason': '', 'binding': bound,
@@ -239,7 +242,8 @@ class Runner:
     async def validate(self, run):
         if await asyncio.to_thread(binding, run['root'], self.config) != run['binding']:
             raise ValueError('Work 身份或成员登记已变化，停止恢复')
-        check_frozen(run)
+        generated=(run.get('evolutionSpec') or {}).get('generated',{})
+        check_frozen(dict(run,frozen={p:h for p,h in run['frozen'].items() if p not in generated}))
 
     def launch(self, key, resume=False):
         task = asyncio.create_task(self.execute(key, resume))
@@ -569,6 +573,7 @@ async def serve(directory, config):
     finally:
         automatic_task.cancel()
         await asyncio.gather(automatic_task, return_exceptions=True)
+        await runner.automatic.shutdown()
         for task in runner.tasks.values():
             task.cancel()
         await asyncio.gather(*list(runner.tasks.values()), return_exceptions=True)

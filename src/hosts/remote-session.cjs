@@ -57,8 +57,8 @@ class RemoteSession extends EventEmitter {
           if (!frame) continue;
           this.committedCursor = item.sequence;
           if (frame.type === 'response' && frame.id?.startsWith('host-')) continue;
-          if (frame.type === 'response' && typeof frame.id === 'string' && frame.id.startsWith('operation-')) {
-            const key = frame.id.slice(10), pending = this.pending.get(key);
+          if (frame.type === 'response' && typeof frame.id === 'string' && /^(operation|observation)-/.test(frame.id)) {
+            const key = frame.id.slice(frame.id.indexOf('-')+1), pending = this.pending.get(key);
             if (pending) {
               this.pending.delete(key); clearTimeout(pending.timer);
               frame.success ? pending.resolve(frame.data) : pending.reject(Object.assign(Error(frame.error || 'OMP 请求失败'), {code: frame.code, operationId: key}));

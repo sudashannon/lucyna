@@ -101,7 +101,7 @@ class Evolution(unittest.TestCase):
 
     def test_dispatch_routes_adopt_and_rollback(self):
         runner,run,_=self.promotion_fixture()
-        runner.admission=asyncio.Lock();runner.tasks={}
+        runner.admission=asyncio.Lock();runner.tasks={};runner.workspace_leases={}
         async def validate(_):pass
         runner.validate=validate
         result=asyncio.run(Runner.dispatch(runner,{'op':'adopt','runId':'run'}))

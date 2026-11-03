@@ -30,6 +30,15 @@ def wait_for(predicate):
 
 
 class SessionTests(unittest.TestCase):
+    def test_task_polling_does_not_fill_write_recovery_table(self):
+        before = self.manager.db.execute('SELECT COUNT(*) FROM operations').fetchone()[0]
+        for kind in ('get_subagents', 'get_background_tasks', 'get_background_task_output'):
+            key = uuid.uuid4().hex
+            args = dict(self.identity, operationId=key, frame=dict(type=kind))
+            self.manager.dispatch('session.request', args)
+            wait_for(lambda: any(item['frame'].get('id') == 'observation-'+key for item in self.manager.dispatch('session.events', dict(self.identity, cursor=0))['frames']))
+        self.assertEqual(self.manager.db.execute('SELECT COUNT(*) FROM operations').fetchone()[0], before)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='lh-session-')
         self.root = Path(self.tmp.name)
@@ -63,6 +72,15 @@ class SessionTests(unittest.TestCase):
         self.assertEqual((self.work/'prompts.txt').read_text(), 'only once\n')
         with self.assertRaisesRegex(ValueError, 'operation_conflict'):
             self.request('prompt-once', dict(type='prompt', message='different'))
+
+    def test_subagent_cancellation_uses_durable_native_operation_identity(self):
+        self.request('list-children', dict(type='get_subagents'))
+        wait_for(lambda: any(item['frame'].get('id') == 'observation-list-children' for item in self.manager.dispatch('session.events', dict(self.identity, cursor=0))['frames']))
+        self.request('cancel-child-once', dict(type='cancel_subagent', subagentId='fixture-child'))
+        wait_for(lambda: self.manager.dispatch('operation.get', dict(operationId='cancel-child-once'))['status'] == 'succeeded')
+        repeated = self.request('cancel-child-once', dict(type='cancel_subagent', subagentId='fixture-child'))
+        self.assertTrue(repeated['replayed'])
+        self.assertEqual((self.work/'cancellations.txt').read_text(), 'fixture-child\n')
 
     def test_workspace_inspection_and_document_cannot_cross_symlink_boundary(self):
         (self.work/'SESSION.md').write_text('# remote work')

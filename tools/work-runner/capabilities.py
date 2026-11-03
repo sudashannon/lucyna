@@ -51,9 +51,13 @@ def walk_files(root, limit=10000):
             yield path
 
 
-def snapshot(root):
+def snapshot(root, paths=None):
     result, size = {}, 0
-    for path in walk_files(root):
+    if paths is not None and (not isinstance(paths, list) or not 1 <= len(paths) <= 5000 or any(not isinstance(p,str) for p in paths) or len(set(paths)) != len(paths)):
+        raise ValueError('实验输入须为 1–5000 个不同的文件')
+    for path in (walk_files(root) if paths is None else (local_path(root, name) for name in sorted(paths))):
+        if path.is_symlink() or not path.is_file() or path.stat().st_nlink != 1:
+            raise ValueError('实验输入必须是普通文件：'+str(path.relative_to(root)))
         size += path.stat().st_size
         if size > 100*1024*1024:
             raise ValueError('实验输入超过 100 MiB，请缩小 Work')

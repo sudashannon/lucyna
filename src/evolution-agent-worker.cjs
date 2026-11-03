@@ -10,7 +10,9 @@ function close(){controller.abort();for(const p of pending.values())p.reject(Err
 async function start(input){
   try{
     const config={...validate(input.config),apiKey:input.config.apiKey||''};
-    const result=await new AuxiliaryAgent().iterateWork(config,input.request,(name,args)=>new Promise((resolve,reject)=>{
+    const agent=new AuxiliaryAgent();
+    const method=input.request.mode==='prepare'?'prepareWorkEvolution':'iterateWork';
+    const result=await agent[method](config,input.request,(name,args)=>new Promise((resolve,reject)=>{
       const id=randomUUID();pending.set(id,{resolve,reject});send({type:'tool',id,name,args});
     }),usage=>send({type:'usage',...usage}),controller.signal);
     send({type:'done',...result});

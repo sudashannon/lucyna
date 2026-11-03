@@ -41,7 +41,7 @@ test('a confirmed dead remote process can be closed and releases its host config
  let remembered;const events=[];remote.send=event=>events.push(event);remote.registry.remember=async saved=>remembered={...saved};
  remote.connectHost=async()=>({});const saved={id:'session',hostId:'host',root:input.root,descriptor:{record:{id:'native'}}};
  remote.active.set(saved.id,{saved,session:{polling:false,attach:async()=>{throw Object.assign(Error('exited'),{code:'session_not_live'});}}});
- await remote.close(saved.id);assert.equal(remembered.ended,true);assert.equal(remote.listConnections().length,0);assert.equal(events[0].type,'process_exit');
+ await remote.close(saved.id);assert.equal(remembered.ended,true);assert.equal(remote.listConnections().length,0);assert.deepEqual(events.map(e=>e.type),['client_closing','process_exit']);assert.equal(events.at(-1).stopped,true);
 });
 
 test('desktop records prompt identity before sending and keeps the guard across lost acknowledgements',async()=>{

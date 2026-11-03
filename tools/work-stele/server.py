@@ -16,11 +16,16 @@ import sys
 import urllib.error
 import urllib.request
 import uuid
+import argparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from runtime_config import load_runtime
 
 
 STELE_URL = "http://127.0.0.1:18989/mcp"
+_options = argparse.ArgumentParser(add_help=False)
+_options.add_argument('--knowledge-client')
+_options.add_argument('--knowledge-data')
+KNOWLEDGE_OPTIONS, _ = _options.parse_known_args()
 RUNTIME = load_runtime()
 WORK_ROOT = RUNTIME['workRoot']
 SKILL_ROOT = RUNTIME['skillDirectory'] / 'worktree-session'
@@ -30,6 +35,8 @@ MAX_FILE_BYTES = 512 * 1024
 MAX_RESPONSE_BYTES = 4 << 20
 
 READ_TOOLS = {
+    "work_material_list", "work_material_read",
+    "library_list", "library_documents", "library_read", "library_history",
     "wiki_search",
     "wiki_component",
     "wiki_neighbors",
@@ -46,6 +53,7 @@ READ_TOOLS = {
     "wiki_candidate_list",
 }
 WRITE_TOOLS = {
+    "library_write",
     "todo_create",
     "todo_update",
     "todo_sync_omp",
@@ -165,6 +173,22 @@ def _stele_request(method, params=None, write=False):
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-8")
+    if KNOWLEDGE_OPTIONS.knowledge_client:
+        if not KNOWLEDGE_OPTIONS.knowledge_data:
+            raise BridgeError('Managed knowledge profile is missing')
+        command = [KNOWLEDGE_OPTIONS.knowledge_client, '--lucyna-mcp', '--knowledge-data', KNOWLEDGE_OPTIONS.knowledge_data, '--once']
+        if write:
+            command.append('--write')
+        try:
+            result = subprocess.run(command, input=payload + b'\n', stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60, check=True)
+            if len(result.stdout) > MAX_RESPONSE_BYTES:
+                raise BridgeError('Managed knowledge response exceeded the size limit')
+            data = json.loads(result.stdout)
+            if data.get('id') != request_id or data.get('error'):
+                raise BridgeError('Managed knowledge MCP request failed')
+            return data.get('result')
+        except (OSError, subprocess.SubprocessError, ValueError):
+            raise BridgeError('Lucyna managed knowledge is unavailable through its native MCP bridge') from None
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if write:
         token = _read_token()

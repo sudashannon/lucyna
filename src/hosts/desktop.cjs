@@ -5,6 +5,7 @@ const {deployFrozen} = require('./ssh-frozen.cjs');
 const {HostConnection} = require('./connection.cjs');
 const {RemoteSession} = require('./remote-session.cjs');
 const {validatePrompt} = require('../prompt-input.cjs');
+const {stopSession} = require('../session-stop.cjs');
 
 const messages = {
   omp_not_executable: '远端未找到 OMP，请填写可执行文件的绝对路径。',
@@ -86,7 +87,7 @@ class RemoteDesktop {
     this.status(id, 'disconnected');
   }
   async remove(id) { await this.registry.remove(id); await this.disconnectHost(id); this.connections.delete(id); this.notify({hostId: id, removed: true}); }
-  emit(item, event) { this.send({...event, clientSessionId: item.saved.id, workRoot: item.saved.root, hostId: item.saved.hostId, runtime: 'ssh'}); }
+  emit(item, event) { if(event.type==='agent_start')item.activityRevision=(item.activityRevision||0)+1;this.send({...event, clientSessionId: item.saved.id, workRoot: item.saved.root, hostId: item.saved.hostId, runtime: 'ssh'}); }
   async persist(item) {
     if (item.session?.record) item.saved.descriptor = item.session.descriptor();
     await this.registry.remember(item.saved);
@@ -208,18 +209,22 @@ class RemoteDesktop {
   owns(id) { return this.active.has(id)||this.starting.has(id); }
   get(id) { const item = this.active.get(identifier(id)); if (!item) throw Error('远端会话未连接'); return item; }
   async request(id, type, data = {}) {
-    const item = this.get(id); if (type === 'prompt') {
+    const item = this.get(id),stateRevision=item.activityRevision||0; if (type === 'prompt') {
       validatePrompt(data);
       if(item.saved.pendingOperation)throw Error('上一条消息的发送结果尚未核对，请先检查远端状态');
+      item.activityRevision=(item.activityRevision||0)+1;
     }
     const operationId = randomUUID();
+    if(['abort','abort_and_restore_queue'].includes(type))this.emit(item,{type:'client_stopping'});
     if(type==='prompt') { item.saved.pendingOperation=operationId; await this.persist(item); }
     try {
-      const result = type === 'get_messages' ? await item.session.messages() : await item.session.request(type, data, {operationId});
+      const result = type === 'get_messages' ? await item.session.messages() : ['abort','abort_and_restore_queue'].includes(type) ? await stopSession(item.session,type,data) : await item.session.request(type, data, {operationId});
       if (type === 'get_state') {
         item.saved.sessionFile = result.sessionFile; item.saved.nativeId = result.sessionId;
         if(item.session.record&&!item.saved.ended)Object.assign(item.session.record,{nativeSessionId:result.sessionId,journal:result.sessionFile,status:'live'});
         await this.persist(item);
+        if(stateRevision!==(item.activityRevision||0))result.isSettled=undefined;
+        this.emit(item,{type:'session_state',sessionName:result.sessionName||'',isSettled:result.isSettled});
       }
       if(type==='prompt') { delete item.saved.pendingOperation; await this.persist(item); }
       return result;
@@ -242,12 +247,13 @@ class RemoteDesktop {
   async close(id) {
     if(this.starting.has(id)){await this.detach(id);return;}
     const item = this.get(id);
+    this.emit(item,{type:'client_closing'});
     try {
       if (!item.session.polling) { await this.connectHost(item.saved.hostId); await item.session.attach(item.saved.descriptor); }
       await item.session.stop();
     }catch(error){if(!['session_not_live','session_interrupted','stale_generation'].includes(error.code))throw error;}
     item.saved.ended = true; await this.persist(item);
-    this.emit(item, {type: 'process_exit', code: 0});
+    this.emit(item, {type: 'process_exit', code: 0, stopped:true});
   }
   async detach(id) {
     if(this.starting.has(id))this.cancelledStarts.add(id);

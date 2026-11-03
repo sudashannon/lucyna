@@ -48,9 +48,15 @@ class InventoryTest(unittest.TestCase):
         self.write([{**self.item, 'branch': 'old', 'mr': 171}, {**self.item, 'name': 'gone', 'path': 'repos/gone', 'baseSha': 'bad', 'mr': {'id': 3}}])
         result = inventory.inspect(self.root)
         self.assertEqual(result['kind'], 'invalid')
+        self.assertTrue(result['rootAvailable'])
         self.assertEqual({i['code'] for i in result['issues']}, {'branch_mismatch','mr_numeric','base_sha_format','mr_type','member_missing'})
         self.assertEqual(len(result['issues']), 5)
         self.assertEqual(len(result['members']), 1)
+
+    def test_missing_root_cannot_be_used_as_a_session_directory(self):
+        result = inventory.inspect(self.base / 'missing')
+        self.assertFalse(result['rootAvailable'])
+        self.assertEqual(result['issues'][0]['code'], 'root_invalid')
 
     def test_all_five_numeric_members_are_returned(self):
         members = []

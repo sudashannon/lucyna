@@ -41,11 +41,11 @@ class Context:
         if pending:
             # The last request may have consumed tokens before its final usage event.
             # Charge its reserved cap conservatively, instead of resetting the budget.
-            self.data['usedTokens']=max(self.data['usedTokens'],pending['base']+pending['budget'])
+            self.data['usedTokens']=max(self.data['usedTokens'],pending['base']+(pending['budget'] or 0))
             self.data['usageEstimated']=True
             for row in self.data['candidates']:
                 if row['id']==pending['id']:
-                    row.update(state='failed',error='生成过程被中断，未完成候选未采纳；该次预留预算按上限计入。')
+                    row.update(state='failed',error='生成过程被中断，未完成候选未采纳；用量记录可能不完整。' if pending['budget'] is None else '生成过程被中断，未完成候选未采纳；该次预留预算按上限计入。')
         self.data['phase']='baseline'
         self.data['agent']='auxiliary'
         self.optimizer=None
@@ -115,10 +115,12 @@ class LocalAgentProposer(Proposer):
             row.update(state='failed',error='已达到候选尝试次数上限')
             ctx.publish('候选尝试次数已用完')
             return ProposalResult(success=False,error_message='Proposal attempt budget exhausted')
-        remaining=ctx.request['tokenBudget']-ctx.data['usedTokens']
-        if remaining<1000:
-            return ProposalResult(success=False,error_message='Token budget exhausted')
-        limit=max(1000,remaining//max(1,ctx.spec['iterations']-sum(c['generation']>0 for c in ctx.data['candidates'])+1))
+        limit=None
+        if ctx.request['tokenBudget'] is not None:
+            remaining=ctx.request['tokenBudget']-ctx.data['usedTokens']
+            if remaining<1000:
+                return ProposalResult(success=False,error_message='Token budget exhausted')
+            limit=max(1000,remaining//max(1,ctx.spec['iterations']-sum(c['generation']>0 for c in ctx.data['candidates'])+1))
         ctx.data['proposalAttempts']=ctx.data.get('proposalAttempts',0)+1
         ctx.data['activeProposal']={'id':new_id,'budget':limit,'base':ctx.data['usedTokens']}
         ctx.data['phase']='proposing';row['state']='proposing';ctx.publish('本地 agent 正在迭代 Work')
@@ -158,7 +160,7 @@ class LocalAgentProposer(Proposer):
         finally:
             # Failed/incomplete calls reserve the cap; SIGKILL is reconciled on restart.
             ctx.data.pop('activeProposal',None)
-            ctx.data['usedTokens']=base+(used if complete else max(used,limit))
+            ctx.data['usedTokens']=base+(used if complete else max(used,limit or 0))
             if not complete:ctx.data['usageEstimated']=True
             ctx.publish('候选调用结束，预算已记录')
 

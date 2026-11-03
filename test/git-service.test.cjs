@@ -1,4 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict');
+const {EventEmitter}=require('node:events');
 const {validate,createGitService}=require('../src/git-service.cjs');
 const {RemoteDesktop}=require('../src/hosts/desktop.cjs');
 test('Git write IPC rejects arbitrary commands, arguments and unbounded payloads',()=>{
@@ -10,6 +11,25 @@ test('unlisted Work never reaches WSL and lifecycle operations use admission',as
   let calls=0,admitted=0;
   const service=createGitService({listWorks:async()=>[],execute:()=>{calls++;},lifecycle:async()=>{admitted++;}});
   await assert.rejects(service('/unknown','app','snapshot'),/无效工作根/);assert.equal(calls,0);assert.equal(admitted,0);
+});
+test('WSL disk usage invokes the installed read-only helper with the registered root',async()=>{
+  const root='/work with spaces';
+  const expected={version:1,root,memberBytes:4096,sharedBytes:0,members:[]};
+  const service=createGitService({listWorks:async()=>[{root}],execute:(program,args)=>{
+    assert.equal(program,'wsl.exe');
+    assert.match(args.at(-5),/worktree-disk\.py$/);
+    assert.deepEqual(args.slice(-4),['members','--json','--',root]);
+    const child=new EventEmitter();
+    child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();
+    child.stdin.end=()=>queueMicrotask(()=>{
+      child.stdout.emit('data',Buffer.from(JSON.stringify(expected)));
+      child.emit('close',0);
+    });
+    return child;
+  }});
+  assert.deepEqual(await service(root,'app','disk'),expected);
+  assert.throws(()=>validate(root,'app','disk',{file:'/another/path'}));
+  assert.throws(()=>validate(root,'app','branch-switch',{lfsMode:'review'}),/LFS/);
 });
 test('remote workspace calls bind host and root and negotiate each capability',async()=>{
   const calls=[],connection={hello:{capabilities:['workspace.files.read']},request:async(...args)=>{calls.push(args);return{path:'file.txt'};}};
