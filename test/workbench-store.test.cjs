@@ -118,6 +118,28 @@ function setup(saved){
 
 const savedSession=(id,extra={})=>({id,root:'/work/a',draftKey:'draft-'+id,title:'Task '+id,sessionFile:'C:/'+id+'.jsonl',agentDir:'C:/agent',runtime:'wsl',reconnectOnLaunch:true,...extra});
 
+test('a Work handoff retains its own conversation and draft identity while another Work is selected',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);
+ const previous=f.store.active;
+ f.api.startWorkCreation=async id=>f.api.start({root:'/work',clientSessionId:id});
+ f.api.finishWorkCreation=async()=>null;
+ const creation=f.store.newWork(),session=f.store.active;
+ assert.equal(creation.draftKey,session.draftKey);
+ await creation.send('/work-start investigate');
+ f.store.selectSession(previous.id);
+ const work={root:'/work/new',name:'new',kind:'gitless'};
+ f.works.push(work);
+ f.emit({type:'work_creation_completed',clientSessionId:session.id,work,sessionFile:'C:/new.jsonl'});
+ await tick();
+ assert.equal(f.store.active,previous);
+ assert.equal(session.work,work);
+ assert.equal(session.draftKey,creation.draftKey);
+ await f.store.selectWork(work);
+ assert.equal(f.store.active,session);
+ assert.equal(session.sessionFile,'C:/new.jsonl');
+ f.store.dispose();
+});
+
 test('startup deadline includes stalled IPC and cleanup; late ready cannot revive an expired attempt',async t=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);const s=f.store.active;
  const start=f.api.start,close=f.api.close;let release;

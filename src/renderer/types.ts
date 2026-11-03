@@ -52,6 +52,8 @@ export interface Desktop {
   checkAuxiliary?(input:AuxiliaryInput):Promise<AuxiliaryCheck>;
   copyText(text: string): Promise<void>;
   listWorks(): Promise<Work[]>; readWork(root: string,hostId?:string): Promise<string>;
+  startWorkCreation?(id:string):Promise<unknown>;
+  finishWorkCreation?(id:string):Promise<{work:Work;sessionFile:string}|null>;
   listHosts?():Promise<SshHost[]>;saveHost?(input:Partial<SshHost>):Promise<SshHost>;connectHost?(id:string):Promise<SshHost[]>;
   updateHost?(id:string):Promise<SshHost[]>;
   cancelHost?(id:string):Promise<void>;disconnectHost?(id:string):Promise<void>;removeHost?(id:string):Promise<void>;

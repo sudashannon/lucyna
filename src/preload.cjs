@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
   mode:'native',
   workDetails:(root,hostId)=>ipcRenderer.invoke('work:details',root,hostId),
+  startWorkCreation:id=>ipcRenderer.invoke('work:create-session',id),
+  finishWorkCreation:id=>ipcRenderer.invoke('work:finish-creation',id),
   workRun:(operation,data)=>ipcRenderer.invoke('work:run',operation,data),
   workGit:(root,member,action,options,hostId)=>ipcRenderer.invoke('work:git',root,member,action,options,hostId),
   gitWorkspace:(root,member,action,options,hostId)=>ipcRenderer.invoke('workspace:git',root,member,action,options,hostId),

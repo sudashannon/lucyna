@@ -5,6 +5,7 @@
 .work-section-actions { display: flex; align-items: center; gap: 3px; }
 .work-section-actions .work-check-button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border-radius: 6px; color: var(--muted-readable); font-size: var(--font-size-caption); }
 .work-check-button:hover { background: var(--sidebar-hover); color: var(--text-primary); }
+.work-creation-field { display: grid; gap: 8px; color: var(--text-secondary); }
 .work-health-notice { display: flex; align-items: center; gap: 9px; flex-shrink: 0; margin: 0 20px 8px; padding: 10px 12px; background: var(--work-warning-bg); border: 1px solid var(--work-warning-border); color: var(--work-warning); border-radius: 9px; font-size: var(--font-size-small); line-height: 1.6; }
 .work-health-notice>svg { flex-shrink: 0; }
 .work-health-notice>span { flex: 1; min-width: 0; }

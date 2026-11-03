@@ -142,7 +142,13 @@ def safe_inspect(root):
 
 
 def list_roots(parent):
-    parent = Path(parent).expanduser().resolve(strict=True)
+    supplied = Path(parent).expanduser()
+    try:
+        parent = supplied.resolve(strict=True)
+    except FileNotFoundError:
+        if supplied.is_symlink():
+            raise
+        return []
     roots = [p for p in sorted(parent.iterdir()) if p.is_dir() and not p.is_symlink()
              and ((p / 'SESSION.md').is_file() or (p / 'work.json').exists())
              and (not (p / '.git').exists() or (p / 'work.json').exists())]

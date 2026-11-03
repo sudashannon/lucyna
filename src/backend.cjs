@@ -46,17 +46,22 @@ function steleCall(name, args) {
 
 class OmpSession {
   constructor(send, executable = defaultOmp, {executeTermination=execFileAsync}={}) { this.send = send; this.executable = executable; this.executeTermination=executeTermination; this.pending = new Map(); this.child = null; this.ready = false; }
-  async start({ root, executionRoot, resume, fork, model, agentDir, env: extraEnv, settings, sessionDir, signal }) {
+  async start({ root, executionRoot, resume, fork, model, agentDir, env: extraEnv, settings, sessionDir, signal, creation }) {
     signal?.throwIfAborted();
     if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
-    const works = await listWorks();
-    signal?.throwIfAborted();
-    if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
-    requireWorkRoot(works,root);
-    if (executionRoot && executionRoot !== root && !executionRoot.startsWith(root + '/')) throw new Error('会话工作目录不属于所选 work');
     const isWsl = settings?.runtime === 'wsl';
+    if (creation) {
+      if (!isWsl || root!==WORK_ROOT || executionRoot) throw Error('新建 Work 只能从本机 WSL 工作区目录开始');
+    } else {
+      requireWorkRoot(await listWorks(),root);
+    }
+    signal?.throwIfAborted();
+    if (this.child) throw new Error('已有活动 OMP 进程；请先关闭当前会话');
+    if (executionRoot && executionRoot !== root && !executionRoot.startsWith(root + '/')) throw new Error('会话工作目录不属于所选 work');
     const cwd = isWsl ? executionRoot || root : wslUnc(executionRoot || root);
     const args = ['--mode', 'rpc-ui', '--cwd', cwd];
+    if (creation) args.push('--append-system-prompt',
+      `For /work-start, create the Work as a direct child of ${WORK_ROOT}. Use the full native session ID for the private SESSION log. On successful validation, emit the native /move command as a standalone plain-text line. Lucyna will validate the target and perform this handoff. Wait for the user's separate /work-continue before doing the task.`);
     if (!isWsl) args.push('--append-system-prompt', `This OMP process runs on Windows. The work root and repositories are in ${runtime.distro} WSL. Before handling work lifecycle or persistent knowledge, load the installed worktree-session skill and use the Stele MCP work_skill tool for its WSL-specific references. Use wsl.exe -d ${runtime.distro} -u ${runtime.user} for Linux commands with an explicit Linux working directory. Do not assume built-in tools, scripts, LSP, or subagents run inside WSL; check their execution context. Respect the worktree-session approval and preservation boundaries.`);
     if (resume) args.push(fork?'--fork':'--resume', isWsl ? wslSessionPath(resume) : resume);
     if (sessionDir) args.push('--session-dir', isWsl ? wslSessionPath(sessionDir) : sessionDir);

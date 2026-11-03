@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, safeStorage } = r
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { spawn } = require('node:child_process');
-const { listWorks, wslUnc, OmpSession, defaultOmp } = require('./backend.cjs');
+const { listWorks, wslUnc, OmpSession, defaultOmp, WORK_ROOT, WORK_HELPER } = require('./backend.cjs');
 const {requireWorkRoot}=require('./work-access.cjs');
 const { importSession, completeImportedFork, validateImportedSession, listWslSessions, listImportedSessions, validateNativeSession, listNativeSessions } = require('./history.cjs');
 const { prepare: prepareModel } = require('./windows-provider.cjs');
@@ -50,6 +50,21 @@ const sessionTitles=new SessionTitles(auxiliaryAgent,auxiliarySettings);
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const historyTrash = new HistoryTrash(app.getPath('userData'));
 const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get(),auxiliary:()=>auxiliarySettings.resolve()});
+const {WorkCreation}=require('./work-creation.cjs');
+const {boundedExec}=require('./bounded-exec.cjs');
+const workCreation = new WorkCreation({
+  directory:path.join(app.getPath('userData'),'work-creations'),base:WORK_ROOT,listWorks,
+  initialize:async agentDir=>{
+    try{await Promise.all([fs.access(windowsSessionPath(agentDir+'/commands/work-start.md')),fs.access(windowsSessionPath(WORK_HELPER))]);}
+    catch{throw Error('请在本机 WSL OMP 配置中安装 /work-start 和 worktree-session 技能');}
+    await boundedExec('wsl.exe',[...runtime.wslPrefix,'--exec','mkdir','-p','--',WORK_ROOT]);
+  },
+  verify:async root=>{
+    const result=JSON.parse(await boundedExec('wsl.exe',[...runtime.wslPrefix,'--exec','python3','-B',WORK_HELPER,'verify',root]));
+    if(result.root!==root||!Array.isArray(result.members))throw Error('WSL Work 校验返回的目录与交接路径不符');
+  },
+  admit:(root,run)=>workRunner.interactive(root,run),
+});
 const gitWorkspace = require('./git-service.cjs').createGitService({listWorks,runnerState:workRunner.state,lifecycle:(root,run)=>workRunner.interactive(root,async()=>{
   if(sessions?.list().some(c=>c.root===root)||[...(terminal?.records.values()||[])].some(t=>t.record?.root===root))throw Error('此 Work 仍有会话或终端连接，请先结束后再管理工作树');
   return run();
@@ -78,6 +93,7 @@ app.whenReady().then(async () => {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file://')) event.preventDefault(); });
   sessions = new SessionManager({titles:sessionTitles,create: send => new OmpSession(send), onState:async record=>{
+    if(record.creation)return workCreation.remember(record);
     if(record.forkSource){
       record.forkTask ||= completeImportedFork(record.importRoot,record.agentDir,record.forkSource,record.sessionFile,record.root);
       try{await record.forkTask;record.forkSource=undefined;}finally{record.forkTask=undefined;}
@@ -132,6 +148,18 @@ app.whenReady().then(async () => {
     return [...(local.status==='fulfilled'?local.value:[]),...hosts.value];
   });
   handle('work:details', (root,hostId) => hostId?remote.workspaceCall(hostId,root,'workspace.details'):workDetails(root));
+  handle('work:create-session', id=>{
+    if(typeof id!=='string')throw Error('无效客户端会话标识');
+    return sessions.start(id,async(startNative,signal,progress)=>{
+      progress('正在准备 WSL 建根会话');
+      const defaults=await settingsStore.get();
+      const options=await workCreation.prepare(id,{...defaults,runtime:'wsl'});
+      signal.throwIfAborted();
+      const start=()=>startNative({...options,model:defaults.runtime==='wsl'?defaults.model||undefined:undefined});
+      return options.creationWork?workRunner.interactive(options.root,start,signal):start();
+    },{root:WORK_ROOT});
+  });
+  handle('work:finish-creation',id=>sessions.finishWork(id,workCreation));
   handle('work:run', (operation,data) => workRunner.call(operation,data));
   handle('work:git', (root, member, action, options,hostId) => hostId?remote.workspaceCall(hostId,root,'workspace.git.read',{member,action,options}):workDetails(root, member, action, options));
   handle('workspace:git', (root,member,action,options,hostId)=>{

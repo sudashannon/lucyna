@@ -58,6 +58,11 @@ class InventoryTest(unittest.TestCase):
         self.assertFalse(result['rootAvailable'])
         self.assertEqual(result['issues'][0]['code'], 'root_invalid')
 
+    def test_missing_collection_is_empty_until_first_work_is_created(self):
+        collection = self.base / 'new-collection'
+        self.assertEqual(inventory.list_roots(collection), [])
+        self.assertFalse(collection.exists())
+
     def test_all_five_numeric_members_are_returned(self):
         members = []
         for n in range(5):

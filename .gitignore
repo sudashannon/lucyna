@@ -82,6 +82,7 @@ test/*
 !test/ssh-host-desktop.cjs
 !test/work-details-ui.cjs
 !test/work-history-access-desktop.cjs
+!test/work-creation-desktop.cjs
 !test/fixtures/
 !test/fixtures/**
 !test/renderer-behavior.cjs
@@ -120,8 +121,9 @@ test/*
 test/renderer-behavior.cjs
 src/pet/assets/companions-atlas-v2.png
 
-# Impeccable rendered review captures are local verification artifacts.
+# Impeccable review captures and inspection caches are local verification artifacts.
 **/.impeccable/review/
+**/.impeccable/build/map-inspections/
 
 # Persist the selected visual system and its focused acceptance test.
 !DESIGN.md
