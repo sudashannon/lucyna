@@ -28,6 +28,8 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
   const [automatic,setAutomatic]=useState<Automation|null>(null),[autoError,setAutoError]=useState(''),[configureAuto,setConfigureAuto]=useState(false);
   const [clarification,setClarification]=useState('');
   const preparing=automatic?.status==='preparing',preparation=automatic?.preparation;
+  const candidatePending=runs.some(run=>run.state==='waiting_review'&&run.mode==='evolution');
+  const needsAttention=candidatePending||runs.some(run=>['waiting_user','interrupted'].includes(run.state))||preparing||['needs_input','preparation_failed','review'].includes(automatic?.status||'');
   const cursor=useRef(0),requestKey=useRef(''),selection=useRef(''),alive=useRef(true),refreshing=useRef(false);
   const current=runs.find(r=>r.id===selected),occupied=runs.some(r=>!terminal.has(r.state));
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
@@ -86,7 +88,9 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
   const prepareAutomatic=async()=>{setBusy('prepare');try{setAutomatic(await api.workRun('automatic-prepare',{root,clarification}));setClarification('');setAutoError('');}catch(e){setAutoError(String(e));}finally{if(alive.current)setBusy('');}};
   const content=<section className="work-runs" hidden={!active} aria-label="Work 后台任务">
     {!showForm&&<KnowledgeConsolidation key={root} root={root} active={active}/>}
-    {!showForm&&<><section className={`wr-automatic wr-auto-${automatic?.status||'loading'}`} aria-label="自动进化" aria-live="polite">
+    {!showForm&&<details className="wr-advanced-evolution" aria-label="高级实验 · 局部文件进化" open={needsAttention||undefined}>
+      <summary><strong>高级实验 · 局部文件进化</strong><span>{needsAttention?candidatePending?'有候选待处理':'需要处理':automatic?.enabled?'自动实验已开启':automatic?'自动实验已暂停':'正在读取状态'}</span></summary>
+      <section className={`wr-automatic wr-auto-${automatic?.status||'loading'}`} aria-label="自动进化" aria-live="polite">
       <div className="wr-section-title"><strong><span className="wr-auto-dot"/>自动进化</strong><span>{automatic?.enabled?'已开启':automatic?'已暂停':'正在连接'}</span></div>
       <h3>{automatic?.label||'正在读取自动调度状态…'}</h3><p>{automatic?.message||'有新变化且空闲时自动比较候选，采纳由你确认。'}</p>
       <ol className="wr-auto-flow" aria-label="自动进化流程"><li aria-current={preparing&&preparation?.state==='reading'?'step':undefined}>读取文档</li><li aria-current={preparing&&preparation?.state==='checking'?'step':undefined}>验证评测</li><li aria-current={automatic?.status==='running'?'step':undefined}>自动迭代</li><li aria-current={automatic?.status==='review'?'step':undefined}>你来采纳</li></ol>
@@ -107,7 +111,7 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
       <div className="wr-actions"><button disabled={!!busy||!loaded||preparing||occupied||(automatic?.preparationsToday??0)>=2} onClick={()=>void prepareAutomatic()}>{busy==='prepare'?'正在安排…':preparation||automatic?.profile?'重新准备评测':'从 Work 文档准备'}</button><button disabled={!!busy||!loaded||preparing} onClick={setupAutomatic}>{automatic?.profile&&!automatic.profile.evolution.prepared?'调整评测配置':'手动配置'}</button>{automatic&&<button disabled={!!busy} onClick={()=>void toggleAutomatic()}>{automatic.enabled?(preparing?'暂停准备与后续实验':'暂停后续实验'):'开启自动进化'}</button>}{automatic?.lastRunId&&runs.some(r=>r.id===automatic.lastRunId)&&<button onClick={()=>{choose(automatic.lastRunId!);setExpanded(true);}}>查看最近结果</button>}</div>
     </section><p className="wd-caption">进化实验在副本中自动运行，不中断普通会话，也不会自动采纳。关闭客户端后服务继续检查已配置的 Work。</p>
     <div className="wr-capabilities"><span>Work 内迭代</span><span>技能 / L3 只读</span><span>候选可回退</span></div>
-    {!expanded&&<button className="wr-expand" onClick={()=>setExpanded(true)}>放大查看任务与实验</button>}</>}
+    {!expanded&&<button className="wr-expand" onClick={()=>setExpanded(true)}>放大查看任务与实验</button>}</details>}
     {!configureAuto&&<div className="wr-readiness" role="status"><strong>{connections?'普通后台任务：此 Work 有 '+connections+' 个会话连接':occupied?'此 Work 已有未结束的后台任务':!loaded?'正在检查已有任务…':'可以配置后台任务'}</strong><p>{connections?'普通后台任务与采纳需要先结束连接；自动实验会等待本轮会话空闲。':'后台任务独立运行，关闭客户端后仍会继续。启动时将再次检查可用状态。'}</p>{connections>0&&onConnections&&<button type="button" onClick={()=>{setShowForm(false);setExpanded(false);onConnections();}}>查看会话连接</button>}</div>}
     <p className="wd-caption">首次启动会安装并启用 Lucyna 用户级后台服务。模型请求在途时可能略超 Token 预算。</p>
     {!showForm&&<div className="wr-actions"><button disabled={!!busy||occupied||!loaded} onClick={()=>{setConfigureAuto(false);setMode('task');setShowForm(true);}}>新建后台任务</button><button disabled={!!busy} onClick={()=>void refresh()}>刷新状态</button></div>}

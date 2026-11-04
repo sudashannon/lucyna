@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom';
 import { ArrowUpRight, BookOpen, Command, RefreshCw, X } from 'lucide-react';
 import { Spinner } from '@cindy/components/ui/spinner';
 import { applyCompletion, commandCatalog, commandHint, completionContext, sourceLabel, suggestionsFor, type CommandSuggestion, type SlashCommand } from '../command-completion';
+import {DraftAssistance} from './DraftAssistance';
+
+type DraftAssistanceTarget={root:string;hostId?:string;workId:string;sessionKey:string;enabled:boolean};
 
 type Props = {
   draft: string; setDraft: (value: string) => void; inputRef: RefObject<HTMLTextAreaElement | null>;
@@ -11,14 +14,16 @@ type Props = {
   loadCommands: (force?: boolean) => Promise<void>;
   onCompletionActive: (active: boolean) => void;
   onPaste?:ClipboardEventHandler<HTMLTextAreaElement>;
+  draftAssistance?:DraftAssistanceTarget;
 };
-export function CommandInput({draft, setDraft, inputRef, onSend, disabled, placeholder, root, openRequest, nativeCommands, status, error, loadCommands, onCompletionActive,onPaste}: Props) {
+export function CommandInput({draft, setDraft, inputRef, onSend, disabled, placeholder, root, openRequest, nativeCommands, status, error, loadCommands, onCompletionActive,onPaste,draftAssistance}: Props) {
   const [editLarge,setEditLarge]=useState(false);const large=draft.length>8000;
   useEffect(()=>{if(!large)setEditLarge(false);},[large]);
   const [focused, setFocused] = useState(false), [caret, setCaret] = useState(0), [selectionEnd, setSelectionEnd] = useState(0);
   const [manual, setManual] = useState(false), [dismissed, setDismissed] = useState('');
   const [filter, setFilter] = useState<'all' | 'skills' | 'commands'>('all'), [selected, setSelected] = useState(0);
   const [composing, setComposing] = useState(false), composingRef = useRef(false);
+  const [typingSequence,setTypingSequence]=useState(0);
   const menu = useRef<HTMLDivElement>(null), lastOpen = useRef(openRequest), lastRoot = useRef(root);
   const [position, setPosition] = useState<{left: number; width: number; top?: number; bottom?: number; maxHeight: number} | null>(null);
   const catalog = useMemo(() => commandCatalog(nativeCommands), [nativeCommands]);
@@ -76,10 +81,10 @@ export function CommandInput({draft, setDraft, inputRef, onSend, disabled, place
     <textarea ref={inputRef} id="message-input" role="combobox" aria-label="给 OMP 的消息" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded={open}
       aria-controls={open ? 'command-completions' : undefined} aria-activedescendant={open && suggestions.length ? `command-option-${activeIndex}` : undefined}
       aria-describedby={hint ? 'command-input-hint' : undefined} autoComplete="off" placeholder={large&&!editLarge?'可继续粘贴，或点击编辑全文…':placeholder} value={large&&!editLarge?'':draft} disabled={disabled} rows={2}
-      onPaste={onPaste}
+      onPaste={e=>{onPaste?.(e);if(e.defaultPrevented&&e.clipboardData.getData('text/plain'))setTypingSequence(value=>value+1);}}
       onFocus={() => {setFocused(true); readCaret();}} onBlur={() => {setFocused(false); setManual(false);}}
       onSelect={readCaret} onClick={readCaret}
-      onChange={e => {setDraft(large&&!editLarge?draft+e.target.value:e.target.value); setFocused(true); setManual(false); setDismissed(''); setCaret(e.target.selectionStart); setSelectionEnd(e.target.selectionEnd);}}
+      onChange={e => {setDraft(large&&!editLarge?draft+e.target.value:e.target.value); setTypingSequence(value=>value+1); setFocused(true); setManual(false); setDismissed(''); setCaret(e.target.selectionStart); setSelectionEnd(e.target.selectionEnd);}}
       onCompositionStart={() => {composingRef.current = true; setComposing(true);}}
       onCompositionEnd={() => {composingRef.current = false; setComposing(false); readCaret();}}
       onKeyDown={e => {
@@ -93,6 +98,7 @@ export function CommandInput({draft, setDraft, inputRef, onSend, disabled, place
         if (open && status === 'loading' && !suggestions.length && e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {e.preventDefault(); return;}
         if (e.key === 'Enter' && !e.shiftKey) {e.preventDefault(); close(); onSend();}
       }}/>
+    {draftAssistance&&<DraftAssistance target={draftAssistance} enabled={draftAssistance.enabled} disabled={disabled} draft={draft} setDraft={setDraft} inputRef={inputRef} caret={caret} selectionEnd={selectionEnd} composing={composing} commandMenuOpen={open} focused={focused} typingSequence={typingSequence}/>}
     {hint && !open && <div id="command-input-hint" className="command-input-hint" title={hint}>{hint}</div>}
     {open && position && createPortal(<div className="command-popover" ref={menu} style={position} onMouseDown={e => e.preventDefault()}>
       <div className="command-popover-header"><span>{context?.kind === 'subcommand' ? `/${context.parent?.name} 子命令` : '技能与命令'} <small>{suggestions.length}</small></span><button type="button" tabIndex={-1} aria-label="刷新技能与命令" disabled={status === 'loading'} onClick={() => void loadCommands(true)}><RefreshCw size={13}/></button><button type="button" tabIndex={-1} aria-label="关闭命令补全" onClick={close}><X size={14}/></button></div>

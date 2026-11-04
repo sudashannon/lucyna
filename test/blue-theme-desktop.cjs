@@ -20,6 +20,8 @@ app.whenReady().then(async()=>{fs.mkdirSync(out,{recursive:true});const timer=se
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.resolve('dist/renderer/index.html'));
   await until('document.querySelectorAll(".work-row").length===3');await click('.work-row');await click('#tab-work');
+  await until('document.querySelector(".wd-tabs[aria-label=\\"工作详情视图\\"]")');
+  await js('Array.from(document.querySelectorAll(".wd-tabs[aria-label=\\"工作详情视图\\"] button")).find(button=>button.textContent.trim()==="进展").click()');
   await until('document.querySelector(".wd-provenance")');
   assert.equal(await js('document.documentElement.dataset.visualTheme'),'blue');
   await overlay('#112341');

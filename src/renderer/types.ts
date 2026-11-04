@@ -21,6 +21,11 @@ export interface WorkEvent { id: string; time: string; text: string; level: 'inf
 // OMP extension events and message blocks are owned by the native protocol.
 export type OmpEvent = Record<string, any>;
 export interface Desktop {
+  workAssistant?(operation:'status'|'refresh'|'configure'|'history',input:{root:string;hostId?:string;enabled?:boolean}):Promise<import('./work-assistant-types').WorkAssistantSnapshot>;
+  onWorkAssistant?(fn:(snapshot:import('./work-assistant-types').WorkAssistantSnapshot)=>void):()=>void;
+  workGuidance?(operation:import('./work-guidance-types').WorkGuidanceOperation,input:import('./work-guidance-types').WorkGuidanceSuggestArgs|import('./work-guidance-types').WorkGuidanceCancelArgs|import('./work-guidance-types').WorkGuidanceMaterialArgs|import('./work-guidance-types').WorkGuidanceFeedbackArgs):Promise<import('./work-guidance-types').WorkGuidanceResult>;
+  workWorkflow?(operation:import('./work-workflow-types').WorkWorkflowOperation,input:import('./work-workflow-types').WorkWorkflowRequest):Promise<import('./work-workflow-types').WorkWorkflowResponse>;
+  onWorkWorkflow?(fn:(snapshot:import('./work-workflow-types').WorkWorkflowSnapshot)=>void):()=>void;
   workRun(operation:string,data?:Record<string,unknown>):Promise<any>;
   workDetails(root:string,hostId?:string):Promise<WorkDetail>;
   workGit(root:string,member:string,action:string,options?:GitReadOptions,hostId?:string):Promise<GitInspection>;

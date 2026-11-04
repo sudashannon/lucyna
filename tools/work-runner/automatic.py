@@ -11,6 +11,7 @@ from evolution import specification
 from storage import TERMINAL
 
 PROFILE_FIELDS = ('objective', 'acceptance', 'model', 'tokenBudget', 'wallSeconds', 'evolution')
+DISABLED_MESSAGE = '日常工作可使用 Work 助手整理多 session 进展并获得对话建议；如需局部文件实验，请手动配置并开启自动进化。'
 LABELS = {
     'preparing': '正在自动准备评测', 'needs_input': '需要补充信息', 'preparation_failed': '评测准备未完成',
     'preparation_limit': '今日评测准备次数已达上限',
@@ -41,8 +42,8 @@ class Automatic:
         rows = self.store.automation(root)
         if rows:
             return rows[0]
-        value = {'root': root, 'enabled': True, 'profile': None, 'status': 'needs_profile',
-                 'message': 'Work 空闲后由内嵌 agent 读取文档、准备并试跑评测；已有配置继续复用。',
+        value = {'root': root, 'enabled': False, 'profile': None, 'status': 'disabled',
+                 'message': DISABLED_MESSAGE,
                  'createdAt': self.clock(), 'lastFingerprint': None, 'idleSince': self.clock()}
         for run in self.store.list(root):
             if run.get('mode') == 'evolution' and run.get('request', {}).get('evolution'):
@@ -129,7 +130,13 @@ class Automatic:
         if value['enabled'] and active:
             state = 'review' if active['state'] == 'waiting_review' else 'paused' if active['state'] == 'paused' else 'running' if active.get('automatic') else 'waiting_task'
             value['lastRunId'] = active['id']
-        self.status(value, state, '结果由你确认采纳；不会自动覆盖 Work。' if state == 'review' else '空闲并检测到新变化后自动运行；结果由你确认采纳。')
+        if state == 'disabled':
+            message = DISABLED_MESSAGE
+        elif state == 'review':
+            message = '结果由你确认采纳；不会自动覆盖 Work。'
+        else:
+            message = '空闲并检测到新变化后自动运行；结果由你确认采纳。'
+        self.status(value, state, message)
         return self.view(root)
 
     def request_preparation(self, request):
@@ -220,7 +227,7 @@ class Automatic:
         if root in self.runner.workspace_leases:
             self.status(value,'waiting_idle','等待工作树管理操作结束。');return
         if not value['enabled']:
-            self.status(value, 'disabled'); return
+            self.status(value, 'disabled', DISABLED_MESSAGE); return
         if value.get('retryAt', 0) > now:
             return
         runs = self.store.list(root)

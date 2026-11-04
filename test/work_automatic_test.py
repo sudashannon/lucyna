@@ -51,12 +51,27 @@ class Scheduling(unittest.IsolatedAsyncioTestCase):
     def end(self, run, state='completed', reason='no_improvement'):
         run.update(state=state, reason=reason); self.runner.store.save(run)
 
-    async def test_missing_configuration_waits_for_idle_and_cannot_escape_work(self):
+    async def test_new_policy_is_disabled_but_reuses_historical_profile_only_after_manual_enable(self):
+        self.runner.store.save({'id':'historical-run','requestKey':'historical-run','root':str(self.root),
+            'state':'completed','mode':'evolution','request':copy.deepcopy(self.profile)},new=True)
         await self.sync(); await self.auto.tick()
-        self.assertEqual(self.auto.view(str(self.root))['status'],'stabilizing'); self.assertEqual(self.launched,[])
+        value=self.auto.view(str(self.root))
+        self.assertFalse(value['enabled']); self.assertEqual(value['status'],'disabled')
+        self.assertEqual(value['profile'],self.profile); self.assertEqual(value['sourceRunId'],'historical-run')
+        self.assertIn('Work 助手',value['message']); self.assertIn('手动',value['message'])
+        self.assertEqual(self.launched,[])
+        enabled=self.auto.configure({'root':str(self.root),'enabled':True})
+        self.assertTrue(enabled['enabled']); self.assertEqual(enabled['profile'],self.profile)
         with self.assertRaises(ValueError):self.auto.configure({'root':'/else','enabled':True})
         self.profile['evolution']['targets']=['holdout.py']
         with self.assertRaises(ValueError):self.configure()
+
+    async def test_existing_policy_preserves_its_saved_enabled_choice(self):
+        value=self.auto.policy(str(self.root))
+        for enabled in (True,False):
+            value['enabled']=enabled; self.runner.store.save_automation(value)
+            restarted=Automatic(self.runner,clock=lambda:self.now)
+            self.assertIs(restarted.policy(str(self.root))['enabled'],enabled)
 
     async def test_busy_stale_clients_and_stable_idle_trigger_exactly_one_run(self):
         self.configure(); await self.sync(busy=True); await self.auto.tick()

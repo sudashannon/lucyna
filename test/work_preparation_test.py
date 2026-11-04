@@ -55,11 +55,29 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         self.now=time.time();self.auto=self.runner.automatic=Automatic(self.runner,clock=lambda:self.now,idle_seconds=0)
         self.auto.policy(str(self.root))
 
+    def enable_automatic(self):
+        return self.auto.configure({'root':str(self.root),'enabled':True})
+
     async def asyncTearDown(self):
         await self.auto.shutdown()
         for task in list(self.runner.tasks.values()): task.cancel()
         await asyncio.gather(*list(self.runner.tasks.values()),return_exceptions=True)
         self.runner.store.db.close()
+
+    async def test_default_off_but_manual_work_document_preparation_still_runs(self):
+        self.runner.auxiliary={'config':{'model':'fixture'}};calls=[]
+        async def blocked(agent,request,host,usage,**kwargs):
+            calls.append(request)
+            await host('report_work_blocker',{'message':'缺少离线回放样例'})
+            return {'usedTokens':100}
+        with patch('preparation.iterate',side_effect=blocked):
+            await self.auto.tick()
+            self.assertEqual(calls,[])
+            self.assertFalse(self.auto.view(str(self.root))['enabled'])
+            self.auto.request_preparation({'root':str(self.root),'clarification':'沿用 Work 文档里的样例'})
+            await self.auto.tick();await asyncio.gather(*list(self.auto.preparing.values()))
+        self.assertEqual(calls[0]['clarification'],'沿用 Work 文档里的样例')
+        self.assertTrue(self.auto.view(str(self.root))['enabled'])
 
     async def test_trial_is_read_only_scoped_and_detects_constant_scorer(self):
         (self.root/'unrelated-link').symlink_to('/etc/passwd')
@@ -115,6 +133,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['controls'][0]['scores'],{'training':1,'validation':1})
 
     async def test_draft_baseline_cannot_publish_a_profile_or_start_an_experiment(self):
+        self.enable_automatic()
         self.runner.auxiliary={'config':{'model':'fixture'}}
         async def trial(agent,request,host,usage,**kwargs):
             for name in self.reads:await host('read_work_file',{'path':name})
@@ -159,6 +178,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await validate_plan(str(self.root),valid,self.reads))['baseline'],{'training':1,'validation':1})
 
     async def test_controls_can_finalize_only_a_previously_validated_draft(self):
+        self.enable_automatic()
         self.runner.auxiliary={'config':{'model':'fixture'}}
         async def incremental(agent,request,host,usage,**kwargs):
             with self.assertRaisesRegex(ValueError,'尚无成功草稿'):
@@ -192,6 +212,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError,'评测文件已变化'):specification(result['profile']['evolution'],str(self.root),self.directory)
 
     async def test_blocker_is_cached_manual_retry_is_bounded_and_restart_retains_charge(self):
+        self.enable_automatic()
         calls=[];self.runner.auxiliary={'config':{'model':'fixture'}}
         async def blocked(agent,request,host,usage,**kwargs):
             calls.append(request);await host('report_work_blocker',{'message':'缺少离线回放样例，请提供输入与预期结果'});usage({'usedTokens':150});return {'usedTokens':150}
@@ -211,6 +232,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(restarted.view(str(self.root))['preparation']['usedTokens'],150)
 
     async def test_pause_cancels_preparation_and_does_not_publish_profile(self):
+        self.enable_automatic()
         self.runner.auxiliary={'config':{'model':'fixture'}};entered=asyncio.Event()
         async def slow(*args,**kwargs):entered.set();await asyncio.Event().wait()
         with patch('preparation.iterate',side_effect=slow):
@@ -221,6 +243,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(value['preparation']['state'],'paused');self.assertTrue(value['preparation']['usageEstimated'])
 
     async def test_unlimited_preparation_records_usage_without_fabricating_a_cap(self):
+        self.enable_automatic()
         self.runner.auxiliary={'config':{'model':'fixture'}}
         async def fail(agent,request,host,usage,**kwargs):
             self.assertIsNone(request['tokenBudget']);usage({'usedTokens':250000})
@@ -239,6 +262,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(a['usedTokens'] for a in value['preparationAttempts']),250100)
 
     async def test_preparation_timeout_has_a_diagnostic_and_keeps_known_usage(self):
+        self.enable_automatic()
         self.runner.auxiliary={'config':{'model':'fixture'}}
         async def slow(agent,request,host,usage,**kwargs):
             usage({'usedTokens':250000})
@@ -254,6 +278,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(value['profile']);self.assertEqual(self.runner.store.list(),[])
 
     async def test_long_markdown_is_paged_before_model_context_is_expanded(self):
+        self.enable_automatic()
         self.runner.auxiliary={'config':{'model':'fixture'}}
         document=MD+'证据与背景。'*10000
         (self.root/'SESSION.md').write_text(document)
@@ -287,6 +312,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
 
     async def test_immediate_pause_and_removed_referenced_documents(self):
         from cli import preparing
+        self.enable_automatic()
         self.runner.auxiliary={'config':{'model':'fixture'}}
         with patch('preparation.iterate',side_effect=AssertionError('cancelled task ran')):
             await self.auto.tick()
@@ -312,7 +338,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         folder=folder_for(self.directory,str(self.root),key);folder.mkdir(parents=True);atomic_json(folder/'compiled.json',result)
         value=self.auto.policy(str(self.root));value.update(profile=result['profile'],profileOrigin='agent',profileDocuments=document_snapshot(str(self.root)))
         self.runner.store.save_automation(value)
-        self.auto.configure({'root':str(self.root),'profile':result['profile']})
+        self.auto.configure({'root':str(self.root),'enabled':True,'profile':result['profile']})
         (self.root/'SESSION.md').write_text(MD+'\n新的范围说明')
         # Manually saved profiles are never silently regenerated, even after document changes.
         with patch.object(self.auto,'advance_preparation',side_effect=AssertionError('manual profile replaced')),patch('evo_runtime.python',return_value='/unused'):
@@ -326,6 +352,7 @@ class Preparation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(called),1)
 
     async def test_real_sdk_prepares_from_md_then_optimizer_iterates_without_omp(self):
+        self.enable_automatic()
         from evo_runtime import python
         try:python()
         except ValueError as exc:self.skipTest(str(exc))

@@ -2,6 +2,7 @@ if(process.argv.includes('--knowledge-service')){require('./knowledge-host.cjs')
 const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const {createHash} = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { listWorks, wslUnc, OmpSession, defaultOmp, WORK_ROOT, WORK_HELPER } = require('./backend.cjs');
 const {requireWorkRoot}=require('./work-access.cjs');
@@ -33,6 +34,11 @@ const {AuxiliarySettings}=require('./auxiliary-settings.cjs');
 const {AuxiliaryAgent}=require('./auxiliary-agent.cjs');
 const {SessionTitles}=require('./session-titles.cjs');
 const {RemoteDesktop}=require('./hosts/desktop.cjs');
+const {WorkAssistant}=require('./work-assistant.cjs');
+const {WorkAssistantAccess,journalIdentity,readAssistantJournal}=require('./work-assistant-sources.cjs');
+const {WorkGuidance}=require('./work-guidance.cjs');
+const {WorkGuidanceAssets}=require('./work-guidance-assets.cjs');
+const {WorkWorkflow}=require('./work-workflow.cjs');
 
 let window, sessions, pet, feedback, selectedHistory, listedHistory = new Map(), terminal, runtimeMutation = false;
 let windowsPreparation = Promise.resolve();
@@ -47,6 +53,83 @@ const settingsStore = new SettingsStore(app.getPath('userData'));
 const auxiliarySettings=new AuxiliarySettings(app.getPath('userData'),safeStorage);
 const auxiliaryAgent=new AuxiliaryAgent(auxiliarySettings);
 const sessionTitles=new SessionTitles(auxiliaryAgent,auxiliarySettings);
+let workGuidance,workWorkflow;
+const workAssistant=new WorkAssistant({
+  directory:path.join(app.getPath('userData'),'work-assistant'),agent:auxiliaryAgent,
+  localScope:JSON.stringify([runtime.distro,runtime.user]),
+  configVersion:()=>auxiliarySettings.revision,
+  config:()=>auxiliarySettings.resolve(),
+  notify:snapshot=>{
+    if(window&&!window.isDestroyed())window.webContents.send('work:assistant-event',snapshot);
+    void Promise.resolve().then(()=>workGuidance?.sourceChanged(snapshot)).catch(error=>console.error('Work guidance:',error.message));
+    void Promise.resolve().then(()=>workWorkflow?.observe(snapshot)).catch(error=>console.error('Work workflow:',error.message));
+  },
+});
+async function resolveAssistantWork({root,hostId}) {
+  if(hostId){
+    const profile=await remote.registry.get(hostId);
+    if(profile.root!==root)throw Error('Work 不属于所选主机');
+    return;
+  }
+  requireWorkRoot(await listWorks(),root);
+}
+async function readAssistantRecord(identity) {
+  await resolveAssistantWork(identity);
+  let text;
+  try {
+    if(identity.hostId){
+      const entry=remote.connections.get(identity.hostId);
+      if(remote.paused.has(identity.hostId)||!entry?.connection.child||entry.profile.root!==identity.root){
+        return {available:false,reason:'远端当前未连接，流程提醒仅参考已收集的会话。'};
+      }
+      const workspace=await entry.connection.request('workspace.inspect',{
+        root:identity.root,omp:entry.profile.omp,agentDir:entry.profile.agentDir,
+      });
+      text=workspace.document;
+    }else{
+      text=(await readWorkspacePreview(wslUnc(identity.root),'SESSION.md',undefined,identity.root)).content;
+    }
+    if(typeof text!=='string'||!text.trim())return {available:false,reason:'当前未读取到 SESSION.md，仅参考会话生成交接建议。'};
+    if(require('./work-knowledge-policy.cjs').sensitiveDocument(text))return {available:false,reason:'Work 记录含疑似凭据，已排除在流程分析之外。'};
+    return {available:true,path:'SESSION.md',text:text.slice(0,48000),truncated:text.length>48000,
+      version:createHash('sha256').update(text).digest('hex')};
+  }catch{return {available:false,reason:'SESSION.md 暂不可读，流程提醒仅参考已收集的会话。'};}
+}
+const guidanceAssets=new WorkGuidanceAssets({resolveWork:resolveAssistantWork,details:workDetails,knowledge});
+workGuidance=new WorkGuidance({assistant:workAssistant,agent:auxiliaryAgent,
+  config:()=>auxiliarySettings.resolve(),configVersion:()=>auxiliarySettings.revision,
+  resolveWork:resolveAssistantWork,listAssets:identity=>guidanceAssets.list(identity),
+  readAsset:(identity,asset)=>guidanceAssets.read(identity,asset),
+});
+workWorkflow=new WorkWorkflow({directory:path.join(app.getPath('userData'),'work-workflow'),
+  assistant:workAssistant,agent:auxiliaryAgent,config:()=>auxiliarySettings.resolve(),
+  configVersion:()=>auxiliarySettings.revision,resolveWork:resolveAssistantWork,readRecord:readAssistantRecord,
+  notify:snapshot=>{if(window&&!window.isDestroyed())window.webContents.send('work:workflow-event',snapshot);},
+});
+function assistantSource(id) {
+  const remoteSession=remote?.active.get(id);
+  if(remoteSession){
+    const record=remoteSession.session.record;
+    if(!record?.journal)return null;
+    return {root:remoteSession.saved.root,hostId:remoteSession.saved.hostId,
+      sessionId:journalIdentity(record.journal),title:remoteSession.assistantTitle||'',messageRevision:remoteSession.assistantMessageRevision||0};
+  }
+  const record=sessions?.records.get(id);
+  if(!record?.sessionFile||record.creation)return null;
+  return {root:record.root,sessionId:journalIdentity(record.sessionFile),title:record.assistantTitle||'',messageRevision:record.assistantMessageRevision||0};
+}
+function observeAssistant(event) {
+  const record=remote?.active.get(event.clientSessionId)||sessions?.records.get(event.clientSessionId);
+  if(record&&event.type==='message_end')record.assistantMessageRevision=(record.assistantMessageRevision||0)+1;
+  if(record&&['session_info_update','session_state','session_metadata'].includes(event.type)) {
+    const title=event.sessionName||event.title||(!record.assistantTitle&&event.titleHint);
+    if(typeof title==='string'&&title.trim())record.assistantTitle=title.slice(0,240);
+  }
+  const source=assistantSource(event.clientSessionId);
+  if(!source)return;
+  void Promise.resolve(workAssistant.observe({...event,workRoot:source.root,hostId:source.hostId,
+    sessionId:source.sessionId,sessionTitle:event.title||source.title})).catch(error=>console.error('Work assistant:',error.message));
+}
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const historyTrash = new HistoryTrash(app.getPath('userData'));
 const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get(),auxiliary:()=>auxiliarySettings.resolve()});
@@ -100,7 +183,7 @@ app.whenReady().then(async () => {
       try{await record.forkTask;record.forkSource=undefined;}finally{record.forkTask=undefined;}
     }
     await nativeWslHistory.remember(record);
-  }, send: e => { workRunner.observe(e);pet?.ingest(e); if (window && !window.isDestroyed()) window.webContents.send('omp:event', e); }});
+  }, send: e => { workRunner.observe(e);observeAssistant(e);pet?.ingest(e); if (window && !window.isDestroyed()) window.webContents.send('omp:event', e); }});
   workRunner.startAutomatic();
   consolidation.start();
   pet=new PetController({directory:app.getPath('userData'),getMain:()=>window,getSessions:()=>sessions,onQuit:()=>app.quit(),onState:snapshot=>feedback?.observe(snapshot)});
@@ -111,7 +194,7 @@ app.whenReady().then(async () => {
   window.on('closed',()=>{if(!quitting)app.quit();});
   const handle = (name, fn) => ipcMain.handle(name, (e, ...args) => { onlyMain(e); return fn(...args); });
   remote = new RemoteDesktop({directory:app.getPath('userData'),
-    send:event=>{pet?.ingest(event);if(window&&!window.isDestroyed())window.webContents.send('omp:event',event);},
+    send:event=>{observeAssistant(event);pet?.ingest(event);if(window&&!window.isDestroyed())window.webContents.send('omp:event',event);},
     notify:event=>{if(window&&!window.isDestroyed())window.webContents.send('host:event',event);}});
   handle('host:list',()=>remote.list());
   handle('host:save',input=>remote.save(input));
@@ -134,7 +217,12 @@ app.whenReady().then(async () => {
   handle('settings:get', async () => ({settings:await settingsStore.get(),storage:app.getPath('userData'),workspace:{distro:runtime.distro,user:runtime.user,root:runtime.workRoot}}));
   handle('settings:check', checkSettings);
   handle('auxiliary:get',()=>auxiliarySettings.get());
-  handle('auxiliary:save',async input=>{const settings=await auxiliarySettings.save(input);for(const record of sessions.records.values())sessionTitles.refresh(record,sessions);return settings;});
+  handle('auxiliary:save',async input=>{
+    const settings=await auxiliarySettings.save(input);
+    for(const record of sessions.records.values())sessionTitles.refresh(record,sessions);
+    await Promise.all([workGuidance.configurationChanged(),workWorkflow.configurationChanged(),workAssistant.configurationChanged()]);
+    return settings;
+  });
   handle('auxiliary:check',input=>auxiliaryAgent.check(input));
   handle('settings:save', async input => {
     const next=validateSettings(input);
@@ -149,7 +237,12 @@ app.whenReady().then(async () => {
     if(local.status==='rejected'&&!hosts.value.length)throw local.reason;
     return [...(local.status==='fulfilled'?local.value:[]),...hosts.value];
   });
-  handle('work:details', (root,hostId) => hostId?remote.workspaceCall(hostId,root,'workspace.details'):workDetails(root));
+  handle('work:details', async (root,hostId) => {
+    if(hostId)return remote.workspaceCall(hostId,root,'workspace.details');
+    const detail=await workDetails(root);
+    guidanceAssets.observe({root},detail);
+    return detail;
+  });
   handle('work:create-session', id=>{
     if(typeof id!=='string')throw Error('无效客户端会话标识');
     return sessions.start(id,async(startNative,signal,progress)=>{
@@ -250,7 +343,14 @@ app.whenReady().then(async () => {
     if (!validateTaskRequest(type,data) && !['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command');
     const transport=remote.owns(id)?remote:sessions;
     if(type==='get_background_task_history')return selectTaskHistory(await transport.request(id,'get_entries'),data.taskIds);
-    return transport.request(id,type,data);
+    const expectedSource=type==='get_messages'&&assistantSource(id);
+    const result=await transport.request(id,type,data);
+    const source=type==='get_messages'&&assistantSource(id);
+    if(source&&expectedSource&&source.sessionId===expectedSource.sessionId&&source.root===expectedSource.root
+      &&source.hostId===expectedSource.hostId&&Array.isArray(result?.messages)) {
+      void workAssistant.ingest({...source,messages:result.messages,authoritative:source.messageRevision===expectedSource.messageRevision}).catch(error=>console.error('Work assistant history:',error.message));
+    }
+    return result;
   });
   handle('omp:terminate',id=>remote.owns(id)?remote.close(id):sessions.terminate(id));
   handle('omp:ui-response', (data,id) => { if (!data || data.type !== 'extension_ui_response' || typeof data.id !== 'string') throw new Error('Invalid UI response'); return remote.owns(id)?remote.respond(id,data):sessions.respond(id,data); });
@@ -258,7 +358,7 @@ app.whenReady().then(async () => {
   handle('omp:list', () => [...sessions.list(),...remote.listConnections()]);
   handle('omp:path', async () => {const s=await settingsStore.get();return s.runtime==='wsl'?s.wslExecutable:s.windowsExecutable;});
   handle('session:choose', async () => { const r = await dialog.showOpenDialog(window, { title: '选择 OMP 会话并导入副本（原件保留）', filters: [{ name: 'OMP session', extensions: ['jsonl'] }], properties: ['openFile'] }); selectedHistory = r.canceled ? null : r.filePaths[0]; return selectedHistory; });
-  handle('session:list', async (root,hostId) => {
+  async function sessionHistory(root,hostId) {
     if(hostId)return remote.history(root,hostId);
     const works = await listWorks();
     requireWorkRoot(works,root);
@@ -277,7 +377,31 @@ app.whenReady().then(async () => {
     const trash=await historyTrash.list(root),removed=new Set(trash.map(item=>item.key));
     const visible=item=>!removed.has(historyTrash.key(root,item.sessionFile||item.path));
     return { ...result,sessions:originals.filter(visible), managed:managed.filter(visible),trash, warnings: sources.flatMap((source, i) => source.status === 'rejected' ? [`${['WSL 原始历史', 'Windows 客户端历史', 'WSL 客户端历史','WSL 原生新会话'][i]}读取失败：${source.reason.message}`] : []) };
+  }
+  handle('session:list',sessionHistory);
+  const assistantAccess=new WorkAssistantAccess({
+    assistant:workAssistant,
+    resolveWork:resolveAssistantWork,
+    listHistory:({root,hostId})=>sessionHistory(root,hostId),
+    readHistory:async(entry,{root})=>{
+      const source=entry.sessionFile||entry.path,settings=await settingsStore.get();
+      const locations=historyLocations(app.getPath('userData'),entry.runtime);
+      let verified;
+      if(entry.runtime==='wsl'&&entry.agentDir?.startsWith('/'))verified=await nativeWslHistory.resolve(entry.agentDir,source,root,settings.wslAgentDir);
+      else if(path.resolve(entry.agentDir||'').toLowerCase()===path.resolve(locations.agentDir).toLowerCase())verified=await validateNativeSession(locations.agentDir,source,root);
+      else verified=await validateImportedSession(locations.historyDir,entry.agentDir,source,root);
+      const messages=await readAssistantJournal({file:verified.sessionFile,root,nativeId:verified.id});
+      const live=[...sessions.records.values()].some(record=>record.session.child&&record.sessionFile&&journalIdentity(record.sessionFile)===journalIdentity(verified.sessionFile));
+      return {messages,authoritative:!live};
+    },
   });
+  handle('work:assistant',async(operation,input)=>{
+    const snapshot=await assistantAccess.call(operation,input);
+    if(operation==='status')void Promise.resolve(workWorkflow.observe(snapshot)).catch(error=>console.error('Work workflow:',error.message));
+    return snapshot;
+  });
+  handle('work:guidance',(operation,input)=>workGuidance.call(operation,input));
+  handle('work:workflow',(operation,input)=>workWorkflow.call(operation,input));
   const deletionPlan=async(source,root)=>{
     const listed=listedHistory.get(source);
     if(typeof source!=='string'||listed?.root!==root)throw Error('请从当前工作区的历史列表选择会话');
@@ -296,16 +420,20 @@ app.whenReady().then(async () => {
   };
   handle('session:delete-preview',async(source,root)=>publicPlan(await deletionPlan(source,root)));
   handle('session:delete', async (source,root,token) => {
+    return assistantAccess.exclusive({root}, async()=>{
     let plan=await deletionPlan(source,root);
     if(typeof token!=='string'||token!==plan.token)throw Error('文件或关联备忘已变化，请取消后重新确认删除范围');
     const release=sessions.reserveJournal(plan.source,plan.entry.id);let lease;
     try{
       lease=await acquireHistoryLease(plan);lease.check();
+      await workAssistant.forgetSession({root},journalIdentity(plan.source));
+      await workWorkflow.forgetSession({root},journalIdentity(plan.source));
       // Fingerprints are checked again immediately before each rename.
       const key=await historyTrash.move(plan,{check:()=>lease.check()});listedHistory.delete(source);invalidateWslHistory();
       if(window&&!window.isDestroyed())window.webContents.send('omp:event',{type:'history_deleted',source:plan.source,workRoot:root});
       return key;
     }finally{await lease?.release();release();}
+    });
   });
   handle('session:restore', async (root,key) => {
     if(typeof root!=='string'||typeof key!=='string')throw Error('回收站记录不存在');
@@ -390,6 +518,9 @@ let quitting=false;
 app.on('before-quit', event => {
   if(quitting)return;
   event.preventDefault();quitting=true;feedback?.dispose();pet?.dispose();terminal?.dispose();
-  void Promise.allSettled([sessions?.closeAll(),remote?.shutdown()]).finally(async()=>{await consolidation.stop();await workRunner.stopAutomatic();app.quit();});
+  void Promise.allSettled([sessions?.closeAll(),remote?.shutdown()]).finally(async()=>{
+    await Promise.allSettled([workGuidance.close(),workWorkflow.close()]);
+    await workAssistant.close();await consolidation.stop();await workRunner.stopAutomatic();app.quit();
+  });
 });
 app.on('before-quit', () => terminal?.dispose());

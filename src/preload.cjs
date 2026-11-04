@@ -2,6 +2,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
   mode:'native',
   workDetails:(root,hostId)=>ipcRenderer.invoke('work:details',root,hostId),
+  workAssistant:(operation,input)=>ipcRenderer.invoke('work:assistant',operation,input),
+  workGuidance:(operation,input)=>ipcRenderer.invoke('work:guidance',operation,input),
+  workWorkflow:(operation,input)=>ipcRenderer.invoke('work:workflow',operation,input),
+  onWorkAssistant:fn=>{const listener=(_event,data)=>fn(data);ipcRenderer.on('work:assistant-event',listener);return()=>ipcRenderer.removeListener('work:assistant-event',listener);},
+  onWorkWorkflow:fn=>{const listener=(_event,data)=>fn(data);ipcRenderer.on('work:workflow-event',listener);return()=>ipcRenderer.removeListener('work:workflow-event',listener);},
   startWorkCreation:id=>ipcRenderer.invoke('work:create-session',id),
   finishWorkCreation:id=>ipcRenderer.invoke('work:finish-creation',id),
   workRun:(operation,data)=>ipcRenderer.invoke('work:run',operation,data),

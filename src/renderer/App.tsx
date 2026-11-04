@@ -31,6 +31,7 @@ import { CommandInput } from './components/CommandInput';
 import { DocumentReader, EventsPanel, MemoryResults, PanelPage } from './components/ToolPanels';
 import {WorkspaceFiles,type GitLocation} from './components/WorkspaceFiles';
 import { WorkDetails } from './components/WorkDetails';
+import { WorkAssistant } from './components/WorkAssistant';
 import { KnowledgeWorkspace as KnowledgePanel } from './components/KnowledgeWorkspace';
 import { TriangleAlert, Info, ClipboardCheck, FolderPlus } from 'lucide-react';
 import { WorkDiagnostics, WorkHealthNotice, workIssues } from './components/WorkDiagnostics';
@@ -482,6 +483,7 @@ export function App() {
           {imageBusy&&<p className="attachment-loading" role="status">正在读取图片…</p>}
           <input ref={imagePicker} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void attachImages(files);}}/>
           <CommandInput key={w.id} inputRef={composer} draft={draft} setDraft={setDraft} onSend={() => void send()} root={workIdentity} openRequest={commandOpenRequest}
+            draftAssistance={w.work?{root:w.work.root,hostId:w.work.hostId,workId:workIdentity,sessionKey:w.draftKey,enabled:workAvailable}:undefined}
             onPaste={paste}
             onCompletionActive={setCompletionActive}
             nativeCommands={w.nativeCommands} status={w.commandsStatus} error={w.commandsError} loadCommands={w.loadCommands}
@@ -518,7 +520,7 @@ export function App() {
         {w.historyError ? <p role="alert" className="error-text">{w.historyError}</p> : !w.history ? <div className="inline-loading"><Spinner size={14}/>读取中…</div> : <><p className="results-caption">{filteredHistory.length} / {entries.length} 个会话</p>{filteredHistory.length ? historyList(filteredHistory) : <p className="empty-line">{historySearch || historySource !== 'all' ? '没有匹配的会话，试试其他关键词或来源。' : '没有发现此工作区的历史会话。'}</p>}{(w.history.warnings || []).map((warning, i) => <p key={i} className="helper-text">{warning}</p>)}</>}</>}
       </PanelPage>
       <PanelPage name="work" active={panelVisible && tab === 'work'} identity={workIdentity}>
-        {remote ? <div className="remote-work-details"><h2>{w.work?.hostName}</h2><p className="panel-intro">{w.work?.root}</p><p className="helper-text">OMP 在此主机执行。文件与 Git 请在「工作区文件」查看。远端终端与完整 Work 管理尚未接入。</p>{w.documentError?<p className="error-text">{w.documentError}</p>:<pre className="remote-work-document">{w.document||"正在读取 SESSION.md…"}</pre>}</div> : w.work ? <WorkDetails work={w.work} connections={w.sessions.filter(s=>w.work&&sameWork(s,w.work)&&['ready','starting','closing'].includes(s.connection)).length} onConnections={()=>openWorkbenchTab('sessions')} active={panelVisible&&tab==='work'&&section==='workbench'} history={entries} onGit={openGit} onOpen={next=>{setFile(next);openPanel('preview');}} onResume={entry=>void resume(entry)} onCommand={command=>{setDraft(previous=>[command,previous].filter(Boolean).join('\n\n'));focusComposer();}} onMemory={value=>{setQuery(value);openPanel('memory');void searchMemory(value);}} onError={w.report}/> : <Empty icon={FolderOpen} title="选择工作区" description="查看工作进展、仓库与 Worktree，以及工作资产。"/>}
+        {remote ? <div className="remote-work-details"><h2>{w.work?.hostName}</h2><p className="panel-intro">{w.work?.root}</p><p className="helper-text">OMP 在此主机执行。文件与 Git 请在「工作区文件」查看。远端终端与完整 Work 管理尚未接入。</p>{w.documentError?<p className="error-text">{w.documentError}</p>:<pre className="remote-work-document">{w.document||"正在读取 SESSION.md…"}</pre>}{w.work&&<WorkAssistant work={w.work} active={panelVisible&&tab==='work'&&section==='workbench'} draftTargetKey={w.draftKey} onCommand={command=>{setDraft(previous=>[previous,command].filter(Boolean).join('\n\n'));focusComposer();}} onError={w.report}/>}</div> : w.work ? <WorkDetails work={w.work} connections={w.sessions.filter(s=>w.work&&sameWork(s,w.work)&&['ready','starting','closing'].includes(s.connection)).length} onConnections={()=>openWorkbenchTab('sessions')} active={panelVisible&&tab==='work'&&section==='workbench'} history={entries} onGit={openGit} onOpen={next=>{setFile(next);openPanel('preview');}} onResume={entry=>void resume(entry)} onCommand={command=>{setDraft(previous=>[command,previous].filter(Boolean).join('\n\n'));focusComposer();}} onMemory={value=>{setQuery(value);openPanel('memory');void searchMemory(value);}} onError={w.report} draftTargetKey={w.draftKey}/> : <Empty icon={FolderOpen} title="选择工作区" description="查看工作进展、仓库与 Worktree，以及工作资产。"/>}
       </PanelPage>
       <PanelPage name="memory" active={panelVisible && tab === 'memory'} identity="stele">
         <div className="panel-title"><h2>Stele 记忆</h2><Button variant="secondary" compact onClick={openKnowledge}>知识库<ArrowUpRight size={13}/></Button></div><p className="panel-intro">{remote?"这是客户端连接的 Stele 知识库，引用内容由你发送到远端会话。":"查找长期知识，引用到当前对话。"}</p>
