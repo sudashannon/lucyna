@@ -9,12 +9,14 @@ export function SessionTaskCard({task,onExpand,onCancel,now}:{task:SessionTask;o
   const output=useRef<HTMLPreElement>(null),[follow,setFollow]=useState(true);
   useEffect(()=>{if(follow&&output.current)output.current.scrollTop=output.current.scrollHeight;},[task.output,task.history,task.expanded,follow]);
   const active=taskActive(task),text=task.expanded&&task.kind==='agent'?task.history||task.output:task.output;
+  const end=task.endedAt??(active&&!task.stale?now:undefined);
+  const elapsed=task.durationMs??(task.startedAt!==undefined&&end!==undefined?end-task.startedAt:undefined);
   return <article className="session-task" data-task={task.key} data-status={task.status}>
     <header><button className="session-task-title" aria-expanded={!!task.expanded} onClick={()=>onExpand(task.key)}>{task.expanded?<ChevronDown size={14}/>:<ChevronRight size={14}/ >}{task.kind==='agent'?<Bot size={16}/>:<Terminal size={16}/>}<span>{task.title}</span></button><span className="session-task-kind">{task.kind==='agent'?'子代理':task.kind==='daemon'?'后台服务':'后台任务'}</span></header>
     {task.detail&&<p className="session-task-detail">{task.detail}</p>}
     {task.command&&<pre className="session-task-command">{task.command}</pre>}
     {(text||task.expanded)&&<div className="session-task-output"><pre ref={output} tabIndex={0} aria-label={`${task.title}的输出`} onScroll={()=>{const el=output.current;if(el)setFollow(el.scrollHeight-el.scrollTop-el.clientHeight<32);}}>{text||'暂未收到输出'}</pre>{!follow&&<button onClick={()=>{setFollow(true);if(output.current)output.current.scrollTop=output.current.scrollHeight;}}>跟随最新输出</button>}</div>}
-    <footer><span className="session-task-state"><i aria-hidden="true"/>{task.stale&&active?'连接中断或状态待核对':labels[task.status]||task.status}</span>{task.startedAt&&<time>{duration((task.endedAt||now)-task.startedAt)}</time>}{task.exitCode!==undefined&&<span>退出码 {task.exitCode}</span>}{active&&<button className="session-task-stop" disabled={!task.cancellable||task.stale||task.status==='stopping'} onClick={()=>onCancel(task.key)} aria-label={`停止 ${task.title}`}><Square size={11}/>{task.status==='stopping'?'等待结束确认':'停止'}</button>}</footer>
+    <footer><span className="session-task-state"><i aria-hidden="true"/>{task.stale&&active?'连接中断或状态待核对':labels[task.status]||task.status}</span>{elapsed!==undefined&&<time>{duration(elapsed)}</time>}{task.exitCode!==undefined&&<span>退出码 {task.exitCode}</span>}{active&&<button className="session-task-stop" disabled={!task.cancellable||task.stale||task.status==='stopping'} onClick={()=>onCancel(task.key)} aria-label={`停止 ${task.title}`}><Square size={11}/>{task.status==='stopping'?'等待结束确认':'停止'}</button>}</footer>
     {task.expanded&&task.cwd&&<p className="session-task-path">{task.cwd}</p>}
     {task.error&&<p className="session-task-error" role="status">{task.error}</p>}
     {task.status==='stopping'&&<p className="session-task-detail">正在等待 OMP 确认退出；其他任务继续运行。</p>}

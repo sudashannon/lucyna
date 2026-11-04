@@ -103,6 +103,7 @@ class Conversation {
       if(generation!==this.generation)return;
       this.historyPending=false;
       this.tasks.restoreHistory(messages.messages||[]);
+      void this.tasks.reconcileHistory();
       this.view={...this.view,messages:[...restoreMessages(messages.messages||[]),...this.view.messages.filter(m=>m.optimistic)],queued:nativeQueue(state.queuedMessages)};
       this.timelineRevision++;
       this.summary='';for(let i=this.view.messages.length-1;i>=0;i--){const message=this.view.messages[i];if(message.role==='assistant'){this.summary=resultExcerpt(message.content);if(this.summary)break;}}
@@ -432,7 +433,7 @@ export class Workbench {
     const s=this.active,d=this.workData(s.work.root,s.work.hostId);
     return {works:this.works,loading:this.loading,work:s.work.root&&!s.creatingWork?s.work:null,creatingWork:s.creatingWork,hasWorkCreation:[...this.sessions.values()].some(session=>session.creatingWork),workCreationReady:!this.initializing,finishingWork:s.finishingWork,finishWork:s.finishWork,newWork:this.newWork,...d,...s.view,connection:s.connection,busy:s.busy,sending:s.sending,model:s.model,error:s.error,events:s.events,questions:s.questions,title:s.title,sessionFile:s.sessionFile,
       id:s.id,timelineRevision:s.timelineRevision,draftKey:s.draftKey,runtime:s.runtime,importing:s.importing,connectionPhase:s.connectionPhase,connectionStarted:s.connectionStarted,stopStalled:s.stopStalled,forcingStop:s.forcingStop,forceStop:s.forceStop,pruneEmpty:this.pruneEmpty,sessions:[...this.sessions.values()].map(c=>({id:c.id,root:c.work.root,hostId:c.work.hostId,hostName:c.work.hostName,workName:c.work.name,title:c.title,draftKey:c.draftKey,busy:c.busy,taskCounts:taskCounts(c.tasks.items),connection:c.connection,unread:c.unread,questions:c.questions.length,error:!!c.error,errorText:c.error,summary:c.summary,model:c.model,runtime:c.runtime,run:c.view.run,queued:c.view.queued.length,connectionPhase:c.connectionPhase,outcome:c.view.run?.outcome,stopStalled:c.stopStalled,forcingStop:c.forcingStop,forceStop:c.forceStop,report:c.report,stop:c.stop,close:c.close})),
-      tasks:s.tasks.items,taskCapability:s.tasks.background,taskError:s.tasks.error,refreshTasks:s.tasks.refresh,expandTask:s.tasks.expand,cancelTask:s.tasks.cancel,taskCounts:taskCounts(s.tasks.items),
+      tasks:s.tasks.items,taskCapability:s.tasks.background,taskError:s.tasks.error,refreshTasks:s.tasks.refreshNow,expandTask:s.tasks.expand,cancelTask:s.tasks.cancel,taskCounts:taskCounts(s.tasks.items),
       pendingOperation:s.pendingOperation,operationStatus:s.operationStatus,checkOperation:s.checkOperation,reconnect:s.reconnect,detach:s.detach,report:s.report,setError:s.setError,log:s.log,loadWorks:this.loadWorks,selectWork:this.selectWork,selectSession:this.selectSession,newSession:this.newSession,dismiss:this.dismiss,setConversationVisible:this.setConversationVisible,
       refreshHistory:this.refreshHistory,refreshDocument:this.refreshDocument,start:s.start,send:s.send,resume:this.resume,close:s.close,stop:s.stop,answer:s.answer,changeModel:s.changeModel,removeQueued:s.removeQueued,request:s.request,
       nativeCommands:s.nativeCommands,commandsStatus:s.commandsStatus,commandsError:s.commandsError,loadCommands:s.loadCommands};

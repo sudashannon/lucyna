@@ -31,9 +31,14 @@ app.whenReady().then(async()=>{const timeout=setTimeout(()=>app.exit(2),60000);t
  assert.deepEqual(calls.filter(c=>c.type==='cancel_subagent').map(c=>[c.id,c.data.subagentId]),[['fixture','review']]);
  assert.equal(await js(`${taskNode('agent:trace:task-1')}.dataset.status`),'running');
  emit('subagent_lifecycle',{payload:{...agents.shift(),status:'aborted'}});await until('document.querySelector(".session-tasks summary")','retained terminal task');
- emit('remote_disconnected',{paused:true});await until(`${taskNode('job:build')}.querySelector('.session-task-stop').disabled`,'disconnected stop disabled');await shot('disconnected');
+ emit('remote_disconnected',{paused:true});await until(`${taskNode('job:build')}.querySelector('.session-task-stop').disabled`,'disconnected stop disabled');
+ assert.equal(await js(`Boolean(${taskNode('job:build')}.querySelector('time'))`),false);await shot('disconnected');
  emit('remote_reconnected');await until(`!${taskNode('job:build')}.querySelector('.session-task-stop').disabled`,'snapshot reconnected');
  await click('button[aria-label="切换深色外观"]');win.setSize(760,900);await pause(150);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));await shot('narrow-dark');
  await click('button[aria-label="打开活跃会话"]');await until('document.querySelector(".monitor-meta").textContent.includes("子任务运行中")','monitor task count');await shot('monitor');
+ emit('message_end',{message:{role:'toolResult',toolName:'wait',timestamp:Date.now(),content:[],details:{op:'wait',jobs:[{id:'build',label:'编译 SELinux 策略',status:'completed',durationMs:26300,resultText:'Build finished'}]}}});
+ await until(`!${taskNode('job:build')}`,'finished job leaves active list');
+ await click('.session-tasks summary');await until(`${taskNode('job:build')}?.dataset.status==='completed'`,'finished job enters history');
+ assert.equal(await js(`${taskNode('job:build')}.querySelector('time').textContent`),'26 秒');
  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({passed:true,calls,errors},null,2));console.log('PASS task cards, output, isolated cancel, disconnect/reconnect, monitor, narrow dark. '+out);clearTimeout(timeout);app.exit(0);
  }catch(e){console.error(e.stack);fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({calls,errors},null,2));await shot('failure').catch(()=>{});clearTimeout(timeout);app.exit(1);}});

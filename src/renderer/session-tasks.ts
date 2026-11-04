@@ -4,6 +4,7 @@ export type TaskStatus = 'running'|'stopping'|'completed'|'failed'|'aborted'|'un
 export type SessionTask = {
   key:string; id:string; kind:'agent'|'job'|'daemon'; title:string; status:TaskStatus;
   parentToolCallId?:string; ownerId?:string; sessionFile?:string; startedAt?:number; endedAt?:number;
+  durationMs?:number; resultAt?:number;
   command?:string; cwd?:string; output:string; detail:string; error?:string; exitCode?:number;
   stale:boolean; cancellable:boolean; revision:number; cursor?:number; history?:string; expanded?:boolean;
 };
@@ -20,12 +21,13 @@ export const taskCounts=(tasks:SessionTask[])=>({running:tasks.filter(t=>!t.stal
 export class SessionTasks {
   items:SessionTask[]=[]; background:'checking'|'available'|'unsupported'='checking'; error='';
   connected=false; revision=0; epoch=0; timer?:ReturnType<typeof setTimeout>; polling=false;
+  private historyEpoch?:number;
   cancelling=new Map<string,TaskStatus|undefined>();
   constructor(readonly request:(type:string,data?:OmpEvent)=>Promise<any>,readonly changed:()=>void){}
-  private put(task:SessionTask){
+  private put(task:SessionTask,notify=true){
     this.items=this.items.some(t=>t.key===task.key)?this.items.map(t=>t.key===task.key?task:t):[...this.items,task];
     const active=this.items.filter(taskActive),done=this.items.filter(t=>!taskActive(t)).slice(-80);
-    this.items=[...done,...active];this.changed();
+    this.items=[...done,...active];if(notify)this.changed();
   }
   private agent(p:OmpEvent, lifecycle=false){
     const progress=p.progress||{},id=String(p.id||progress.id||'');if(!id)return;
@@ -54,15 +56,64 @@ export class SessionTasks {
     if(event.type==='message_end')this.restoreHistory([event.message]);
     if(['remote_disconnected','process_exit','process_error','remote_interrupted'].includes(event.type))this.disconnect();
   }
-  restoreHistory(messages:OmpEvent[]){
-    for(const item of messages){const m=item?.message||item;if(m?.customType!=='async-result')continue;
-      for(const job of m.details?.jobs||[]){
-        const key=`job:${job.jobId}`;if(this.items.some(t=>t.key===key))continue;
-        const s=status(job.status||'completed');if(!terminal(s))continue;
-        this.put({key,id:job.jobId,kind:'job',title:job.label||job.type||'后台任务',status:s,output:'',detail:'来自会话历史',stale:false,cancellable:false,revision:++this.revision});
+  restoreHistory(messages:OmpEvent[],missingAtRevision?:number){
+    const outcomes=new Map<string,{job:OmpEvent;state:TaskStatus;resultAt?:number}>();
+    for(const item of messages){
+      const message=item?.message??item;
+      const details=message?.details;
+      const asyncResult=message?.customType==='async-result';
+      const jobReport=message?.role==='toolResult'&&!message.isError&&
+        (message.toolName==='wait'&&details?.op==='wait'||message.toolName==='cancel'&&details?.op==='cancel');
+      // A later launch can reuse the same job ID. Its older result no longer applies.
+      if(message?.role==='toolResult'&&details?.async?.state==='running')outcomes.delete(details.async.jobId);
+      if((!asyncResult&&!jobReport)||!Array.isArray(details?.jobs))continue;
+      const timestamp=message.timestamp??item.timestamp;
+      const time=typeof timestamp==='string'?Date.parse(timestamp):timestamp;
+      const resultAt=Number.isFinite(time)?time:undefined;
+      for(const job of details.jobs){
+        const id=asyncResult?job?.jobId:job?.id;
+        if(typeof id!=='string'||!id)continue;
+        const state=status(job.status||(asyncResult?'completed':''));
+        // A coordination report can say cancelled as soon as abort is requested.
+        if(state==='running'||jobReport&&state==='aborted')outcomes.delete(id);
+        if(!terminal(state)||jobReport&&state==='aborted')continue;
+        outcomes.delete(id);
+        outcomes.set(id,{job,state,resultAt});
       }
     }
+    let changed=false;
+    for(const [id,{job,state,resultAt}] of outcomes){
+      const key=`job:${id}`,old=this.items.find(task=>task.key===key);
+      if(missingAtRevision!==undefined&&(!old?.stale||!taskActive(old)||old.revision>missingAtRevision))continue;
+      if(resultAt!==undefined&&resultAt<Math.max(old?.startedAt??0,old?.endedAt??0,old?.resultAt??0))continue;
+      const durationMs=Number.isFinite(job.durationMs)&&job.durationMs>=0?job.durationMs:undefined;
+      // Keep exact native timing when the result agrees with an already ended instance.
+      const nativeEnd=old?.status===state&&old.endedAt!==undefined&&
+        (durationMs===undefined||old.startedAt!==undefined&&old.endedAt-old.startedAt===durationMs);
+      if(nativeEnd||old?.resultAt!==undefined&&old.resultAt===resultAt&&old.status===state)continue;
+      const previousOutput=old?.output||'';
+      const output=job.resultText??job.errorText??(previousOutput.startsWith('Running background task ')?'':previousOutput);
+      this.put({...old,key,id,kind:'job',title:job.intent||job.label||old?.title||job.type||'后台任务',
+        status:state,resultAt,durationMs,endedAt:undefined,output:tail(output),
+        detail:'来自会话记录',error:undefined,exitCode:Number.isInteger(job.exitCode)?job.exitCode:undefined,
+        stale:false,cancellable:false,revision:++this.revision},false);
+      changed=true;
+    }
+    if(changed)this.changed();
   }
+  async reconcileHistory(){
+    const {epoch,revision}=this;
+    if(!this.connected||this.historyEpoch===epoch)return;
+    const taskIds=this.items.filter(task=>task.kind==='job'&&task.stale&&taskActive(task)).slice(-80).map(task=>task.id);
+    if(!taskIds.length)return;
+    this.historyEpoch=epoch;
+    try{
+      const result=await this.request('get_background_task_history',{taskIds});
+      if(epoch===this.epoch&&Array.isArray(result?.messages))this.restoreHistory(result.messages,revision);
+    }catch{ /* An older host or oversized history may not support reconciliation. */ }
+    finally{if(this.historyEpoch===epoch)this.historyEpoch=undefined;}
+  }
+  refreshNow=async()=>{await this.refresh();await this.reconcileHistory();};
   saved(){return this.items.slice(-80).map(t=>({...t,output:tail(t.output,2048),history:undefined,expanded:false,error:undefined}));}
   restore(saved:unknown){if(!Array.isArray(saved))return;this.items=saved.filter(t=>t&&typeof t.key==='string'&&typeof t.id==='string'&&['agent','job','daemon'].includes(t.kind)).slice(-80).map(t=>({...t,output:tail(t.output,2048),history:undefined,expanded:false,stale:!terminal(t.status),cancellable:false,status:terminal(t.status)?t.status:'unknown',revision:++this.revision}));}
   disconnect(){this.connected=false;this.epoch++;clearTimeout(this.timer);this.polling=false;this.items=this.items.map(t=>taskActive(t)?{...t,stale:true,cancellable:false}:t);this.changed();}
@@ -89,7 +140,12 @@ export class SessionTasks {
           if(value.agentId&&this.items.some(t=>t.kind==='agent'&&t.id===value.agentId))continue;
           const key=`${value.kind}:${value.id}`,old=this.items.find(t=>t.key===key);seen.add(key);if(old&&old.revision>revision)continue;
           const next=status(value.status),same=old?.startedAt===value.startedAt;
-          this.put({...old,...value,key,output:tail(value.output??old?.output??''),detail:value.detail||'',stale:false,status:same&&old?.status==='stopping'&&!terminal(next)?'stopping':next,revision:++this.revision});
+          const recorded=value.kind==='job'&&old?.resultAt!==undefined&&value.startedAt<=old.resultAt;
+          if(value.kind==='job'&&old&&terminal(old.status)&&(same||recorded)&&!terminal(next))continue;
+          const previous=same||recorded?old:undefined;
+          this.put({...previous,...value,key,resultAt:undefined,durationMs:undefined,
+            output:tail(value.output??previous?.output??''),detail:value.detail||'',stale:false,
+            status:same&&old?.status==='stopping'&&!terminal(next)?'stopping':next,revision:++this.revision});
         }
         this.items=this.items.map(t=>t.kind!=='agent'&&taskActive(t)&&t.revision<=revision&&!seen.has(t.key)?{...t,status:'unknown',stale:true,cancellable:false,detail:'任务已不在原生快照中'}:t);
         this.error=jobs.value.warning||'';
@@ -98,12 +154,13 @@ export class SessionTasks {
     }finally{if(epoch===this.epoch){this.polling=false;this.changed();if(this.connected)this.timer=setTimeout(this.refresh,2500);}}
   };
   private async readOutput(task:SessionTask,epoch:number){
+    if(task.resultAt!==undefined)return;
     try{
       const result=await this.request(task.kind==='agent'?'get_subagent_messages':'get_background_task_output',task.kind==='agent'?{subagentId:task.id,fromByte:task.cursor||0,expectedSessionFile:task.sessionFile}:{taskId:task.id,kind:task.kind,startedAt:task.startedAt});
-      if(epoch!==this.epoch)return;const current=this.items.find(t=>t.key===task.key);if(!current||current.startedAt!==task.startedAt)return;
+      if(epoch!==this.epoch)return;const current=this.items.find(t=>t.key===task.key);if(!current||current.startedAt!==task.startedAt||current.resultAt!==task.resultAt)return;
       if(task.kind==='agent')this.put({...current,cursor:result.nextByte,history:tail((result.reset?'':current.history||'')+(result.messages||[]).map((m:OmpEvent)=>`\n${m.role||''} ${contentText(m.content)}`).join('\n'))});
       else this.put({...current,output:tail(result.output),exitCode:result.exitCode??current.exitCode});
-    }catch(e){if(epoch===this.epoch){const current=this.items.find(t=>t.key===task.key);if(current)this.put({...current,error:errorText(e)});}}
+    }catch(e){if(epoch===this.epoch){const current=this.items.find(t=>t.key===task.key);if(current&&current.startedAt===task.startedAt&&current.resultAt===task.resultAt)this.put({...current,error:errorText(e)});}}
   }
   expand=async(key:string)=>{const task=this.items.find(t=>t.key===key);if(!task)return;this.put({...task,expanded:!task.expanded});if(!task.expanded&&this.connected)await this.readOutput({...task,expanded:true},this.epoch);};
   cancel=async(key:string)=>{

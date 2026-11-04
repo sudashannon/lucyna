@@ -245,7 +245,13 @@ app.whenReady().then(async () => {
     },{root:options.root});
   });
   handle('omp:prepare-text', (id,files) => {if(remote.owns(id))throw Error('远端文本文件附件尚未接入，请使用内联文本；草稿已保留');return sessions.prepareTextAttachments(id,files);});
-  handle('omp:request', (type, data, id) => { if (!require('./task-rpc.cjs').validateTaskRequest(type,data) && !['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command'); return remote.owns(id)?remote.request(id,type,data):sessions.request(id,type,data); });
+  handle('omp:request', async (type, data, id) => {
+    const {validateTaskRequest,selectTaskHistory}=require('./task-rpc.cjs');
+    if (!validateTaskRequest(type,data) && !['get_state', 'get_messages', 'prompt', 'abort', 'abort_and_restore_queue', 'remove_queued_message', 'get_available_commands', 'get_available_models', 'set_model', 'set_ask_dialog'].includes(type)) throw new Error('Unsupported command');
+    const transport=remote.owns(id)?remote:sessions;
+    if(type==='get_background_task_history')return selectTaskHistory(await transport.request(id,'get_entries'),data.taskIds);
+    return transport.request(id,type,data);
+  });
   handle('omp:terminate',id=>remote.owns(id)?remote.close(id):sessions.terminate(id));
   handle('omp:ui-response', (data,id) => { if (!data || data.type !== 'extension_ui_response' || typeof data.id !== 'string') throw new Error('Invalid UI response'); return remote.owns(id)?remote.respond(id,data):sessions.respond(id,data); });
   handle('omp:close', id => remote.owns(id)?remote.close(id):sessions.close(id));

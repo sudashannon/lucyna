@@ -23,12 +23,12 @@ REPLAY_BYTES = 32*1024*1024
 REQUESTS = {'get_state', 'get_messages', 'get_messages_page', 'get_available_models',
             'get_available_commands', 'set_ask_dialog', 'abort_and_restore_queue', 'remove_queued_message',
             'get_subagents', 'cancel_subagent', 'set_subagent_subscription', 'get_subagent_messages',
-            'get_background_tasks', 'get_background_task_output', 'cancel_background_task',
+            'get_background_tasks', 'get_background_task_output', 'cancel_background_task', 'get_entries',
             'get_session_stats', 'get_commands', 'get_last_assistant_text', 'get_session_name',
             'prompt', 'steer', 'follow_up', 'abort', 'set_model', 'set_thinking_level',
             'set_session_name', 'set_steering_mode', 'set_follow_up_mode',
             'extension_ui_response', 'compact'}
-OBSERVATIONS = {'get_subagents', 'get_subagent_messages', 'get_background_tasks', 'get_background_task_output'}
+OBSERVATIONS = {'get_subagents', 'get_subagent_messages', 'get_background_tasks', 'get_background_task_output', 'get_entries'}
 
 
 def encode(value):

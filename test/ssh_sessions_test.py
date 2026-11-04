@@ -32,7 +32,7 @@ def wait_for(predicate):
 class SessionTests(unittest.TestCase):
     def test_task_polling_does_not_fill_write_recovery_table(self):
         before = self.manager.db.execute('SELECT COUNT(*) FROM operations').fetchone()[0]
-        for kind in ('get_subagents', 'get_background_tasks', 'get_background_task_output'):
+        for kind in ('get_subagents', 'get_background_tasks', 'get_background_task_output', 'get_entries'):
             key = uuid.uuid4().hex
             args = dict(self.identity, operationId=key, frame=dict(type=kind))
             self.manager.dispatch('session.request', args)
