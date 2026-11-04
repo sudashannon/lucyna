@@ -1,0 +1,58 @@
+.knowledge-governance{height:100%;min-height:0;display:flex;flex-direction:column;overflow:auto;padding:20px 24px;gap:16px;color:var(--text-primary)}
+.knowledge-governance-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.knowledge-governance h2{font-size:20px;font-weight:600;line-height:1.5;margin:0 0 8px;overflow-wrap:anywhere}
+.knowledge-governance p{line-height:1.7;max-width:72ch;margin:8px 0;overflow-wrap:anywhere}
+.knowledge-governance-heading p,.knowledge-governance-note,.knowledge-governance-source{font-size:13px;color:var(--muted-readable)}
+.knowledge-governance-status{border-block:1px solid var(--soft-border);padding:14px 0;flex:none;font-size:13px}
+.knowledge-governance-status>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px}
+.knowledge-governance-status p{color:var(--muted-readable)}
+.knowledge-governance-filters,.knowledge-governance-filters>div,.knowledge-governance-filters label{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px}
+.knowledge-governance-filters{justify-content:space-between}
+.knowledge-governance select{font:inherit;background:var(--surface-elevated);color:var(--text-primary);border:1px solid var(--input-border);border-radius:6px;padding:5px 10px;max-width:100%}
+.knowledge-governance .knowledge-native-split{min-height:360px;flex:1;border-top:1px solid var(--soft-border);grid-template-columns:minmax(220px,28%) minmax(0,1fr)}
+.knowledge-governance .knowledge-native-list{padding:0}
+.knowledge-governance-groups h3{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;font-weight:500;margin:0;padding:18px 12px 10px}
+.knowledge-governance-groups h3 span{font-size:12px;color:var(--muted-readable);font-weight:400}
+.knowledge-governance-row{font:inherit;text-align:left;width:100%;display:flex;flex-direction:column;gap:7px;border:0;border-bottom:1px solid var(--soft-border);background:transparent;color:inherit;padding:14px 12px;cursor:pointer}
+.knowledge-governance-row:hover{background:var(--surface-hover-soft)}
+.knowledge-governance-row[aria-current]{background:var(--sidebar-selection)}
+.knowledge-governance-row strong{font-size:14px;font-weight:500;line-height:1.6;overflow-wrap:anywhere}
+.knowledge-governance-row span,.knowledge-governance-row small{font-size:12px;color:var(--muted-readable);line-height:1.65;overflow-wrap:anywhere}
+.knowledge-governance-detail{padding:24px clamp(16px,3vw,36px);max-width:1060px;margin-inline:auto;font-size:14px}
+.knowledge-governance-title{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.knowledge-governance-title>span{font-size:12px;color:var(--muted-readable)}
+.knowledge-governance-scope{margin:18px 0;padding-block:12px;border-block:1px solid var(--soft-border)}
+.knowledge-governance-scope strong{font-size:14px;font-weight:600}
+.knowledge-governance-scope p{font-size:13px;color:var(--muted-readable)}
+.knowledge-governance-comparison{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:24px 0}
+.knowledge-governance-comparison>section{min-width:0}
+.knowledge-governance-comparison header{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted-readable)}
+.knowledge-governance-detail h3{font-size:16px;font-weight:600;line-height:1.6;margin:22px 0 10px;overflow-wrap:anywhere}
+.knowledge-governance-comparison h3{margin-top:14px}
+.knowledge-governance-excerpt{margin-top:20px}
+.knowledge-governance-excerpt strong{font-size:13px;font-weight:500;line-height:1.7}
+.knowledge-governance-excerpt blockquote{margin:12px 0 6px;padding:0 12px;border-left:1px solid var(--soft-border);line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere}
+.knowledge-governance small{font-size:12px;color:var(--muted-readable)}
+.knowledge-governance pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:13px;line-height:1.8;max-height:360px;overflow:auto;margin:12px 0}
+.knowledge-governance-comparison details p{font-size:13px;line-height:1.8;color:var(--muted-readable)}
+.knowledge-governance summary{font-size:13px;padding:10px 0;cursor:pointer;line-height:1.6}
+.knowledge-governance ul,.knowledge-governance ol{padding-left:20px;line-height:1.85;font-size:13px;overflow-wrap:anywhere}
+.knowledge-governance-proposal{border-top:1px solid var(--soft-border)}
+.knowledge-governance-proposal h4{font-size:13px;font-weight:600;margin:18px 0 8px}
+.knowledge-governance-review ul{display:flex;gap:8px 22px;flex-wrap:wrap;list-style:none;padding:0}
+.knowledge-governance-notice{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:12px;background:var(--surface-hover-soft)}
+.knowledge-governance-notice svg{flex:none;margin-top:3px}
+.knowledge-governance-actions{border-block:1px solid var(--soft-border);margin-top:24px}
+.knowledge-governance-feedback{padding-bottom:18px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.knowledge-governance-feedback label{display:flex;flex-direction:column;gap:8px;font-size:13px;width:100%}
+.knowledge-governance-feedback textarea{width:100%;font:inherit;line-height:1.7;resize:vertical;min-height:80px;color:var(--text-primary);background:var(--surface-elevated);border:1px solid var(--input-border);border-radius:6px;padding:10px;caret-color:var(--text-primary)}
+.knowledge-governance-feedback textarea::placeholder{color:var(--muted-readable)}
+.knowledge-governance-events ol{list-style:none;padding:0}
+.knowledge-governance-events li{display:flex;gap:16px;padding:7px 0;font-size:13px;line-height:1.65}
+.knowledge-governance time{font-size:12px;color:var(--muted-readable);font-variant-numeric:tabular-nums;white-space:nowrap}
+.knowledge-governance-empty{padding:32px 0;max-width:65ch}
+.knowledge-governance-empty h3{font-size:17px;font-weight:500}
+.knowledge-governance-empty p,.knowledge-governance-warnings{font-size:13px;color:var(--muted-readable)}
+.knowledge-governance :focus-visible{outline:2px solid var(--focus-ring);outline-offset:3px}
+@media(max-width:1100px){.knowledge-governance{padding:16px}.knowledge-governance .knowledge-native-split{display:block}.knowledge-governance:has(.reading) .knowledge-governance-status,.knowledge-governance:has(.reading) .knowledge-governance-filters{display:none}.knowledge-governance .knowledge-native-split.reading{flex:none}}
+@media(max-width:720px){.knowledge-governance-comparison{grid-template-columns:1fr;gap:20px}.knowledge-governance-comparison>section+section{border-top:1px solid var(--soft-border);padding-top:16px}.knowledge-governance-filters>div{gap:10px}.knowledge-governance-events li{flex-direction:column;gap:2px}.knowledge-governance-detail{padding:18px 14px}}

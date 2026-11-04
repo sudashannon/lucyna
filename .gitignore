@@ -52,6 +52,8 @@ docs/*
 !docs/knowledge-managed-engine.md
 !docs/work-evolution-preparation.md
 !docs/knowledge-consolidation.md
+!docs/knowledge-maintenance.md
+!docs/knowledge-governance.md
 !docs/design/
 docs/design/*
 !docs/design/git-workspace/
@@ -118,6 +120,10 @@ test/*
 !test/work-knowledge-desktop.cjs
 !test/knowledge-consolidation-native.cjs
 !test/knowledge-consolidation-desktop.cjs
+!test/knowledge-maintenance-native.cjs
+!test/knowledge-maintenance-desktop.cjs
+!test/knowledge-governance-native.cjs
+!test/knowledge-governance-desktop.cjs
 !test/memory-markdown-desktop.cjs
 
 # Superseded local harness and unused intermediate artwork.

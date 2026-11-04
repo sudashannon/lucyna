@@ -5,6 +5,21 @@ function createManagedKnowledge({directory,chooseDirectory,executable=process.ex
  const runtime=new KnowledgeRuntime(directory,{executable}),service=createKnowledgeService(runtime.fetch.bind(runtime)),selections=new Map();
  const knowledge=async(kind,args={},progress)=>{
   switch(kind){
+   case 'governanceStatus':case 'governanceGet':case 'governanceConfigure':case 'governanceAction':{
+    const state=await runtime.ensure();if(!state.health?.capabilities?.includes('knowledge-governance'))throw Error('当前知识服务尚未加载重复与冲突检查；请在现有任务结束后重启知识服务');
+    if(kind==='governanceStatus')return runtime.call('/api/governance/status');
+    if(kind==='governanceGet')return runtime.call('/api/governance/get?'+new URLSearchParams({id:args.id}));
+    if(kind==='governanceConfigure')return runtime.call('/api/governance/configure',{method:'POST',body:{enabled:args.enabled,scan:args.scan}});
+    return runtime.call('/api/governance/action',{method:'POST',body:{id:args.id,action:args.action,version:args.version,note:args.note}});
+   }
+   case 'maintenanceStatus':case 'maintenanceGet':case 'maintenanceConfigure':case 'maintenanceAction':{
+    const state=await runtime.ensure();if(!state.health?.capabilities?.includes('knowledge-maintenance'))throw Error('当前知识服务尚未加载自动维护；请在现有任务结束后重启知识服务');
+    if(kind==='maintenanceStatus')return runtime.call('/api/maintenance/status');
+    if(kind==='maintenanceGet')return runtime.call('/api/maintenance/get?'+new URLSearchParams({id:args.id}));
+    if(kind==='maintenanceConfigure')return runtime.call('/api/maintenance/configure',{method:'POST',body:{enabled:args.enabled,autoApply:args.autoApply,scan:args.scan}});
+    return runtime.call('/api/maintenance/action',{method:'POST',body:{id:args.id,action:args.action}});
+   }
+   case 'document':{const state=await runtime.ensure(),result=await service(kind,args,progress);if(state.health?.capabilities?.includes('knowledge-maintenance'))result.maintenance=await runtime.call('/api/maintenance/document?'+new URLSearchParams({document:args.id}));return result;}
    case 'workAssetList':{if(!workAssets)throw Error('当前窗口未接入 Work 资料');await workAssets.validate(args.root);return runtime.call('/api/work-material/list?'+new URLSearchParams({root:args.root,query:args.query||''}));}
    case 'workAssetCapture':{if(!workAssets)throw Error('当前窗口未接入 Work 资料');const input=await workAssets.capture(args.root,args.path);return runtime.call('/api/work-material/capture',{method:'POST',body:input});}
    case 'workAssetRead':{if(!workAssets)throw Error('当前窗口未接入 Work 资料');await workAssets.validate(args.root);return runtime.call('/api/work-material/read?'+new URLSearchParams({root:args.root,id:args.id}));}

@@ -103,6 +103,7 @@ class KnowledgeConsolidation{
   this.status(p,p.enabled?'completed':'paused');
  }
  async advance(){
+  if(this.maintenanceBusy?.())return;
   for(let p of this.all().sort((a,b)=>(a.lastRunAt||0)-(b.lastRunAt||0))){
    if(!p.enabled||!p.registered)continue;
    if(!this.eligible(p)){this.status(p,'busy');continue;}
