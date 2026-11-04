@@ -2,13 +2,13 @@
   <img src="src/assets/app-icon.png" width="112" alt="Lucyna — silver-haired companion and black cat" />
   <h1>Lucyna</h1>
   <p><strong>让原生 OMP，拥有一个桌面工作台。</strong></p>
-  <p>A Windows desktop workbench for native OMP, WSL workspaces and lasting knowledge.</p>
+  <p>A Windows desktop workbench for native OMP, local and SSH workspaces, and long-term knowledge.</p>
   <p><a href="docs/getting-started.md">快速开始</a> · <a href="docs/features.md">功能列表</a> · <a href="docs/architecture.md">架构</a> · <a href="docs/development.md">开发</a></p>
 </div>
 
-![Lucyna 工作台](docs/screenshots/workbench-light.png)
+![Lucyna 蓝调工作室的对话工作台](docs/screenshots/workbench-light.png)
 
-Lucyna 是一个围绕 [oh-my-pi / OMP](https://github.com/can1357/oh-my-pi) 的 Windows 桌面客户端：用可视化界面管理工作区、并行会话、终端、文件阅读和知识引用。模型、agent loop、技能、工具调用和 session 仍由 **原生 OMP** 执行。
+Lucyna 是 [oh-my-pi / OMP](https://github.com/can1357/oh-my-pi) 的 Windows 桌面工作台。你可以连接本机 WSL、Windows 或 SSH 主机上的 OMP，在一个窗口里处理对话、工作区文件和长期知识。模型、agent loop、技能、工具调用和 session 由 **原生 OMP** 执行。
 
 界面借鉴 [Cindy](https://github.com/makecindy/cindy)，复用部分带许可证的 UI 组件；Work 承载当前工作上下文，Stele 承载 L3 长期知识。银发女孩与黑猫是 Lucyna 的视觉伙伴，也可以作为桌面像素宠物陪伴工作。
 
@@ -18,17 +18,24 @@ Lucyna 是一个围绕 [oh-my-pi / OMP](https://github.com/can1357/oh-my-pi) 的
 
 | 场景 | 能力 |
 | --- | --- |
-| 多个工作同时推进 | 多 work / 多 session 并行，切换保留任务、草稿、终端和状态 |
-| 使用自己的 OMP | WSL / Windows 运行时切换，原生配置、技能补全、模型选择、交互提问与停止 |
+| 多个工作同时推进 | 从「新建 Work」发起 WSL Work，切换工作区时保留任务、草稿和状态 |
+| 查看跨工作区任务 | 「工作台 → 活跃会话」集中查看运行中、已完成未读和待处理的会话，可打开、停止或结束连接 |
+| 使用自己的 OMP | WSL、Windows 或 SSH 运行时，原生配置、技能补全、模型选择、交互提问与停止 |
 | 接着之前的任务做 | 历史搜索、会话导入副本、续聊和原生 journal 归属校验 |
-| 在上下文中阅读 | 文件列表、Markdown/GFM、语法高亮、公式、Mermaid、图片；网页链接在系统默认浏览器打开 |
-| 留下长期知识 | Stele 文档、来源与标签筛选、关联阅读、候选知识、待核实、引用到草稿 |
-| 看清任务状态 | 工具过程、事件、只读工作区诊断；登记偏差不会阻断阅读与终端 |
+| 浏览文件与管理 Git | 在「工作区文件」阅读 Markdown、代码和图表，查看仓库差异、暂存、提交及管理分支与 Worktree |
+| 留下长期知识 | 内置 Stele 提供文档阅读与编辑、证据检索、图谱和会话引用。配置辅助模型后可从空闲 Work 的笔记与日志提炼可复用经验 |
+| 看清任务状态 | 原生工具过程、子代理与后台任务进度、事件时间线、工作区诊断 |
 | 桌面上有个伙伴 | 两种外观、四种动画状态、32 帧像素素材、置顶、托盘、状态提示和隐私设置 |
 
-完整范围和限制见 [功能与当前边界](docs/features.md)。客户端需要保持运行才能维持后台会话；Work 技能与 Stele 服务需单独准备。
+本机普通会话由客户端持有，SSH 会话由远端 host 持有。WSL Work 后台任务由独立服务执行，关闭窗口后仍可运行。新建 Work 与后台任务需要对应的 WSL 技能和运行环境。详见 [功能与当前边界](docs/features.md) 和 [Work 知识沉淀](docs/knowledge-consolidation.md)。
 
 ## 界面一览
+
+### 活跃会话
+
+工作台内的「对话工作」「工作区文件」「活跃会话」可以直接切换。活跃会话汇总所有工作区的连接，便于查看进度、处理待办或回到对应的对话。
+
+![工作台内的活跃会话与状态筛选](docs/screenshots/active-sessions.png)
 
 ### 知识库
 
@@ -36,9 +43,20 @@ Lucyna 是一个围绕 [oh-my-pi / OMP](https://github.com/can1357/oh-my-pi) 的
 
 ![知识库与关联阅读](docs/screenshots/knowledge.png)
 
-### 深色工作台
+### 四套视觉主题
 
-![深色工作台](docs/screenshots/workbench-dark.png)
+经典原色、蓝调工作室、纸页研读室和像素工作室可在左侧「视觉主题」或设置中切换。每套主题都支持浅色和深色，切换时保留当前会话与草稿。页首展示浅色蓝调工作室。
+
+<details>
+<summary>查看另外三套主题与深色蓝调</summary>
+
+| 经典原色 | 纸页研读室 |
+| --- | --- |
+| ![经典原色工作台](docs/screenshots/workbench-classic.png) | ![纸页研读室工作台](docs/screenshots/workbench-folio.png) |
+| **像素工作室** | **蓝调工作室 · 深色** |
+| ![像素工作室工作台](docs/screenshots/workbench-pixel.png) | ![深色蓝调工作台](docs/screenshots/workbench-dark.png) |
+
+</details>
 
 ### 文件与 Markdown
 
@@ -74,7 +92,7 @@ npm start
 
 `runtime.local.json` 不上传 Git。模型凭证继续放在原生 OMP profile。客户端设置页可切换 OMP 运行时和模型；WSL 的发行版、用户和工作根在本地 JSON 中配置。
 
-**首次使用请看 [完整安装与配置指南](docs/getting-started.md)**，包括最小 demo work、历史存储、Windows 模式、可选 Work/Stele 集成和回退。当前仓库不提供一键安装包，也不随源码分发个人技能、会话、认证或 Stele 服务。
+**首次使用请看 [完整安装与配置指南](docs/getting-started.md)**，包括最小 demo work、历史存储、Windows 模式、SSH 主机、内置知识引擎及可选的 Work + Stele 集成。当前为源码安装，个人技能、会话和认证由使用者自行配置。
 
 ## 原生能力与客户端的分工
 
