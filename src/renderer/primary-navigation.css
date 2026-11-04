@@ -26,7 +26,6 @@
 .primary-switcher button:hover { background: var(--sidebar-hover); color: var(--text-primary); }
 .primary-switcher button[aria-selected=true] { background: var(--sidebar-selection); color: var(--text-primary); }
 .primary-switcher button:focus-visible { outline-offset: -2px; }
-.primary-count { font-size: var(--font-size-caption); font-variant-numeric: tabular-nums; }
 @container primary-navigation (max-width: 210px) {
   .primary-switcher button { font-size: var(--font-size-small); padding-inline: 2px; gap: 2px; }
 }
@@ -50,17 +49,3 @@
   gap: var(--space-1);
 }
 .primary-compact-label { font-size: var(--font-size-caption); line-height: 1.25; }
-.primary-switcher.is-compact .primary-count {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  min-width: 18px;
-  height: 18px;
-  display: grid;
-  place-items: center;
-  padding-inline: 3px;
-  border-radius: var(--radius-full);
-  background: var(--surface-elevated);
-  border: 1px solid var(--soft-border);
-  color: var(--text-primary-body-strong);
-}

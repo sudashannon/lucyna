@@ -17,11 +17,14 @@ app.whenReady().then(async()=>{
   const menu=installWindowChrome(win);win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.resolve('dist/renderer/index.html'));await until('document.querySelectorAll(".window-menubar button").length===5');await until('document.querySelectorAll(".work-row").length===3');
   assert.equal(win.getTitle(),'Lucyna · 工作台');assert.ok((await js('document.querySelector(".brand").textContent')).includes('Lucyna'));
-  await click('.work-row');await until('document.querySelector("#message-input")');await js('window.gallery.ready()');await until('document.querySelector(".composer-footnote").textContent.includes("会话已连接")');await js('window.gallery.conversation()');await until('document.querySelector(".message.assistant")');
+  await click('.work-row');await until('document.querySelector("#message-input")');await click('button[aria-label="技能与命令"]');await until('document.querySelector(".composer-footnote").textContent.includes("会话已连接")');await click('button[aria-label="关闭命令补全"]');await js('window.gallery.conversation()');await until('document.querySelector(".message.assistant")');
   await pause(600);const light=await layout('light');fs.writeFileSync(path.join(out,'light.png'),(await win.webContents.capturePage()).toPNG());
   await click('button[aria-label="切换深色外观"]');await until('document.documentElement.dataset.theme==="dark"');assert.equal(nativeTheme.themeSource,'dark');const dark=await layout('dark');fs.writeFileSync(path.join(out,'dark.png'),(await win.webContents.capturePage()).toPNG());
   const view=menu.getMenuItemById('view');view.submenu.items[0].click();await until('document.querySelector(".app-shell.rail-mode")');view.submenu.items[0].click();await until('!document.querySelector(".app-shell.rail-mode")');
   view.submenu.items[1].click();await until('document.querySelector(".app-shell.with-panel")');assert.equal(await js('document.querySelectorAll(".window-menubar button").length'),5);
+  view.submenu.items.find(item=>item.label==='知识库').click();await until('document.querySelector("#primary-tab-knowledge").getAttribute("aria-selected")==="true"');
+  view.submenu.items.find(item=>item.label==='活跃会话').click();await until('document.querySelector("#workspace-tab-sessions").getAttribute("aria-selected")==="true"');
+  assert.equal(await js('document.querySelector("#primary-tab-workbench").getAttribute("aria-selected")'),'true');await click('#workspace-tab-chat');
   win.setSize(960,700);await pause(200);const narrow=await layout('narrow');fs.writeFileSync(path.join(out,'narrow.png'),(await win.webContents.capturePage()).toPNG());
   menu.getMenuItemById('help').submenu.items[0].click();await until('document.querySelector("[role=dialog]")');await click('button[aria-label="关闭弹窗"]');
   // Actual accelerator routing: hidden native menus must not duplicate React handlers.

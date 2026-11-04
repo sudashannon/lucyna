@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import signal
-import urllib.request
+import subprocess
 import uuid
 
 from work import bounded_file, digest, local_path, private_name, tool, check_frozen, sandbox_command
@@ -13,26 +13,34 @@ from work import bounded_file, digest, local_path, private_name, tool, check_fro
 KNOWLEDGE_READ = {'wiki_search','wiki_read','wiki_context','wiki_overview','wiki_claim_search','wiki_claim_get','wiki_claims','todo_list'}
 
 
-def knowledge(args):
+def knowledge(args, config):
     name = args.get('name', 'list')
     if name != 'list' and name not in KNOWLEDGE_READ:
         raise ValueError('公共知识只开放列出的读取接口')
     request_id = str(uuid.uuid4())
     payload = {'jsonrpc':'2.0','id':request_id,'method':'tools/list' if name == 'list' else 'tools/call',
         'params':{} if name == 'list' else {'name':name,'arguments':args.get('arguments') or {}}}
-    request = urllib.request.Request('http://127.0.0.1:18989/mcp',data=json.dumps(payload).encode(),headers={'Content-Type':'application/json','Accept':'application/json'})
     try:
-        with urllib.request.urlopen(request,timeout=20) as response:
-            raw = response.read(256*1024+1)
+        settings = json.loads((Path(config['agentDir'])/'mcp.json').read_text(encoding='utf-8'))
+        entry = settings['mcpServers']['stele']
+        arguments = entry['args']
+        if (entry.get('type') != 'stdio' or entry.get('command') != 'python3' or
+            not isinstance(arguments, list) or len(arguments) != 5 or
+            arguments[1] != '--knowledge-manifest' or arguments[3] != '--knowledge-data' or
+            any(not isinstance(x, str) or not x or '\0' in x for x in arguments)):
+            raise ValueError('请先配置 Lucyna 内部知识库 MCP')
+        result = subprocess.run(['/usr/bin/python3', *arguments], input=(json.dumps(payload)+'\n').encode(),
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=90, check=True)
+        raw = result.stdout
         if len(raw)>256*1024:
             raise ValueError('公共知识结果过大，请缩小查询')
         value=json.loads(raw)
-        if value.get('id')!=request_id or 'error' in value:
+        if value.get('id')!=request_id or 'error' in value or value.get('result',{}).get('isError'):
             raise ValueError('公共知识读取失败')
         result=value['result']
         return {'tools':[t for t in result.get('tools',[]) if t.get('name') in KNOWLEDGE_READ]} if name=='list' else result
-    except (OSError,KeyError):
-        raise ValueError('Stele 只读接口暂不可用') from None
+    except (OSError, KeyError, TypeError, json.JSONDecodeError, subprocess.SubprocessError):
+        raise ValueError('Lucyna 内部知识库只读接口暂不可用') from None
 
 
 def walk_files(root, limit=10000):
@@ -163,7 +171,7 @@ async def git_read(run, args, config):
 
 
 TOOLS = [
-    tool('read_work_knowledge','Read existing shared L3 knowledge through Stele. First call name=list for exact schemas. Write interfaces and credentials are never exposed.',{'name':{'type':'string','enum':['list',*sorted(KNOWLEDGE_READ)]},'arguments':{'type':'object'}},[]),
+    tool('read_work_knowledge','Read Lucyna internal knowledge. First call name=list for exact schemas. Write interfaces and credentials are never exposed.',{'name':{'type':'string','enum':['list',*sorted(KNOWLEDGE_READ)]},'arguments':{'type':'object'}},[]),
     tool('search_work_files','Search text in Work source and notes. Returns file paths and line numbers.',{'query':{'type':'string'}},['query']),
     tool('list_work_skills','List existing shared skills for read-only use. Skills do not expand tool permissions.',{},[]),
     tool('read_work_skill','Read a skill or its relative supporting file; never modifies the shared skill.',{'skill':{'type':'string'},'path':{'type':'string'}},['skill']),

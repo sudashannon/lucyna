@@ -9,7 +9,7 @@ import { documentHeadings } from '../panel-data';
 import { markdownTranslations } from '../markdown-config';
 import {isWorkspaceReference, mediaErrorText} from '../workspace-media';
 
-export type DocumentMedia = {onNavigate?: (href: string) => void | Promise<void>; resolveImage?: (src: string) => Promise<string>; onImage?: (src: string) => void};
+export type DocumentMedia = {onNavigate?: (href: string) => void | Promise<void>; onAnchor?: (anchor:string)=>void; resolveImage?: (src: string) => Promise<string>; onImage?: (src: string) => void};
 const DefaultImage = defaultComponents.img;
 const DefaultParagraph = defaultComponents.p;
 
@@ -35,14 +35,14 @@ const readTheme = () => document.documentElement.dataset.theme === 'dark';
 function DiagramError({chart, retry}: MermaidErrorComponentProps) {
   return <div className="markdown-diagram-error" role="status"><p>图表暂时无法渲染，原始内容已保留。</p><button type="button" onClick={retry}>重试图表</button><details><summary>查看 Mermaid 源码</summary><pre>{chart}</pre></details></div>;
 }
-export const Document = memo(function Document({content, onError, onNavigate, resolveImage, onImage, streaming = false}: DocumentMedia & {content: string; onError: (e: unknown) => void; streaming?: boolean}) {
+export const Document = memo(function Document({content, onError, onNavigate, onAnchor, resolveImage, onImage, streaming = false, forceFull = false}: DocumentMedia & {content: string; onError: (e: unknown) => void; streaming?: boolean; forceFull?:boolean}) {
   const [expanded,setExpanded]=useState(false);
   const [diagram,setDiagram]=useState(() => loadedDiagram);
   const needsDiagram = /^\s*(?:`{3,}|~{3,})mermaid\b/im.test(content);
   useEffect(() => {let active=true; if(needsDiagram&&!diagram) void loadDiagram().then(value=>{if(active)setDiagram(value);}).catch(e=>{if(active)onError(e);});return ()=>{active=false;};}, [needsDiagram,diagram,onError]);
   const plugins = useMemo(() => ({...basePlugins, mermaid: diagram}), [diagram]);
   const dark = useSyncExternalStore(subscribeTheme, readTheme);
-  const limited = content.length > 200000 && !expanded;
+  const limited = content.length > 200000 && !expanded && !forceFull;
   const visible = limited ? content.slice(0,24000) : content;
   const headingSource = streaming ? '' : visible;
   const components = useMemo<Components>(() => {
@@ -51,12 +51,12 @@ export const Document = memo(function Document({content, onError, onNavigate, re
     return {
     // Static documents retain line-based outline IDs; streaming blocks have local positions.
     ...(!streaming ? {h1: heading(1), h2: heading(2), h3: heading(3), h4: heading(4), h5: heading(5), h6: heading(6)} : {}),
-    a: props => <DocumentLink {...props} onNavigate={onNavigate} onError={onError}/>,
+    a: props => <DocumentLink {...props} onNavigate={onNavigate} onAnchor={onAnchor} onError={onError}/>,
     // Streamdown's image wrapper is a div, including for images mixed with text.
     // Keep that content out of a p so the resulting DOM remains valid.
     p: props => containsImage(props.node) ? <div className="markdown-image-paragraph">{props.children}</div> : <DefaultParagraph {...props}/>,
     img: ({alt, src}) => <LocalImage src={src} alt={alt} resolve={resolveImage} onImage={onImage}/>,
-  };}, [headingSource, streaming, onNavigate, onError, resolveImage, onImage]);
+  };}, [headingSource, streaming, onNavigate, onAnchor, onError, resolveImage, onImage]);
   const mermaid = useMemo(() => ({config: {theme: dark ? 'dark' : 'neutral', fontFamily: 'Source Han Sans SC, Microsoft YaHei, sans-serif', securityLevel: 'strict', htmlLabels: false}, errorComponent: DiagramError}), [dark]);
   const controls = useMemo(() => ({code: {copy: {onError}, download: false}, mermaid: {copy: {onError}, download: true, fullscreen: true, panZoom: true}, table: {copy: true, fullscreen: true, download: true}, image: false}), [onError]);
   return <div className="markdown markdown-engine" data-markdown-streaming={streaming || undefined}>
@@ -67,13 +67,13 @@ export const Document = memo(function Document({content, onError, onNavigate, re
 function containsImage(node: {type: string; tagName?: string; children?: readonly unknown[]} | undefined): boolean {
   return !!node && (node.tagName === 'img' || !!node.children?.some(child => containsImage(child as typeof node)));
 }
-function DocumentLink({href, children, id, title, onNavigate, onError, ...props}: Omit<ComponentProps<'a'>, 'onError'> & {onNavigate?: DocumentMedia['onNavigate']; onError: (error: unknown) => void}) {
+function DocumentLink({href, children, id, title, onNavigate, onAnchor, onError, ...props}: Omit<ComponentProps<'a'>, 'onError'> & {onNavigate?: DocumentMedia['onNavigate']; onAnchor?:DocumentMedia['onAnchor']; onError: (error: unknown) => void}) {
   const [busy, setBusy] = useState(false);
   return <a href={href} id={id} title={title} aria-label={props['aria-label']} aria-busy={busy || undefined} onClick={async event => {
     event.preventDefault(); if (!href || busy) return;
     const element = event.currentTarget;
     try {
-      if (href.startsWith('#')) element.closest('.markdown')?.querySelector(`[id="${CSS.escape(decodeURIComponent(href.slice(1)))}"]`)?.scrollIntoView({block: 'start'});
+      if (href.startsWith('#')) {const anchor=decodeURIComponent(href.slice(1));if(onAnchor)onAnchor(anchor);else {const target=element.closest('.markdown')?.querySelector(`[id="${CSS.escape(anchor)}"]`);if(!target)throw Error('文档中没有找到链接指向的章节');target.scrollIntoView({block:'start'});}}
       else if (/^https?:\/\//i.test(href)) await api.openExternal(href);
       else if (isWorkspaceReference(href) && onNavigate) {setBusy(true); await onNavigate(href);}
       else throw Error('此链接无法在当前文档中打开。');

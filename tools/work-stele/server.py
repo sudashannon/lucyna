@@ -10,6 +10,7 @@ import hmac
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 import sys
@@ -23,7 +24,9 @@ from runtime_config import load_runtime
 
 STELE_URL = "http://127.0.0.1:18989/mcp"
 _options = argparse.ArgumentParser(add_help=False)
-_options.add_argument('--knowledge-client')
+_managed = _options.add_mutually_exclusive_group()
+_managed.add_argument('--knowledge-client')
+_managed.add_argument('--knowledge-manifest')
 _options.add_argument('--knowledge-data')
 KNOWLEDGE_OPTIONS, _ = _options.parse_known_args()
 RUNTIME = load_runtime()
@@ -56,6 +59,7 @@ WRITE_TOOLS = {
     "library_write",
     "todo_create",
     "todo_update",
+    "todo_delete",
     "todo_sync_omp",
     "wiki_claim_upsert",
     "wiki_review_action",
@@ -173,10 +177,21 @@ def _stele_request(method, params=None, write=False):
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-8")
-    if KNOWLEDGE_OPTIONS.knowledge_client:
+    if KNOWLEDGE_OPTIONS.knowledge_client or KNOWLEDGE_OPTIONS.knowledge_manifest:
         if not KNOWLEDGE_OPTIONS.knowledge_data:
             raise BridgeError('Managed knowledge profile is missing')
-        command = [KNOWLEDGE_OPTIONS.knowledge_client, '--lucyna-mcp', '--knowledge-data', KNOWLEDGE_OPTIONS.knowledge_data, '--once']
+        client = KNOWLEDGE_OPTIONS.knowledge_client
+        if KNOWLEDGE_OPTIONS.knowledge_manifest:
+            try:
+                manifest = Path(KNOWLEDGE_OPTIONS.knowledge_manifest)
+                config = json.loads(manifest.read_text(encoding='utf-8'))
+                binary = config.get('binary')
+                if not isinstance(binary, str) or not re.fullmatch(r'stele-[a-f0-9]{16}\.exe', binary, re.IGNORECASE):
+                    raise ValueError('invalid binary name')
+                client = str(manifest.parent / binary)
+            except (OSError, ValueError, AttributeError):
+                raise BridgeError('Lucyna managed knowledge engine manifest is unavailable or invalid') from None
+        command = [client, '--lucyna-mcp', '--knowledge-data', KNOWLEDGE_OPTIONS.knowledge_data, '--once']
         if write:
             command.append('--write')
         try:
@@ -282,7 +297,9 @@ def _load_skill(section):
 
 
 def _listed_stele_tools():
-    result = _stele_request("tools/list")
+    # Managed native clients expose the full catalogue only with --write.
+    # Listing does not write; each subsequent call still uses the per-tool mode.
+    result = _stele_request("tools/list", write=bool(KNOWLEDGE_OPTIONS.knowledge_client or KNOWLEDGE_OPTIONS.knowledge_manifest))
     tools = result.get("tools") if isinstance(result, dict) else None
     if not isinstance(tools, list):
         raise BridgeError("Stele MCP tool catalogue is invalid")
@@ -403,7 +420,8 @@ def _handle(request):
                 "serverInfo": {"name": "work-stele", "version": "0.1.0"},
                 "instructions": (
                     "Use work_skill before worktree-session operations. Work tools are read-only. "
-                    "Stele writes use the existing WSL-local token and must follow work skill evidence/approval rules."
+                    + ("Knowledge calls use Lucyna's managed internal library. " if (KNOWLEDGE_OPTIONS.knowledge_client or KNOWLEDGE_OPTIONS.knowledge_manifest) else "Stele writes use the existing WSL-local token. ")
+                    + "Follow the work skill evidence and approval rules."
                 ),
             },
         )

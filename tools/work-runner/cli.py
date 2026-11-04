@@ -101,7 +101,9 @@ def install(config):
     previous_config = json.loads(config_file.read_text()) if config_file.exists() else None
     changed = old != content or previous_config != config
     active = control('is-active', UNIT).returncode == 0
-    if changed and any(run['state'] not in ('completed', 'cancelled', 'failed') for run in inspect(directory)):
+    # A completed execution awaiting the user's review has no process to stop;
+    # its durable candidate and review state survive a service restart.
+    if changed and any(run['state'] != 'waiting_review' or run.get('process') for run in inspect(directory)):
         raise ValueError('存在未结束任务，先暂停并取消或完成后才能升级后台服务')
     if changed and active and preparing(directory):
         raise ValueError('正在准备 Work 评测，请等待完成或暂停准备后再升级后台服务')

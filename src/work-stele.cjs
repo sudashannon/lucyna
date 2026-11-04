@@ -124,12 +124,23 @@ function mergeWorkSteleMcpConfig(config, serverDefinition) {
     previousStele !== undefined &&
     !jsonEqual(previousStele, LEGACY_STELE_HTTP) &&
     !jsonEqual(previousStele, workSteleServerDefinition()) &&
-    !jsonEqual(previousStele, serverDefinition)
+    !jsonEqual(previousStele, serverDefinition) &&
+    !isManagedEngineUpgrade(previousStele,serverDefinition)
   ) {
     throw new Error('An existing Stele MCP config differs from the known entry and was preserved');
   }
   merged.mcpServers = { ...(existing || {}), [SERVER_NAME]: serverDefinition };
   return merged;
+}
+
+// A Lucyna build changes the content-addressed engine executable. Upgrade only
+// the managed bridge with the same arguments, knowledge profile and engine dir.
+function isManagedEngineUpgrade(previous,next){
+ if(!previous||!next||previous.type!=='stdio'||next.type!=='stdio'||previous.command!=='wsl.exe'||next.command!=='wsl.exe'||!Array.isArray(previous.args)||!Array.isArray(next.args)||previous.args.length!==next.args.length)return false;
+ if(Object.keys(previous).some(k=>!['type','command','args'].includes(k)))return false;
+ const i=next.args.indexOf('--knowledge-client');if(i<0||previous.args.indexOf('--knowledge-client')!==i||next.args.indexOf('--knowledge-data')<0)return false;
+ const a=previous.args[i+1],b=next.args[i+1];if(typeof a!=='string'||typeof b!=='string'||!/^stele-[a-f0-9]{16}\.exe$/i.test(path.posix.basename(a))||!/^stele-[a-f0-9]{16}\.exe$/i.test(path.posix.basename(b))||path.posix.dirname(a)!==path.posix.dirname(b))return false;
+ return previous.args.every((value,index)=>index===i+1||value===next.args[index]);
 }
 
 async function installWorkSteleMcp(agentDir, options = {}) {

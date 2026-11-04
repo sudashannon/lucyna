@@ -8,7 +8,7 @@ const local=JSON.parse(fs.readFileSync(process.env.LUCYNA_CONFIG||'runtime.local
 const prefix=['-d',local.distro,'-u',local.user,'--exec'];
 const temp=execFileSync('wsl.exe',[...prefix,'mktemp','-d','/tmp/lucyna-create-work.XXXXXXXX'],{encoding:'utf8'}).trim();
 assert.match(temp,/^\/tmp\/lucyna-create-work\.[A-Za-z0-9]+$/);
-const base=temp+'/develop',root=base+'/first-work',agent=temp+'/agent';
+const base=temp+'/develop',root=base+'/first-work-long-workspace-name',agent=temp+'/agent';
 const out=path.resolve('.runtime/work-creation-desktop-'+Date.now()),profile=path.join(out,'profile');
 fs.mkdirSync(profile,{recursive:true});
 process.env.LUCYNA_USERDATA=profile;
@@ -127,11 +127,11 @@ function cleanup(){
 app.whenReady().then(async()=>{
   const timer=setTimeout(()=>app.exit(2),100000);
   try{
-    await until('Array.from(document.querySelectorAll(".work-section-actions button")).some(button=>button.textContent.trim()==="新建 Work"&&!button.disabled)');
+    await until('document.querySelector(".new-work") && !document.querySelector(".new-work").disabled');
     assert.equal(await js('document.querySelectorAll(".work-row").length'),0);
     assert.equal(await js('document.querySelectorAll(".notice[role=alert]").length'),0);
     assert.equal(fs.existsSync(native(base)),false);
-    await press('.work-section-actions button','新建 Work');
+    await press('.work-sidebar-content>.nav-action','新建 Work');
     await until('document.querySelector(".work-creation-field textarea")');
     await js('document.querySelector(".work-creation-field textarea").focus()');
     await win.webContents.insertText('验证空工作区建根');
@@ -142,7 +142,7 @@ app.whenReady().then(async()=>{
     assert.equal(fs.existsSync(native(root)),false);
     assert.equal(calls.filter(call=>call.type==='prompt').length,1);
     await press('.modal-actions button','确认');
-    await until('document.querySelector(".work-row[aria-current=page]")?.textContent.includes("first-work")');
+    await until('document.querySelector(".work-row[aria-current=page]")?.textContent.includes("first-work") && !document.querySelector("#message-input").disabled');
     assert.equal(await js('document.querySelector(".app-shell").dataset.sessionId'),id);
     assert.equal(await js('document.querySelector("#message-input").disabled'),false);
     assert.ok(await js('document.querySelector(".transcript")?.textContent.includes("Work 已校验")'));
@@ -151,13 +151,70 @@ app.whenReady().then(async()=>{
     await until('document.querySelector(".work-row[aria-current=page]")?.textContent.includes("first-work") && document.querySelector(".transcript")?.textContent.includes("Work 已校验")');
     assert.equal(await js('document.querySelector(".app-shell").dataset.sessionId'),id);
     assert.deepEqual(calls.map(call=>call.message||call.type),['start','/work-start 验证空工作区建根','/move '+root]);
+    // A new conversation belongs to the selected Work and leaves its existing draft intact.
+    assert.equal(await js('document.querySelectorAll(".work-new-session").length'),1);
+    assert.ok(await js('document.querySelector(".work-new-session").getAttribute("aria-label").includes("first-work")'));
+    assert.equal(await js('document.querySelector(".work-new-session").parentElement.closest("button")'),null);
+    await js('document.querySelector("#message-input").focus()');
+    await win.webContents.insertText('保留在原会话的草稿');
+    await until('!document.querySelector(".work-new-session").disabled');
+    await js('document.querySelector(".work-new-session").focus()');
+    assert.equal(await js('document.activeElement.className'),'work-new-session');
+    win.webContents.sendInputEvent({type:'keyDown',keyCode:'Enter'});
+    win.webContents.sendInputEvent({type:'char',keyCode:'\r'});
+    win.webContents.sendInputEvent({type:'keyUp',keyCode:'Enter'});
+    await until(`document.querySelector('.app-shell').dataset.sessionId!==${JSON.stringify(id)}`);
+    const newId=await js('document.querySelector(".app-shell").dataset.sessionId');
+    assert.equal(await js('document.querySelector("#message-input").value'),'');
+    assert.ok(await js('document.querySelector(".work-row[aria-current=page]").textContent.includes("first-work")'));
+    await js('document.querySelector("#message-input").focus()');
+    await win.webContents.insertText('新会话的独立草稿');
+    await js(`document.querySelector('.session-select[data-session="${id}"]').click()`);
+    await until('document.querySelector("#message-input").value==="保留在原会话的草稿"');
+    await js(`document.querySelector('.session-select[data-session="${newId}"]').click()`);
+    await until('document.querySelector("#message-input").value==="新会话的独立草稿"');
+    const chooseTheme=async value=>{
+      await js(`(()=>{const e=document.querySelector('select[aria-label="视觉主题"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+      await until(`document.documentElement.dataset.visualTheme===${JSON.stringify(value)}`);
+    };
+    for(const visualTheme of ['blue','classic','folio','pixel']){
+      await chooseTheme(visualTheme);
+      for(const appearance of ['light','dark']){
+        if(await js('document.documentElement.dataset.theme')!==appearance)await js(`Array.from(document.querySelectorAll('button[aria-label="切换${appearance==='dark'?'深色':'浅色'}外观"]')).find(button=>button.getClientRects().length).click()`);
+        await until(`document.documentElement.dataset.theme===${JSON.stringify(appearance)}`);
+        assert.ok(await js('document.querySelector(".new-work").getClientRects().length>0'));
+        assert.ok(await js('document.querySelector(".work-new-session").getClientRects().length>0'));
+        await capture('work-actions-'+visualTheme+'-'+appearance);
+      }
+      win.setContentSize(640,760);
+      await until('Math.abs(innerWidth-640)<=2');
+      for(const label of ['新建 Work','新会话'])assert.ok(await js(`Array.from(document.querySelectorAll('button[aria-label="${label}"]')).some(button=>button.getClientRects().length)`));
+      await capture('work-actions-'+visualTheme+'-narrow');
+      win.setContentSize(1440,900);
+      await until('Math.abs(innerWidth-1440)<=2');
+    }
+    await chooseTheme('blue');
+    win.setContentSize(1800,1000);
+    await until('Math.abs(innerWidth-1800)<=2');
+    await js(`document.querySelector('button[aria-label="切换浅色外观"]').click()`);
+    await js(`document.querySelector('[aria-label="调整左侧栏宽度"]').dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}))`);
+    await until('getComputedStyle(document.querySelector(".work-new-session span")).display!=="none"');
+    assert.ok(await js('document.querySelector(".work-row.selected").getBoundingClientRect().right<=document.querySelector(".work-new-session").getBoundingClientRect().left+1'));
+    await capture('work-actions-blue-wide');
+    await js(`document.querySelector('button[aria-label="收起侧栏 · Ctrl B"]').click()`);
+    await until('document.querySelector(".app-shell.rail-mode")');
+    for(const label of ['新建 Work','新会话'])assert.ok(await js(`Array.from(document.querySelectorAll('button[aria-label="${label}"]')).some(button=>button.getClientRects().length)`));
+    await capture('work-actions-blue-collapsed');
+    await js(`document.querySelector('button[aria-label="展开侧栏 · Ctrl B"]').click()`);
+    await until('!document.querySelector(".app-shell.rail-mode")');
     win.setContentSize(640,760);
     await until('Math.abs(innerWidth-640)<=2 && document.querySelector("button[aria-label=\\\"新建 Work\\\"]")');
+    assert.ok(await js(`Array.from(document.querySelectorAll('button[aria-label="新会话"]')).some(button=>button.getClientRects().length)`));
     await js(`Array.from(document.querySelectorAll('button[aria-label="切换深色外观"]')).find(button=>button.getClientRects().length).click()`);
-    await js(`document.querySelector('button[aria-label="新建 Work"]').click()`);
+    await js(`Array.from(document.querySelectorAll('button[aria-label="新建 Work"]')).find(button=>button.getClientRects().length).click()`);
     await until('document.querySelector(".work-creation-field textarea") && document.documentElement.dataset.theme==="dark"');
     await capture('new-work-narrow-dark');
-    console.log('PASS empty WSL root, explicit approval, same-session handoff and renderer reload',out);
+    console.log('PASS empty WSL root, approval, same-session handoff, reload, scoped new conversation, retained draft and four themes',out);
     clearTimeout(timer);cleanup();app.exit(0);
   }catch(error){console.error(error);await capture('failure').catch(()=>{});clearTimeout(timer);try{cleanup();}catch(e){console.error(e.message);}app.exit(1);}
 });

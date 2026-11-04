@@ -3,7 +3,15 @@
 .terminal-panel[hidden], .session-preview[hidden] { display: none !important; }
 .session-preview { min-height: 0; display: flex; flex-direction: column; flex: 1; }
 .work-group { flex-shrink: 0; min-width: 0; }
-.work-group>.work-row { width: 100%; }
+.work-group { container: work-actions / inline-size; }
+.work-row-actions { display: flex; align-items: center; min-width: 0; border-radius: 8px; }
+.work-row-actions.selected { background: var(--sidebar-selection); }
+.work-row-actions>.work-row { flex: 1; width: 0; }
+.work-new-session { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: var(--space-1); margin-right: var(--space-1); padding: var(--space-2); min-height: 32px; border-radius: 6px; font-size: var(--font-size-caption); color: var(--text-primary); white-space: nowrap; }
+.work-new-session:enabled:hover { background: var(--sidebar-hover); }
+@container work-actions (max-width: 280px) {
+  .work-new-session span { display: none; }
+}
 .open-sessions { margin: 3px 0 7px 21px; border-left: 1px solid var(--soft-border); padding-left: 6px; }
 .open-sessions:empty { display: none; }
 .open-session { display: flex; align-items: center; min-width: 0; border-radius: 7px; }

@@ -111,7 +111,7 @@ func runLucynaMCP() int {
 		}
 	}()
 	readonly := map[string]bool{}
-	for _, name := range strings.Fields("work_material_list work_material_read wiki_search wiki_read wiki_component wiki_neighbors wiki_context wiki_sessions wiki_lint wiki_overview wiki_claim_search wiki_claim_get wiki_claims wiki_review_list todo_list library_list library_documents library_read library_history") {
+	for _, name := range strings.Fields("work_material_list work_material_read wiki_search wiki_read wiki_component wiki_neighbors wiki_context wiki_sessions wiki_lint wiki_overview wiki_claim_search wiki_claim_get wiki_claims wiki_review_list wiki_candidate_list todo_list library_list library_documents library_read library_history") {
 		readonly[name] = true
 	}
 	scanner := bufio.NewScanner(os.Stdin)

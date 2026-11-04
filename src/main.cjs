@@ -50,6 +50,7 @@ const sessionTitles=new SessionTitles(auxiliaryAgent,auxiliarySettings);
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const historyTrash = new HistoryTrash(app.getPath('userData'));
 const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get(),auxiliary:()=>auxiliarySettings.resolve()});
+const consolidation=new (require('./knowledge-consolidation-client.cjs').ConsolidationClient)({knowledge,listWorks,wslUnc,auxiliary:()=>auxiliarySettings.resolve(),busy:root=>workRunner.admissions.has(root)||(sessions?.list()||[]).some(c=>c.root===root&&(!c.ready||c.questions?.length||(workRunner.activity.get(c.id)??c.busy)))});
 const {WorkCreation}=require('./work-creation.cjs');
 const {boundedExec}=require('./bounded-exec.cjs');
 const workCreation = new WorkCreation({
@@ -101,6 +102,7 @@ app.whenReady().then(async () => {
     await nativeWslHistory.remember(record);
   }, send: e => { workRunner.observe(e);pet?.ingest(e); if (window && !window.isDestroyed()) window.webContents.send('omp:event', e); }});
   workRunner.startAutomatic();
+  consolidation.start();
   pet=new PetController({directory:app.getPath('userData'),getMain:()=>window,getSessions:()=>sessions,onQuit:()=>app.quit(),onState:snapshot=>feedback?.observe(snapshot)});
   await pet.init().catch(error=>{console.error('Desktop companion:',error.message);});
   feedback=new FeedbackController({directory:app.getPath('userData'),getMain:()=>window,onChange:settings=>{pet.feedbackReducedMotion=settings.reducedMotion;pet.schedule();}});
@@ -173,7 +175,7 @@ app.whenReady().then(async () => {
   });
   handle('work:read', async (root,hostId) => { if(hostId)return remote.readWork(root,hostId);const works = await listWorks(); requireWorkRoot(works,root); return (await readBounded(path.join(wslUnc(root), 'SESSION.md'), 512 * 1024, 'SESSION.md')).toString('utf8'); });
   handle('stele:context', async query => { if (typeof query !== 'string' || !query.trim() || query.length > 2000) throw new Error('请输入查询内容');const response=await knowledge.runtime.call('/mcp',{method:'POST',body:{jsonrpc:'2.0',id:require('node:crypto').randomUUID(),method:'tools/call',params:{name:'wiki_context',arguments:{query:query.trim()}}}});if(response.error||response.result?.isError)throw Error(response.error?.message||'知识上下文读取失败');return response.result; });
-  handle('stele:knowledge', (kind,args) => knowledge(kind,args,event=>{if(window&&!window.isDestroyed())window.webContents.send('stele:knowledge-event',{requestId:args?.requestId,event});}));
+  handle('stele:knowledge', (kind,args) => kind.startsWith('consolidation')?consolidation.call(kind,args):knowledge(kind,args,event=>{if(window&&!window.isDestroyed())window.webContents.send('stele:knowledge-event',{requestId:args?.requestId,event});}));
   handle('stele:save-file', async (name,bytes) => {
     if(typeof name!=='string'||name.length>255||!(bytes instanceof Uint8Array)||bytes.length>64*1024*1024)throw Error('无效的知识导出内容');
     const result=await dialog.showSaveDialog(window,{defaultPath:path.basename(name)});
@@ -382,6 +384,6 @@ let quitting=false;
 app.on('before-quit', event => {
   if(quitting)return;
   event.preventDefault();quitting=true;feedback?.dispose();pet?.dispose();terminal?.dispose();
-  void Promise.allSettled([sessions?.closeAll(),remote?.shutdown()]).finally(async()=>{await workRunner.stopAutomatic();app.quit();});
+  void Promise.allSettled([sessions?.closeAll(),remote?.shutdown()]).finally(async()=>{await consolidation.stop();await workRunner.stopAutomatic();app.quit();});
 });
 app.on('before-quit', () => terminal?.dispose());

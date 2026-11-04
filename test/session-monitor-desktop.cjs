@@ -25,7 +25,16 @@ app.whenReady().then(async()=>{const timer=setTimeout(()=>app.exit(2),90000);try
  await win.loadFile(path.resolve('dist/renderer/index.html'));await until('document.querySelectorAll(".open-session").length===6','reattach all six connections');
  // Offscreen fixtures emulate focus explicitly; no activation of the user's desktop.
  await js('document.hasFocus=()=>true;window.dispatchEvent(new Event("focus"))');await click('.work-row');await until('document.querySelector(".breadcrumb").textContent.includes("未读结果验收")','work');
- await input('#message-input','未发送草稿，保持原样');await click('button[aria-label="打开活跃会话"]');await until('document.querySelectorAll(".monitor-session").length===6','monitor');
+ await input('#message-input','未发送草稿，保持原样');
+ assert.deepEqual(await js('[...document.querySelectorAll(".primary-switcher [role=tab]")].map(tab=>tab.id)'),['primary-tab-workbench','primary-tab-knowledge']);
+ await js('document.querySelector("#workspace-tab-chat").focus()');
+ win.webContents.sendInputEvent({type:'keyDown',keyCode:'End'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'End'});
+ await until('document.querySelector("#workspace-tab-sessions").getAttribute("aria-selected")==="true"','Workbench keyboard navigation');
+ assert.equal(await js('document.activeElement.id'),'workspace-tab-sessions');
+ assert.ok(await js('document.querySelector("#primary-tab-workbench").getAttribute("aria-selected")==="true"&&document.querySelector("#primary-panel-workbench > #workspace-content-sessions[aria-labelledby=workspace-tab-sessions]")&&!document.querySelector("#primary-panel-workbench").hidden&&document.querySelector("#tools-panel").hidden'));
+ assert.equal(await js('document.querySelector("#workspace-tab-sessions .workspace-tab-count").textContent'),'6');
+ await until('document.querySelectorAll(".monitor-session").length===6','monitor');
+ checks.push('Sessions is the third Workbench tab, with a linked panel, live count and keyboard focus.');
  await click('#monitor-tab-completedUnread');await until('document.querySelector(".monitor-empty h2").textContent.includes("没有已完成未读")','initial empty state');
  await finish('older');await finish('newer');await finish('stopped','aborted');await finish('failed','error');await finish('selected','completed',true);
  await until('document.querySelector("#monitor-tab-completedUnread span").textContent==="2"','only settled successes');
@@ -41,13 +50,18 @@ app.whenReady().then(async()=>{const timer=setTimeout(()=>app.exit(2),90000);try
  assert.equal(await js('document.querySelector("#monitor-tab-completedUnread").getAttribute("aria-selected")'),'true');
  checks.push('Searching and changing filters preserve unread; opening a result clears only that result and preserves its draft.');
  // A foreground chat becomes unread when it finishes while the window is blurred.
- await click('button[aria-label="打开工作台"]');settled.delete('selected');emit('selected','agent_start');await pause(80);await js('document.hasFocus=()=>false;window.dispatchEvent(new Event("blur"))');await finish('selected');
+ await click('#workspace-tab-chat');settled.delete('selected');emit('selected','agent_start');await pause(80);await js('document.hasFocus=()=>false;window.dispatchEvent(new Event("blur"))');await finish('selected');
  await click('button[aria-label="打开活跃会话"]');await js('document.hasFocus=()=>true;window.dispatchEvent(new Event("focus"))');await until('document.querySelector("#monitor-tab-completedUnread span").textContent==="3"','blurred result stays unread on monitor focus');
  await click('[data-monitor-session="selected"] .monitor-session-heading button');await click('button[aria-label="打开活跃会话"]');await until('document.querySelector("#monitor-tab-completedUnread span").textContent==="2"','open after focus marks read');
  checks.push('Window blur preserves unread; returning focus to the monitor does not consume results.');
  // Keyboard tabs and narrow layout remain usable.
  await js('document.querySelector("#monitor-tab-completedUnread").dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true}))');await until('document.querySelector("#monitor-tab-attention").getAttribute("aria-selected")==="true"','keyboard tab');
  await click('#monitor-tab-completedUnread');await click('button[aria-label="切换深色外观"]');win.setSize(760,760);await pause(200);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));await shot('completed-unread-narrow-dark');
+ win.setContentSize(390,700);await pause(150);
+ assert.ok(await js('document.documentElement.scrollWidth<=innerWidth&&document.querySelector(".monitor-list").clientHeight>100'));
+ assert.ok(await js('document.querySelector(".workspace-content-tabs").scrollWidth<=document.querySelector(".workspace-content-tabs").clientWidth'));
+ assert.ok(await js('document.querySelector(".monitor-session-main").clientWidth>=150'),'session titles get the row width before actions wrap');
+ await shot('completed-unread-compact');
  // Existing stop stays scoped to the one running native connection.
  await click('#monitor-tab-running');await js('[...document.querySelectorAll(".monitor-actions button")].find(el=>el.textContent==="停止").click()');await until('document.querySelector("#monitor-tab-running span").textContent==="0"','scoped stop');
  assert.deepEqual(calls.filter(c=>c.type==='abort_and_restore_queue'),[{type:'abort_and_restore_queue',id:'running'}]);assert.equal(calls.filter(c=>c.type==='close').length,0);

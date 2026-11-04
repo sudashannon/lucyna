@@ -1,26 +1,23 @@
-import {Activity, BookOpen, PanelsTopLeft} from 'lucide-react';
+import {BookOpen, PanelsTopLeft} from 'lucide-react';
 import '../primary-navigation.css';
 
-export type Section = 'workbench' | 'knowledge' | 'sessions';
+export type Section = 'workbench' | 'knowledge';
 const sections = [
   {id: 'workbench', label: '工作台', icon: PanelsTopLeft},
   {id: 'knowledge', label: '知识库', icon: BookOpen},
-  {id: 'sessions', label: '活跃会话', icon: Activity},
 ] as const;
 
-export function PrimaryNavigation({section, expanded, vertical = false, count, onChange}: {
+export function PrimaryNavigation({section, expanded, vertical = false, onChange}: {
   section: Section;
   expanded: boolean;
   vertical?: boolean;
-  count: number;
   onChange: (section: Section) => void;
 }) {
   return <nav className={`primary-switcher ${expanded ? '' : 'is-compact'} ${vertical ? 'is-vertical' : ''}`} role="tablist" aria-label="主要功能" aria-orientation={expanded && !vertical ? 'horizontal' : 'vertical'}>
     {sections.map(({id, label, icon: Icon}, index) => {
-      const description = id === 'sessions' && count > 0 ? `${count} 个连接` : undefined;
       return <button key={id} id={`primary-tab-${id}`} role="tab" aria-controls={`primary-panel-${id}`} tabIndex={section === id ? 0 : -1}
-        aria-label={`打开${label}`} aria-description={description} aria-selected={section === id}
-        title={description ? `${label} · ${description}` : label}
+        aria-label={`打开${label}`} aria-selected={section === id}
+        title={label}
         onClick={() => onChange(id)}
         onKeyDown={event => {
           if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
@@ -30,8 +27,7 @@ export function PrimaryNavigation({section, expanded, vertical = false, count, o
           onChange(sections[next].id);
           (event.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();
         }}>
-        {expanded ? <>{vertical && <Icon size={19}/>}<span>{label}</span></> : <><Icon size={18}/><span className="primary-compact-label">{id === 'sessions' ? '会话' : label}</span></>}
-        {id === 'sessions' && count > 0 && <span className="primary-count" aria-hidden="true">{count > 99 ? '99+' : count}</span>}
+        {expanded ? <>{vertical && <Icon size={19}/>}<span>{label}</span></> : <><Icon size={18}/><span className="primary-compact-label">{label}</span></>}
       </button>;
     })}
   </nav>;

@@ -43,6 +43,14 @@ test('merges the bridge into each OMP agent config while retaining other servers
   assert.equal(merged.mcpServers.stele.type, 'stdio');
 });
 
+test('managed bridge upgrades only the engine binary while preserving other settings',()=>{
+ const prior={type:'stdio',command:'wsl.exe',args:['-d','Ubuntu-22.04','--','python3','/mnt/c/app/server.py','--knowledge-client','/mnt/c/app/stele-1111111111111111.exe','--knowledge-data','C:/user/knowledge']};
+ const next={...prior,args:prior.args.map(x=>x.includes('stele-1111')?'/mnt/c/app/stele-2222222222222222.exe':x)};
+ assert.deepEqual(mergeWorkSteleMcpConfig({mcpServers:{stele:prior,other:{type:'http'}}},next).mcpServers.stele,next);
+ const changed={...prior,args:prior.args.map(x=>x==='C:/user/knowledge'?'C:/other/knowledge':x)};
+ assert.throws(()=>mergeWorkSteleMcpConfig({mcpServers:{stele:changed}},next),/preserved/);
+});
+
 test('points native OMP skill discovery at the WSL skills directory without copying it', () => {
   const directory = workSkillDirectory();
   assert.equal(directory, '\\\\wsl.localhost\\Ubuntu-22.04\\home\\user\\.agents\\skills');

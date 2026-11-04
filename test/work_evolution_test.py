@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from types import SimpleNamespace
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools/work-runner'))
@@ -57,8 +58,23 @@ class Evolution(unittest.TestCase):
         self.assertEqual(skill_tool(config,'list_work_skills',{})['skills'][0]['name'],'example')
         self.assertIn('deterministic',skill_tool(config,'read_work_skill',{'skill':'example'})['content'])
         with self.assertRaises(ValueError):skill_tool(config,'read_work_skill',{'skill':'example','path':'../../../outside'})
-        with self.assertRaises(ValueError):knowledge({'name':'wiki_claim_upsert'})
+        with self.assertRaises(ValueError):knowledge({'name':'wiki_claim_upsert'}, config)
         self.assertEqual(search(self.run,{'query':'VALUE'})['matches'][0]['path'],'workflow.py')
+
+    def test_internal_knowledge_bridge_filters_writes_and_rejects_legacy(self):
+        agent=self.base/'agent';agent.mkdir()
+        entry={'type':'stdio','command':'python3','args':['/bridge.py','--knowledge-manifest','/manifest.json','--knowledge-data','C:/knowledge']}
+        (agent/'mcp.json').write_text(json.dumps({'mcpServers':{'stele':entry}}))
+        def run(argv, **kwargs):
+            request=json.loads(kwargs['input'])
+            self.assertEqual(argv[0],'/usr/bin/python3')
+            return SimpleNamespace(stdout=json.dumps({'id':request['id'],'result':{'tools':[{'name':'wiki_search'},{'name':'library_write'}]}}).encode())
+        with patch('capabilities.subprocess.run', side_effect=run):
+            result=knowledge({'name':'list'},{'agentDir':str(agent)})
+        self.assertEqual([item['name'] for item in result['tools']],['wiki_search'])
+        entry.update(type='http',url='http://127.0.0.1:18989/mcp')
+        (agent/'mcp.json').write_text(json.dumps({'mcpServers':{'stele':entry}}))
+        with self.assertRaises(ValueError):knowledge({'name':'list'},{'agentDir':str(agent)})
 
     def promotion_fixture(self):
         directory=self.base/'state';folder=directory/'runs/run/evolution';(folder/'initial').mkdir(parents=True)

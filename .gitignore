@@ -51,6 +51,7 @@ docs/*
 !docs/stele-integration-design.md
 !docs/knowledge-managed-engine.md
 !docs/work-evolution-preparation.md
+!docs/knowledge-consolidation.md
 !docs/design/
 docs/design/*
 !docs/design/git-workspace/
@@ -115,6 +116,8 @@ test/*
 !test/knowledge-managed-native.cjs
 !test/knowledge-managed-desktop.cjs
 !test/work-knowledge-desktop.cjs
+!test/knowledge-consolidation-native.cjs
+!test/knowledge-consolidation-desktop.cjs
 !test/memory-markdown-desktop.cjs
 
 # Superseded local harness and unused intermediate artwork.

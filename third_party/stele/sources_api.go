@@ -210,7 +210,7 @@ func (a *SourceAPI) handleCapture(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, "could not allocate source id", http.StatusInternalServerError)
 		return
 	}
-	rel := filepath.ToSlash(filepath.Join("knowledge", "sources", id+".md"))
+	rel := filepath.ToSlash(filepath.Join(sourceKnowledgeDir(), "sources", id+".md"))
 	root, err := filepath.EvalSymlinks(sourceRoot(ws))
 	if err != nil {
 		writeJSONError(w, "workspace source root is unavailable", http.StatusInternalServerError)
@@ -415,8 +415,9 @@ func privateSourceDir(root, alias string) (string, error) {
 	}
 	return filepath.Join(filepath.Clean(root), "sources", privateWorkspaceKey(alias)), nil
 }
+func sourceKnowledgeDir() string { if managed.Unified() { return "知识" }; return "knowledge" }
 func (a *SourceAPI) sourceFile(ws WorkspaceConfig, id string) (string, error) {
-	rel := filepath.ToSlash(filepath.Join("knowledge", "sources", id+".md"))
+	rel := filepath.ToSlash(filepath.Join(sourceKnowledgeDir(), "sources", id+".md"))
 	p, e := safeSourcePath(sourceRoot(ws), rel)
 	if e != nil {
 		return "", e
@@ -451,7 +452,7 @@ func (a *SourceAPI) list(alias string) ([]capturedSource, error) {
 		return nil, os.ErrNotExist
 	}
 	root := sourceRoot(ws)
-	dir, e := safeSourcePath(root, filepath.Join("knowledge", "sources"))
+	dir, e := safeSourcePath(root, filepath.ToSlash(filepath.Join(sourceKnowledgeDir(), "sources")))
 	if e != nil {
 		return nil, e
 	}
@@ -467,7 +468,7 @@ func (a *SourceAPI) list(alias string) ([]capturedSource, error) {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md.json") {
 			continue
 		}
-		metaPath, e := safeSourcePath(root, filepath.ToSlash(filepath.Join("knowledge", "sources", entry.Name())))
+		metaPath, e := safeSourcePath(root, filepath.ToSlash(filepath.Join(sourceKnowledgeDir(), "sources", entry.Name())))
 		if e != nil {
 			continue
 		}

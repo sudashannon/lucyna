@@ -29,7 +29,7 @@ app.whenReady().then(async()=>{
     assert.ok(await js('document.querySelector(".knowledge-reader .markdown-engine").textContent.length>0'),'real document body');
     await shot('live-library-sidebar');
     const selected=await js('document.querySelector(".knowledge-row.selected").title');
-    await aria('打开活跃会话');assert.equal(await js('document.querySelector(".knowledge-sidebar-slot").getClientRects().length'),0);
+    await aria('打开工作台');await aria('打开活跃会话');assert.equal(await js('document.querySelector(".knowledge-sidebar-slot").getClientRects().length'),0);
     await aria('打开知识库');assert.equal(await js('document.querySelector(".knowledge-row.selected").title'),selected);
     console.log('live library sidebar and retained document: passed');
     await click('探索');await click('知识图谱');await until('document.querySelector(".knowledge-network-canvas canvas")');await pause(700);await shot('live-graph');

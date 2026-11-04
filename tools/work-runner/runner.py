@@ -483,7 +483,7 @@ class Runner:
             elif name in ('list_work_skills','read_work_skill'):
                 value=await asyncio.to_thread(skill_tool,self.config,name,args)
             elif name=='read_work_knowledge':
-                value=await asyncio.to_thread(knowledge,args)
+                value=await asyncio.to_thread(knowledge,args,self.config)
             elif name=='search_work_files':
                 value=await asyncio.to_thread(search,run,args)
             elif name=='inspect_work_git':

@@ -16,7 +16,10 @@ class KnowledgeLibrary {
    CREATE TABLE IF NOT EXISTS documents(id TEXT PRIMARY KEY,library TEXT NOT NULL REFERENCES libraries(id),relative TEXT NOT NULL COLLATE NOCASE,revision TEXT NOT NULL,hash TEXT NOT NULL,UNIQUE(library,relative));
    CREATE TABLE IF NOT EXISTS revisions(id TEXT PRIMARY KEY,document TEXT NOT NULL,parent TEXT,hash TEXT NOT NULL,created TEXT NOT NULL,origin TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY,signature TEXT NOT NULL,status TEXT NOT NULL,result TEXT);
-   CREATE TABLE IF NOT EXISTS imports(id TEXT PRIMARY KEY,source TEXT NOT NULL,library TEXT NOT NULL,created TEXT NOT NULL,manifest TEXT NOT NULL,result TEXT);`);
+   CREATE TABLE IF NOT EXISTS imports(id TEXT PRIMARY KEY,source TEXT NOT NULL,library TEXT NOT NULL,created TEXT NOT NULL,manifest TEXT NOT NULL,result TEXT);
+   CREATE TABLE IF NOT EXISTS library_folders(library TEXT PRIMARY KEY REFERENCES libraries(id),folder TEXT NOT NULL UNIQUE COLLATE NOCASE);
+   CREATE TABLE IF NOT EXISTS library_redirects(old_id TEXT PRIMARY KEY, target TEXT NOT NULL REFERENCES libraries(id));
+   CREATE TABLE IF NOT EXISTS document_path_aliases(path TEXT PRIMARY KEY COLLATE NOCASE,document TEXT NOT NULL REFERENCES documents(id));`);
   this.db.exec(`CREATE TABLE IF NOT EXISTS document_origins(document TEXT PRIMARY KEY,provenance TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS work_materials(id TEXT PRIMARY KEY,work_key TEXT NOT NULL,root TEXT NOT NULL,relative TEXT NOT NULL,title TEXT NOT NULL,kind TEXT NOT NULL,category TEXT NOT NULL,revision TEXT NOT NULL,metadata TEXT NOT NULL,UNIQUE(work_key,relative));
    CREATE TABLE IF NOT EXISTS work_material_versions(id TEXT PRIMARY KEY,material TEXT NOT NULL,hash TEXT,created TEXT NOT NULL,metadata TEXT NOT NULL);`);
@@ -25,15 +28,19 @@ class KnowledgeLibrary {
  }
  close(){this.db.close();}
  serial(fn){const result=this.queue.then(fn);this.queue=result.catch(()=>{});return result;}
- directory(library){return path.join(this.root,'libraries',library,'documents');}
- list(){return this.db.prepare("SELECT l.*, (SELECT count(*) FROM documents d WHERE d.library=l.id AND (lower(d.relative) LIKE '%.md' OR lower(d.relative) LIKE '%.markdown')) AS documents FROM libraries l ORDER BY created").all().map(row=>({...row,path:this.directory(row.id)}));}
- get(id){const row=this.list().find(row=>row.id===id||row.alias===id);if(!row)throw failure('知识库不存在',404);return row;}
+ directory(library){const row=this.db.prepare('SELECT folder FROM library_folders WHERE library=?').get(library);return row?.folder==='@root'?path.join(this.root,'libraries'):path.join(this.root,'libraries',row?.folder||library,'documents');}
+ isUnified(){return !!this.db.prepare("SELECT 1 FROM library_folders WHERE folder='@root'").get();}
+ list(){return this.db.prepare("SELECT l.*, (SELECT count(*) FROM documents d WHERE d.library=l.id AND (lower(d.relative) LIKE '%.md' OR lower(d.relative) LIKE '%.markdown')) AS documents FROM libraries l WHERE NOT EXISTS (SELECT 1 FROM library_redirects r WHERE r.old_id=l.id) ORDER BY created").all().map(row=>({...row,path:this.directory(row.id)}));}
+ get(id){const old=this.db.prepare('SELECT target FROM library_redirects WHERE old_id=?').get(id);const row=this.list().find(row=>row.id===(old?.target||id)||row.alias===id);if(!row)throw failure('知识库不存在',404);return row;}
  create(name,alias){
+  if(this.isUnified())throw failure('知识库已经统一管理，请选择文档类别');
   if(typeof name!=='string'||!name.trim()||name.length>120)throw failure('请输入知识库名称');
   const id=randomUUID();alias=alias||'library-'+id.slice(0,12);if(!/^[a-zA-Z0-9_-]{1,80}$/.test(alias))throw failure('知识库标识无效');
-  fs.mkdirSync(this.directory(id),{recursive:true});this.db.prepare('INSERT INTO libraries VALUES(?,?,?,?)').run(id,name.trim(),alias,new Date().toISOString());return this.get(id);
+  let folder=name.trim().replace(/[<>:"/\\|?*\x00-\x1f]/g,'-').replace(/[. ]+$/,'').slice(0,80);if(!folder||/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(folder))folder=alias;
+  const base=folder;let suffix=0;while(this.db.prepare('SELECT 1 FROM library_folders WHERE folder=? COLLATE NOCASE').get(folder)||fs.existsSync(path.join(this.root,'libraries',folder)))folder=base+'-'+(++suffix);
+  this.db.exec('BEGIN IMMEDIATE');try{this.db.prepare('INSERT INTO libraries VALUES(?,?,?,?)').run(id,name.trim(),alias,new Date().toISOString());this.db.prepare('INSERT INTO library_folders VALUES(?,?)').run(id,folder);fs.mkdirSync(this.directory(id),{recursive:true});this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');throw error;}return this.get(id);
  }
- doc(identity){const row=this.db.prepare('SELECT * FROM documents WHERE id=?').get(identity)||this.db.prepare('SELECT * FROM documents WHERE relative=?').get('__never__');if(row)return row;for(const lib of this.list()){const target=path.resolve(String(identity));if(inside(lib.path,target)){return this.db.prepare('SELECT * FROM documents WHERE library=? AND relative=?').get(lib.id,path.relative(lib.path,target).split(path.sep).join('/'));}}return null;}
+ doc(identity){const row=this.db.prepare('SELECT * FROM documents WHERE id=?').get(identity)||this.db.prepare('SELECT d.* FROM document_path_aliases a JOIN documents d ON d.id=a.document WHERE a.path=? COLLATE NOCASE').get(String(identity));if(row)return row;for(const lib of this.list()){const target=path.resolve(String(identity));if(inside(lib.path,target)){return this.db.prepare('SELECT * FROM documents WHERE library=? AND relative=?').get(lib.id,path.relative(lib.path,target).split(path.sep).join('/'));}}return null;}
  describe(doc){const lib=this.get(doc.library);return {...doc,path:path.join(lib.path,...doc.relative.split('/')),workspace:lib.alias,libraryName:lib.name};}
  read(identity){const doc=this.doc(identity);if(!doc)throw failure('内部文档不存在',404);const revision=this.db.prepare('SELECT * FROM revisions WHERE id=?').get(doc.revision),bytes=fs.readFileSync(this.revisionPath(doc.id,revision.id));if(hash(bytes)!==revision.hash)throw failure('文档版本校验失败',500);const origin=this.db.prepare('SELECT provenance FROM document_origins WHERE document=?').get(doc.id);return {...this.describe(doc),content:bytes.toString('utf8'),etag:etag(bytes),...(origin?{provenance:JSON.parse(origin.provenance)}:{})};}
  history(identity){const doc=this.doc(identity);if(!doc)throw failure('内部文档不存在',404);return this.db.prepare('SELECT id,parent,hash,created,origin FROM revisions WHERE document=? ORDER BY rowid DESC').all(doc.id);}
@@ -41,8 +48,9 @@ class KnowledgeLibrary {
  atomic(file,bytes){fs.mkdirSync(path.dirname(file),{recursive:true});const temp=file+'.'+randomUUID()+'.tmp';const fd=fs.openSync(temp,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}try{fs.renameSync(temp,file);}finally{if(fs.existsSync(temp))fs.unlinkSync(temp);}}
  recover(){for(const operation of this.db.prepare("SELECT * FROM operations WHERE status='committed'").all()){const result=JSON.parse(operation.result),bytes=fs.readFileSync(this.revisionPath(result.id,result.revision));if(fs.existsSync(result.path)){const current=fs.readFileSync(result.path),currentHash=hash(current);if(currentHash!==hash(bytes)&&currentHash!==result.previousHash)this.atomic(path.join(this.root,'recovery-conflicts',randomUUID()),current);}this.atomic(result.path,bytes);this.db.prepare("UPDATE operations SET status='done' WHERE id=?").run(operation.id);}this.db.exec("DELETE FROM operations WHERE status='prepared'");}
  write(input){return this.serial(()=>this.writeSync(input));}
- writeSync({library,relative,document,content,bytes,expected,operationId=randomUUID(),origin='ui',provenance}){
-  const lib=this.get(library||this.doc(document)?.library),name=safeRelative(relative||this.doc(document)?.relative);
+ writeSync({library,relative,document,category,content,bytes,expected,operationId=randomUUID(),origin='ui',provenance,syncIdentity}){
+  const lib=this.get(library||this.doc(document)?.library);let name=safeRelative(relative||this.doc(document)?.relative);
+  if(this.isUnified()&&!document){const allowed=['知识','规范','计划','提案','任务','报告','设计','图表','资料','待分类'],prefix=name.split('/')[0];if(category&&!allowed.includes(category))throw failure('请选择有效的文档类别');if(category&&allowed.includes(prefix)&&prefix!==category)throw failure('文档路径与所选类别不一致');if(category&&!allowed.includes(prefix))name=safeRelative(category+'/'+name);else if(!allowed.includes(prefix))name=safeRelative('待分类/'+name);}
   const data=bytes?Buffer.from(bytes):Buffer.from(typeof content==='string'?content:'');if(data.length>32*1024*1024||/\.md$/i.test(name)&&data.length>2*1024*1024)throw failure('文件超过导入或正文大小限制',413);
   if(/\.(md|markdown|txt)$/i.test(name)){try{new TextDecoder('utf-8',{fatal:true}).decode(data);}catch{throw failure('文本文档必须使用有效 UTF-8 编码');}}
   const signature=hash(JSON.stringify({library:lib.id,relative:name,hash:hash(data),expected}));
@@ -50,7 +58,9 @@ class KnowledgeLibrary {
   const current=this.db.prepare('SELECT * FROM documents WHERE library=? AND relative=?').get(lib.id,name);
   if(current){const old=this.read(current.id);if(fs.existsSync(old.path)&&hash(fs.readFileSync(old.path))!==current.hash)throw failure('内部文件在应用外发生变化，请先核对；原文件已保留',409);if(expected!==current.revision&&expected!==old.etag)throw failure('文档已变化，请重新读取版本后保存',412);}
   else if(expected&&expected!=='new')throw failure('原文档已不存在',412);
-  const id=current?.id||randomUUID(),revision=randomUUID(),file=path.join(lib.path,...name.split('/'));
+  const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
+  if(syncIdentity&&(origin!=='sync'||!uuid(syncIdentity.document)||!uuid(syncIdentity.revision)||current&&current.id!==syncIdentity.document||!current&&this.doc(syncIdentity.document)||this.db.prepare('SELECT 1 FROM revisions WHERE id=?').get(syncIdentity.revision)))throw failure('同步文档标识或版本标识冲突',409);
+  const id=current?.id||syncIdentity?.document||randomUUID(),revision=syncIdentity?.revision||randomUUID(),file=path.join(lib.path,...name.split('/'));
   // Managed projections cannot cross symlinks, including directory junctions.
   for(let p=path.dirname(file);p!==this.root;p=path.dirname(p)){if(!inside(this.root,p))throw failure('文档路径越界',403);if(fs.existsSync(p)&&fs.lstatSync(p).isSymbolicLink())throw failure('知识目录不能包含链接',403);}
   if(fs.existsSync(file)&&fs.lstatSync(file).isSymbolicLink())throw failure('文档不能是链接',403);
@@ -64,7 +74,7 @@ class KnowledgeLibrary {
    if(provenance){const encoded=JSON.stringify(provenance);if(encoded.length>32768)throw failure('来源元数据过大');this.db.prepare('INSERT INTO document_origins VALUES(?,?) ON CONFLICT(document) DO UPDATE SET provenance=excluded.provenance').run(id,encoded);}
    this.db.prepare("UPDATE operations SET status='committed',result=? WHERE id=?").run(JSON.stringify(result),operationId);this.db.exec('COMMIT');
   }catch(error){this.db.exec('ROLLBACK');throw error;}
-  this.atomic(file,data);this.db.prepare("UPDATE operations SET status='done' WHERE id=?").run(operationId);return result;
+  this.atomic(file,data);this.db.prepare("UPDATE operations SET status='done' WHERE id=?").run(operationId);if(origin!=='sync'&&this.onWrite)try{this.onWrite(result);}catch{}return result;
  }
  workKey(root){if(typeof root!=='string'||!root.startsWith('/')||/[\0\r\n]/.test(root))throw failure('无效 Work 身份');return hash('wsl-work\0'+root);}
  listWork(root,q=''){const key=this.workKey(root);return this.db.prepare('SELECT * FROM work_materials WHERE work_key=? ORDER BY rowid DESC').all(key).map(row=>({...row,metadata:JSON.parse(row.metadata)})).filter(row=>!q||(row.title+' '+row.relative).toLowerCase().includes(String(q).toLowerCase()));}
@@ -111,9 +121,10 @@ class KnowledgeLibrary {
     if(!inside(job.source,resolved))throw failure('来源已越出导入目录',403);
     const stat=await fsp.lstat(source);if(!stat.isFile()||stat.isSymbolicLink()||stat.size!==file.size)throw failure('来源已变化',409);
     const bytes=await boundedRead(source,file.size);if(hash(bytes)!==file.hash)throw failure('来源内容已变化，请重新扫描',409);
-    const current=this.db.prepare('SELECT * FROM documents WHERE library=? AND relative=?').get(job.library,file.relative);
+    const destination=this.isUnified()?'待分类/导入/'+id+'/'+file.relative:file.relative;
+    const current=this.db.prepare('SELECT * FROM documents WHERE library=? AND relative=?').get(job.library,destination);
     if(current){if(current.hash===file.hash){items.push({relative:file.relative,status:'skipped'});continue;}throw failure('内部已存在不同版本，请保留现有内容并另行核对',409);}
-    const result=await this.write({library:job.library,relative:file.relative,bytes,expected:'new',operationId:'import:'+id+':'+file.relative,origin:'import'});items.push({...result,status:'imported'});
+    const result=await this.write({library:job.library,relative:destination,bytes,expected:'new',operationId:'import:'+id+':'+file.relative,origin:'import'});items.push({...result,status:'imported'});
    }catch(error){items.push({relative:file.relative,status:'failed',error:error.message});}
   }
   const result={id,library:job.library,items,imported:items.filter(i=>i.status==='imported').length,skipped:items.filter(i=>i.status==='skipped').length,failed:items.filter(i=>i.status==='failed').length};

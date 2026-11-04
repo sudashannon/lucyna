@@ -9,6 +9,7 @@ import {api} from '../api';
 import {errorText} from '../errors';
 import type {KnowledgeCatalog, KnowledgeCandidate, KnowledgeDetail, KnowledgeDocument, KnowledgeReview} from '../knowledge-types';
 import {Document} from './Document';
+import {documentHeadings} from '../panel-data';
 
 type View = 'documents'|'candidates'|'reviews';
 const views = [{value:'documents' as const,label:'文档库'},{value:'candidates' as const,label:'候选知识'},{value:'reviews' as const,label:'待核实'}];
@@ -36,6 +37,7 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onQu
   const [selected,setSelected]=useState<Record<View,string>>({documents:'',candidates:'',reviews:''}),[readerOpen,setReaderOpen]=useState(false);
   const [loadedDetail,setDetail]=useState<KnowledgeDetail|null>(null),[detailBusy,setDetailBusy]=useState(false),[detailFailure,setDetailFailure]=useState<{id:string;message:string}>(),[actionError,setActionError]=useState('');
   const [reload,setReload]=useState(0),[relatedMore,setRelatedMore]=useState(false);
+  const [anchorRequest,setAnchorRequest]=useState<{id:string;anchor:string}|null>(null),handledAnchor=useRef<object|null>(null);
   const list=useRef<HTMLDivElement>(null),reader=useRef<HTMLDivElement>(null),reading=useRef(new Map<string,number>()),request=useRef(0),extraRequest=useRef(0);
   const listPosition=useRef(0);
   useLayoutEffect(()=>{if(active&&list.current)list.current.scrollTop=listPosition.current;},[active,sidebarTarget]);
@@ -67,6 +69,7 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onQu
     void api.knowledgeDocument(docId).then(value=>{if(token===request.current)setDetail(value);}).catch(e=>{if(token===request.current)setDetailFailure({id:docId,message:errorText(e)});}).finally(()=>{if(token===request.current)setDetailBusy(false);});
   },[docId,reload]);
   useLayoutEffect(()=>{if(active&&readingReady&&reader.current)reader.current.scrollTop=reading.current.get(readingKey)||0;},[readingKey,detail,readerOpen,active,readingReady]);
+  useLayoutEffect(()=>{if(!active||!readerOpen||!detail||!anchorRequest||anchorRequest.id!==docId||handledAnchor.current===anchorRequest)return;const frame=requestAnimationFrame(()=>{const el=reader.current,target=el?.querySelector(`[id="${CSS.escape(anchorRequest.anchor)}"]`);if(el&&target){el.scrollTop+=target.getBoundingClientRect().top-el.getBoundingClientRect().top;reading.current.set(readingKey,el.scrollTop);}else setActionError('已打开目标文档，但没有找到链接指向的章节。');handledAnchor.current=anchorRequest;});return()=>cancelAnimationFrame(frame);},[active,readerOpen,detail,anchorRequest,docId,readingKey]);
   const normalized=query.trim().toLocaleLowerCase();
   const rows=useMemo(()=>{
     const match=(text:string)=>!normalized||normalized.split(/\s+/).every(word=>text.toLocaleLowerCase().includes(word));
@@ -77,7 +80,7 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onQu
   const maxPage=Math.max(0,Math.ceil(rows.length/pageSize)-1),currentPage=Math.min(page,maxPage),visible=rows.slice(currentPage*pageSize,(currentPage+1)*pageSize);
   const resetPage=()=>{listPosition.current=0;setPage(0);if(list.current)list.current.scrollTop=0;};
   const changeView=(next:View)=>{setView(next);setReaderOpen(false);setActionError('');resetPage();};
-  const choose=(id:string)=>{if(view==='documents'&&byId.get(id)?.type==='session'&&onSession){onSession(id);return;}setSelected(s=>({...s,[view]:id}));setReaderOpen(true);setActionError('');};
+  const choose=(id:string)=>{if(view==='documents'&&byId.get(id)?.type==='session'&&onSession){onSession(id);return;}setAnchorRequest(null);setSelected(s=>({...s,[view]:id}));setReaderOpen(true);setActionError('');};
   const openDocument=(id:string)=>{if(byId.get(id)?.type==='session'&&onSession){onSession(id);return;}setView('documents');setSelected(s=>({...s,documents:id}));setReaderOpen(true);setActionError('');};
   useEffect(()=>{if(navigateTo)openDocument(navigateTo);},[navigateTo]);
   useEffect(()=>{if(refreshKey){void loadCatalog(true);if(docId)setReload(v=>v+1);}},[refreshKey,loadCatalog]);
@@ -88,9 +91,10 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onQu
   const title=view==='candidates'?selectedCandidate?.title:selectedDoc?.title;
   const currentWorkspace=view==='candidates'?selectedCandidate?.workspace:selectedDoc?.workspace||selectedReview?.workspace;
   const docBody=useMemo(()=>{const body=bodyText(content),heading=/^#\s+([^\n]+)\n?/.exec(body);return heading&&heading[1].replace(/\s/g,'')===title?.replace(/\s/g,'')?body.slice(heading[0].length).trim():body;},[content,title]);
+  const titleAnchor=useMemo(()=>{const body=bodyText(content),heading=/^#\s+([^\n]+)\n?/.exec(body);return heading&&heading[1].replace(/\s/g,'')===title?.replace(/\s/g,'')?documentHeadings(heading[0])[0]?.id:undefined;},[content,title]);
   const relations=useMemo(()=>detail?[...detail.forward.map(edge=>({...edge,id:edge.to,direction:'引用'})),...detail.backlinks.map(edge=>({...edge,id:edge.from,direction:'被引用'}))]:[],[detail]);
   const onNavigate=useCallback((href:string)=>{
-    try{if(!selectedDoc)return;const target=normalPath(selectedDoc.path,href);const found=documents.find(d=>normalPath(d.path,'./'+d.path.replaceAll('\\','/').split('/').pop())===target);if(!found)throw new Error('链接目标未被知识库索引，请刷新后重试。');openDocument(found.id);}catch(e){setActionError(errorText(e));}
+    try{if(!selectedDoc)return;const target=normalPath(selectedDoc.path,href);const found=documents.find(d=>normalPath(d.path,'./'+d.path.replaceAll('\\','/').split('/').pop())===target);if(!found)throw new Error('链接目标未被知识库索引，请刷新后重试。');const fragment=href.includes('#')?decodeURIComponent(href.slice(href.indexOf('#')+1)):'';setAnchorRequest(fragment?{id:found.id,anchor:fragment}:null);openDocument(found.id);}catch(e){setActionError(errorText(e));}
   },[selectedDoc,documents]);
   const resolveImage=useCallback((src:string)=>api.knowledgeImage(docId,src),[docId]);
   const quote=()=>{
@@ -120,8 +124,8 @@ export const KnowledgePanel = memo(function KnowledgePanel({active,workName,onQu
           {!selectedId?<div className="knowledge-empty knowledge-reader-empty"><BookOpen size={32} strokeWidth={1.4} aria-hidden="true"/><h2>把知识带回正在做的事</h2><p>从左侧选择一篇文档，阅读来源与关联内容。<br/>选取需要的段落，引用到工作台的草稿。</p><span className="knowledge-empty-note">{workName?`当前工作区：${workName}`:'选择工作区后即可引用知识'}</span></div>:<>
             {selectedReview&&<div className="knowledge-review-note"><strong>{rules[selectedReview.issue.rule]||selectedReview.issue.rule}</strong><p>{selectedReview.issue.detail}</p><span>Stele 自动检查结果，需结合原文核实。</span></div>}
             {waitingForDetail?<div className="knowledge-empty" role="status"><Spinner size={20}/><p>读取正文与关联…</p></div>:detailError?<div className="knowledge-empty" role="alert"><h2>暂时无法读取文档</h2><p>{detailError}</p><Button variant="secondary" compact onClick={()=>setReload(v=>v+1)}>重试正文</Button></div>:<>
-              <div className="knowledge-document-heading"><h2>{title||'知识详情'}</h2><div className="knowledge-document-meta"><span>{currentWorkspace}</span><span>{view==='candidates'?candidateNames[selectedCandidate?.status||'']||'候选知识':typeNames[selectedDoc?.type||'']||selectedDoc?.type}</span>{selectedDoc?.updatedAt&&<time>更新于 {date(selectedDoc.updatedAt)}</time>}</div>{selectedDoc&&<details className="knowledge-source"><summary>查看来源路径</summary><p>{selectedDoc.path}</p></details>}{view==='candidates'&&<p className="knowledge-candidate-note">{selectedCandidate?.status==='adopted'?'已采纳的知识候选，保留提炼时的证据。':'此内容是候选记录，使用前请核实原始证据。'} 编辑、采纳与拒绝可在 Stele 中完成。</p>}</div>
-              {detail?.contentError?<div className="knowledge-alert" role="alert"><span>{detail.contentError}</span><Button compact variant="secondary" onClick={()=>setReload(v=>v+1)}>重试正文</Button></div>:<Document key={readingKey} content={docBody||'此文档暂无正文。'} onError={e=>setActionError(errorText(e))} onNavigate={onNavigate} resolveImage={view==='documents'||view==='reviews'?resolveImage:undefined}/>}
+              <div className="knowledge-document-heading"><h2 id={titleAnchor}>{title||'知识详情'}</h2><div className="knowledge-document-meta"><span>{currentWorkspace}</span><span>{view==='candidates'?candidateNames[selectedCandidate?.status||'']||'候选知识':typeNames[selectedDoc?.type||'']||selectedDoc?.type}</span>{selectedDoc?.updatedAt&&<time>更新于 {date(selectedDoc.updatedAt)}</time>}</div>{selectedDoc&&<details className="knowledge-source"><summary>查看来源路径</summary><p>{selectedDoc.path}</p></details>}{view==='candidates'&&<p className="knowledge-candidate-note">{selectedCandidate?.status==='adopted'?'已采纳的知识候选，保留提炼时的证据。':'此内容是候选记录，使用前请核实原始证据。'} 编辑、采纳与拒绝可在 Stele 中完成。</p>}</div>
+              {detail?.contentError?<div className="knowledge-alert" role="alert"><span>{detail.contentError}</span><Button compact variant="secondary" onClick={()=>setReload(v=>v+1)}>重试正文</Button></div>:<Document key={readingKey} content={docBody||'此文档暂无正文。'} forceFull={anchorRequest?.id===docId} onError={e=>setActionError(errorText(e))} onNavigate={onNavigate} onAnchor={docId?anchor=>{setActionError('');setAnchorRequest({id:docId,anchor});}:undefined} resolveImage={view==='documents'||view==='reviews'?resolveImage:undefined}/>}
               {view==='candidates'&&<section className="knowledge-relations"><h3>原始证据 <span>{selectedCandidate?.references?.length||0}</span></h3>{selectedCandidate?.references?.length?selectedCandidate.references.map((ref,i)=><div key={ref.id||i} className="knowledge-evidence"><span>{ref.workspace} / {ref.freshness==='stale'?'证据已过期':ref.freshness==='current'?'证据当前有效':'有效性未知'}</span><button className="knowledge-related" disabled={!byId.has(ref.id)&&!documents.some(d=>d.path===ref.path)} onClick={()=>openDocument(byId.has(ref.id)?ref.id:documents.find(d=>d.path===ref.path)!.id)}>{ref.title||ref.path||ref.id}<ArrowUpRight size={14}/></button><p>{ref.excerpt}</p>{ref.path&&<small>{ref.path}{ref.lineStart?`:${ref.lineStart}`:''}</small>}</div>):<p className="helper-text">此候选没有附带证据，请在使用前核实来源。</p>}</section>}
               {detail&&<section className="knowledge-relations"><h3>关联文档 <span>{relations.length}</span></h3><p className="helper-text">区分文档引用与 Stele 检索到的相似内容。</p>{detail.relationsError&&<p role="alert" className="error-text">{detail.relationsError}</p>}{!relations.length&&!detail.relationsError&&<p className="helper-text">Stele 暂未返回关联文档。</p>}{(relatedMore?relations:relations.slice(0,8)).map((rel,i)=><button key={rel.id+rel.kind+i} className="knowledge-related" onClick={()=>openDocument(rel.id)}><FileText size={15} aria-hidden="true"/><span>{byId.get(rel.id)?.title||basename(rel.id)}<small>{rel.kind==='similar'?'相似内容':rel.direction+' · '+rel.kind}{byId.get(rel.id)?.workspace?' / '+byId.get(rel.id)?.workspace:''}</small></span><ChevronRight size={14} aria-hidden="true"/></button>)}{relations.length>8&&<button className="text-action" onClick={()=>setRelatedMore(v=>!v)}>{relatedMore?'收起关联':`查看全部 ${relations.length} 条关联`}</button>}</section>}
             </>}

@@ -85,7 +85,9 @@ func (a knowledgeAdopter) create(candidate review.Candidate) (source.EvidenceRef
 	if err != nil {
 		return source.EvidenceReference{}, err
 	}
-	directory := filepath.Join(root, "knowledge")
+	category := "knowledge"
+	if managed.Unified() { category = "知识" }
+	directory := filepath.Join(root, category)
 	if err := os.MkdirAll(directory, 0755); err != nil {
 		return source.EvidenceReference{}, err
 	}

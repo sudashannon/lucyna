@@ -1,6 +1,10 @@
 const http=require('node:http'),fs=require('node:fs'),fsp=require('node:fs/promises'),path=require('node:path');
 const {spawn}=require('node:child_process'),{Worker}=require('node:worker_threads'),{randomUUID,randomBytes,timingSafeEqual}=require('node:crypto');
 const {KnowledgeLibrary,hash,inside,failure}=require('./knowledge-library.cjs');
+const {KnowledgeConsolidation}=require('./knowledge-consolidation.cjs');
+const {KnowledgeSync}=require('./knowledge-sync.cjs');
+const {KnowledgeAutoSync}=require('./knowledge-auto-sync.cjs');
+const {AuxiliaryAgent}=require('./auxiliary-agent.cjs');
 let standalone=false;
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const json=(response,value,status=200)=>{response.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});response.end(JSON.stringify(value));};
@@ -11,16 +15,16 @@ const tools=[
  {name:'library_list',description:'List Lucyna-managed internal knowledge libraries.',inputSchema:{type:'object',properties:{}},annotations:{readOnlyHint:true}},
  {name:'library_documents',description:'List stable document IDs, revisions and native Stele paths in a library.',inputSchema:{type:'object',properties:{library:{type:'string'}},required:['library']},annotations:{readOnlyHint:true}},
  {name:'library_read',description:'Read a managed document with its revision and ETag before editing.',inputSchema:{type:'object',properties:{document:{type:'string'}},required:['document']},annotations:{readOnlyHint:true}},
- {name:'library_write',description:'Create or update a Markdown document. Updates require the revision/ETag returned by library_read; use expected=new only for a new path. operationId makes retries idempotent.',inputSchema:{type:'object',properties:{library:{type:'string'},document:{type:'string'},relative:{type:'string'},content:{type:'string'},expected:{type:'string'},operationId:{type:'string'}},required:['content','expected','operationId']},annotations:{readOnlyHint:false}},
+ {name:'library_write',description:'Create or update a Markdown document. For new unified-library documents choose category; unspecified categories go to 待分类. Updates require the revision/ETag returned by library_read; use expected=new only for a new path. operationId makes retries idempotent.',inputSchema:{type:'object',properties:{library:{type:'string'},document:{type:'string'},relative:{type:'string'},category:{type:'string',enum:['知识','规范','计划','提案','任务','报告','设计','图表','资料','待分类']},content:{type:'string'},expected:{type:'string'},operationId:{type:'string'}},required:['content','expected','operationId']},annotations:{readOnlyHint:false}},
  {name:'library_history',description:'List immutable document revisions.',inputSchema:{type:'object',properties:{document:{type:'string'}},required:['document']},annotations:{readOnlyHint:true}},
 ];
-async function startKnowledgeHost({directory,engineDirectory=process.resourcesPath&&fs.existsSync(path.join(process.resourcesPath,'knowledge-engine/manifest.json'))?path.join(process.resourcesPath,'knowledge-engine'):path.resolve(__dirname,'../resources/knowledge-engine'),idleMs=15*60*1000}={}){
+async function startKnowledgeHost({directory,engineDirectory=process.resourcesPath&&fs.existsSync(path.join(process.resourcesPath,'knowledge-engine/manifest.json'))?path.join(process.resourcesPath,'knowledge-engine'):path.resolve(__dirname,'../resources/knowledge-engine'),idleMs=15*60*1000,consolidationOptions={},syncOptions={},automaticSyncOptions={}}={}){
  if(!directory||!path.isAbsolute(directory))throw Error('Knowledge data directory must be absolute');
  const root=path.resolve(directory),runtime=path.join(root,'runtime');fs.mkdirSync(runtime,{recursive:true});
  const manifest=JSON.parse(fs.readFileSync(path.join(engineDirectory,'manifest.json'),'utf8')),binary=path.join(engineDirectory,manifest.binary);
  if(path.basename(manifest.binary)!==manifest.binary||hash(fs.readFileSync(binary))!==manifest.sha256)throw Error('内置 Stele 运行包校验失败，请重新构建知识引擎');
  for(const [relative,digest] of Object.entries(manifest.embeddingFiles||{})){const target=path.resolve(__dirname,'../third_party/ternlight-base',relative);if(!inside(path.resolve(__dirname,'../third_party/ternlight-base'),target)||hash(fs.readFileSync(target))!==digest)throw Error('内置向量运行包校验失败，请重新构建知识引擎');}
- const store=new KnowledgeLibrary(root),instanceId=randomUUID(),token=randomBytes(32).toString('hex');let engineURL='',child,ready=false,closing=false,lastUsed=Date.now(),embeddingReady=false,activeRequests=0;
+ const store=new KnowledgeLibrary(root),sync=new KnowledgeSync(store,{...syncOptions,onImported:async()=>{for(const lib of store.list())await register(lib.id);}}),automaticSync=new KnowledgeAutoSync(sync,automaticSyncOptions),instanceId=randomUUID(),token=randomBytes(32).toString('hex');store.onWrite=()=>automaticSync.changed();let engineURL='',child,ready=false,closing=false,lastUsed=Date.now(),embeddingReady=false,activeRequests=0;
  const pending=new Map();let sequence=0;
  const worker=new Worker(path.join(__dirname,'knowledge-embedding.cjs'),{workerData:{module:path.resolve(__dirname,'../third_party/ternlight-base/src/index.js')}});
  const workerReady=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('向量运行时初始化超时')),20000);worker.on('message',message=>{if(message.ready){embeddingReady=true;clearTimeout(timer);resolve();}else if(message.id){const task=pending.get(message.id);if(task){pending.delete(message.id);clearTimeout(task.timer);message.error?task.reject(Error(message.error)):task.resolve(message.output);}}else if(message.error){clearTimeout(timer);reject(Error(message.error));}});worker.on('error',reject);});
@@ -31,9 +35,18 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
   return fetch(new URL(route,engineURL),{method,body:bytes,headers:{...headers,'X-Lucyna-Engine-Token':token,...(mcpToken?{Authorization:'Bearer '+mcpToken}:{})},signal:signal||AbortSignal.timeout(180000),redirect:'error'});
  }
  async function nativeJSON(route,options){const r=await native(route,options);if(!r.ok)throw failure('知识引擎请求失败（'+r.status+'）：'+(await r.text()).slice(0,800),r.status);return r.status===204?null:r.json();}
- async function register(library){const lib=store.get(library);if(!lib.documents)return;const spaces=await nativeJSON('/api/workspaces');if(!spaces.some(s=>s.alias===lib.alias))await nativeJSON('/api/workspaces',{method:'POST',bytes:JSON.stringify({alias:lib.alias,path:lib.path,type:'docs'}),headers:{'content-type':'application/json'}});await nativeJSON('/api/wiki/rebuild',{method:'POST'});}
+ async function register(library,{rebuild=true}={}){const lib=store.get(library);if(!lib.documents)return;const spaces=await nativeJSON('/api/workspaces');if(!spaces.some(s=>s.alias===lib.alias))await nativeJSON('/api/workspaces',{method:'POST',bytes:JSON.stringify({alias:lib.alias,path:lib.path,type:'docs'}),headers:{'content-type':'application/json'}});if(rebuild)await nativeJSON('/api/wiki/rebuild',{method:'POST'});}
  function managedPath(file){for(const lib of store.list())if(inside(lib.path,path.resolve(file)))return {library:lib.id,relative:path.relative(lib.path,path.resolve(file)).split(path.sep).join('/')};throw failure('只允许写入内部知识库文档',403);}
  async function write(input){const result=await store.write(input);await register(result.library);return result;}
+ const consolidation=new KnowledgeConsolidation({store,agent:new AuxiliaryAgent(),register,...consolidationOptions});
+ function remapLegacyMcpArguments(value,key=''){
+  if(Array.isArray(value))return value.map(v=>remapLegacyMcpArguments(v));
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,remapLegacyMcpArguments(v,k)]));
+  if(typeof value!=='string')return value;
+  if(['id','path','componentId','docId','from','to'].includes(key)){const alias=store.db.prepare('SELECT document FROM document_path_aliases WHERE path=? COLLATE NOCASE').get(value);if(alias){const doc=store.doc(alias.document);if(doc)return store.describe(doc).path;}}
+  if(key==='workspace'){const redirect=store.db.prepare('SELECT target FROM library_redirects WHERE old_id=?').get(value);if(redirect)return store.get(redirect.target).alias;}
+  return value;
+ }
  async function mcp(message){
   if(!message||message.jsonrpc!=='2.0'||typeof message.method!=='string')throw failure('无效 MCP 请求');
   if(message.method==='tools/list'){const original=await nativeJSON('/mcp',{method:'POST',bytes:JSON.stringify(message),headers:{'content-type':'application/json'}});if(original.result)original.result.tools=[...original.result.tools,...tools];return original;}
@@ -43,7 +56,8 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
     return {jsonrpc:'2.0',id:message.id,result:{content:[{type:'text',text:JSON.stringify(result)}]}};
    }catch(error){return {jsonrpc:'2.0',id:message.id,result:{isError:true,content:[{type:'text',text:error.message}]}};}
   }
-  return nativeJSON('/mcp',{method:'POST',bytes:JSON.stringify(message),headers:{'content-type':'application/json'}});
+  const forwarded=message.method==='tools/call'&&message.params?.arguments?{...message,params:{...message.params,arguments:remapLegacyMcpArguments(message.params.arguments)}}:message;
+  return nativeJSON('/mcp',{method:'POST',bytes:JSON.stringify(forwarded),headers:{'content-type':'application/json'}});
  }
  const server=http.createServer(async(request,response)=>{
   activeRequests++;response.once('finish',()=>{activeRequests--;lastUsed=Date.now();});response.once('close',()=>{if(!response.writableFinished)activeRequests--;});
@@ -54,9 +68,16 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
    if(url.pathname==='/internal/embed'){return json(response,await embed(JSON.parse((await body(request)).toString())));}
    if(url.pathname==='/internal/write'){const input=JSON.parse((await body(request)).toString());return json(response,await store.write({...managedPath(input.path),content:input.content,expected:input.expected,origin:'stele'}));}
    if(url.pathname==='/internal/shutdown'){json(response,{stopping:true});setImmediate(()=>void stop().then(()=>{if(standalone)process.exit(0);}));return;}
-   if(url.pathname==='/api/health')return json(response,{instanceId,ready,embeddingReady,sourceHash:manifest.sourceHash,storageSchema:1,pid:process.pid,capabilities:['managed-libraries','directory-import','document-revisions','mcp','semantic-search']});
+   if(url.pathname==='/api/health')return json(response,{instanceId,ready,embeddingReady,unified:store.isUnified(),sourceHash:manifest.sourceHash,storageSchema:1,pid:process.pid,capabilities:['managed-libraries','directory-import','document-revisions','mcp','semantic-search','knowledge-consolidation']});
    if(!ready)throw failure('内置知识引擎正在启动',503);
+   if(url.pathname==='/api/consolidation/sync'&&request.method==='POST')return json(response,consolidation.sync(JSON.parse((await body(request)).toString())));
+   if(url.pathname==='/api/consolidation/status')return json(response,consolidation.view(url.searchParams.get('root')));
+   if(url.pathname==='/api/consolidation/configure'&&request.method==='POST'){const input=JSON.parse((await body(request)).toString());return json(response,consolidation.configure(input.root,input));}
    if(url.pathname==='/api/library/libraries'){if(request.method==='POST'){const input=JSON.parse((await body(request)).toString());return json(response,store.create(input.name,input.alias));}return json(response,store.list());}
+   if(url.pathname==='/api/library/sync/status'&&request.method==='GET')return json(response,{...sync.status(),automatic:automaticSync.status()});
+   if(url.pathname==='/api/library/sync/config'&&request.method==='POST'){const input=JSON.parse((await body(request)).toString());const value=await sync.configure(input.remote);automaticSync.changed();return json(response,{...value,automatic:automaticSync.status()});}
+   if(url.pathname==='/api/library/sync/automatic'&&request.method==='POST'){const input=JSON.parse((await body(request)).toString());return json(response,await automaticSync.setEnabled(input.enabled));}
+   if(url.pathname==='/api/library/sync/run'&&request.method==='POST')return json(response,await automaticSync.run());
    if(url.pathname==='/api/workspaces'&&request.method==='GET'){const names=new Map(store.list().map(lib=>[lib.alias,lib.name]));return json(response,(await nativeJSON('/api/workspaces')).map(space=>({...space,name:names.get(space.alias)||space.alias})));}
    if(url.pathname==='/api/work-material/list')return json(response,store.listWork(url.searchParams.get('root'),url.searchParams.get('query')||''));
    if(url.pathname==='/api/work-material/read')return json(response,store.readWork(url.searchParams.get('root'),url.searchParams.get('id')));
@@ -81,19 +102,21 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
    if(upstream.body){for await(const chunk of upstream.body){if(response.destroyed)break;if(!response.write(Buffer.from(chunk)))await new Promise(resolve=>response.once('drain',resolve));}}response.end();
   }catch(error){if(!response.headersSent)json(response,{error:error.message},error.status||500);else response.destroy();}
  });
- const stop=async()=>{if(closing)return;closing=true;ready=false;clearInterval(idleTimer);server.closeAllConnections();await new Promise(resolve=>server.close(resolve));child?.kill();await worker.terminate();store.close();try{const file=path.join(runtime,'connection.json'),saved=JSON.parse(fs.readFileSync(file,'utf8'));if(saved.instanceId===instanceId)fs.unlinkSync(file);}catch{};};
+ const stop=async()=>{if(closing)return;closing=true;ready=false;clearInterval(idleTimer);await consolidation.stop();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await automaticSync.stop();child?.kill();await worker.terminate();store.close();try{const file=path.join(runtime,'connection.json'),saved=JSON.parse(fs.readFileSync(file,'utf8'));if(saved.instanceId===instanceId)fs.unlinkSync(file);}catch{};};
  let idleTimer;
  try{
   await workerReady;await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const url='http://127.0.0.1:'+server.address().port;
   fs.mkdirSync(path.join(root,'empty'),{recursive:true});fs.mkdirSync(path.join(root,'engine-state'),{recursive:true});
-  child=spawn(binary,['--bind','127.0.0.1','--port','0','--share-port','0','--dir',path.join(root,'empty'),'--sessions-dir','','--worktree-status-script',''],{cwd:root,windowsHide:true,env:{...process.env,STELE_DATA_DIR:path.join(root,'engine-state'),LUCYNA_ENGINE_CALLBACK:url,LUCYNA_ENGINE_TOKEN:token},stdio:['ignore','pipe','pipe']});
+  child=spawn(binary,['--bind','127.0.0.1','--port','0','--share-port','0','--dir',path.join(root,'empty'),'--sessions-dir','','--worktree-status-script',''],{cwd:root,windowsHide:true,env:{...process.env,STELE_DATA_DIR:path.join(root,'engine-state'),LUCYNA_ENGINE_CALLBACK:url,LUCYNA_ENGINE_TOKEN:token,LUCYNA_UNIFIED_KNOWLEDGE:store.isUnified()?'1':'0'},stdio:['ignore','pipe','pipe']});
   let stderr='';child.stderr.on('data',b=>{stderr=(stderr+b.toString()).slice(-12000);});
   await new Promise((resolve,reject)=>{let output='';const timer=setTimeout(()=>reject(Error('内置 Stele 启动超时')),30000);child.once('error',reject);child.once('exit',code=>{clearTimeout(timer);reject(Error('内置 Stele 退出（'+code+'）：'+stderr.slice(-2000)));});child.stdout.on('data',chunk=>{output+=chunk.toString();const match=/LUCYNA_ENGINE_READY (127\.0\.0\.1:\d+)/.exec(output);if(match){engineURL='http://'+match[1];clearTimeout(timer);resolve();}output=output.slice(-8192);});});
-  for(const lib of store.list())await register(lib.id);
+  for(const lib of store.list())await register(lib.id,{rebuild:false});
+  await nativeJSON('/api/wiki/rebuild',{method:'POST'});
   ready=true;child.on('exit',()=>{ready=false;if(!closing)setImmediate(()=>void stop().then(()=>{if(standalone)process.exit(1);}));});
   const connection={version:1,instanceId,url,token,pid:process.pid,root,sourceHash:manifest.sourceHash};store.atomic(path.join(runtime,'connection.json'),Buffer.from(JSON.stringify(connection)));
-  idleTimer=setInterval(()=>{if(!activeRequests&&Date.now()-lastUsed>idleMs)void stop().then(()=>{if(standalone)process.exit(0);});},10000);idleTimer.unref();
-  return {...connection,stop,store,mcp,nativeJSON};
+  consolidation.start();automaticSync.start();
+  idleTimer=setInterval(()=>{if(!activeRequests&&!consolidation.keepAlive()&&!automaticSync.status().enabled&&Date.now()-lastUsed>idleMs)void stop().then(()=>{if(standalone)process.exit(0);});},10000);idleTimer.unref();
+  return {...connection,stop,store,mcp,nativeJSON,consolidation};
  }catch(error){await stop();throw error;}
 }
 function main(){

@@ -2,6 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from '../api';
 import {EvolutionView,FileChanges,RunStages,type Evolution,type FileDelta} from './WorkRunVisuals';
 import {Modal} from './Modal';
+import {KnowledgeConsolidation} from './KnowledgeConsolidation';
 import '../work-runs.css';
 
 type Run={id:string;root:string;objective:string;acceptance:string;state:string;reason:string;createdAt:number;updatedAt:number;tokenBudget:number|null;usedTokens:number|null;elapsedSeconds:number;wallSeconds:number;attemptStartedAt?:number;sessionId?:string;effectiveModel?:{id?:string;name?:string;provider?:string};model:string;result:string;question?:{key:string;text:string};verification?:{passed:boolean|null;output:string};mode?:string;phase?:string;evolution?:Evolution;changes?:FileDelta[];automatic?:{trigger:string}};
@@ -84,6 +85,7 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
   const toggleAutomatic=async()=>{setBusy('automatic');try{setAutomatic(await api.workRun('automatic-configure',{root,enabled:!automatic?.enabled}));setAutoError('');}catch(e){setAutoError(String(e));}finally{setBusy('');}};
   const prepareAutomatic=async()=>{setBusy('prepare');try{setAutomatic(await api.workRun('automatic-prepare',{root,clarification}));setClarification('');setAutoError('');}catch(e){setAutoError(String(e));}finally{if(alive.current)setBusy('');}};
   const content=<section className="work-runs" hidden={!active} aria-label="Work 后台任务">
+    {!showForm&&<KnowledgeConsolidation key={root} root={root} active={active}/>}
     {!showForm&&<><section className={`wr-automatic wr-auto-${automatic?.status||'loading'}`} aria-label="自动进化" aria-live="polite">
       <div className="wr-section-title"><strong><span className="wr-auto-dot"/>自动进化</strong><span>{automatic?.enabled?'已开启':automatic?'已暂停':'正在连接'}</span></div>
       <h3>{automatic?.label||'正在读取自动调度状态…'}</h3><p>{automatic?.message||'有新变化且空闲时自动比较候选，采纳由你确认。'}</p>
@@ -127,7 +129,7 @@ export function WorkRuns({root,active,connections=0,onConnections}:{root:string;
       </fieldset>
       <div className="wr-actions wr-form-actions"><span>{configureAuto?'每次预算 '+Number(tokens).toLocaleString()+' Token · 结果由你采纳':connections?'请先结束普通会话连接':'预算 '+Number(tokens).toLocaleString()+' Token · 上限 '+minutes+' 分钟'}</span><button type="submit" disabled={!!busy||(!configureAuto&&(!!connections||occupied))||!loaded}>{busy==='create'?'正在保存…':configureAuto?'保存并自动运行':'开始执行'}</button><button type="button" disabled={!!busy} onClick={()=>{setShowForm(false);setConfigureAuto(false);}}>取消</button></div>
     </form>}
-    {loaded&&!runs.length&&!showForm&&<p className="empty-line">此 Work 尚无后台任务。</p>}
+    {loaded&&!runs.length&&!showForm&&<p className="empty-line">暂无普通任务或进化实验记录。</p>}
     {!!runs.length&&<label className="wr-picker">任务<select value={selected} onChange={e=>choose(e.target.value)}>{runs.map(run=><option key={run.id} value={run.id}>{states[run.state]||run.state} · {run.objective.slice(0,45)}</option>)}</select></label>}
     {current&&<article className="wr-run">
       <div className={`wr-heading wr-state-${current.state}`} role="status" aria-live="polite"><strong>{current.mode==='evolution'&&current.state==='waiting_review'?'候选待采纳':states[current.state]||current.state}</strong><span>{current.evolution?.agent==='auxiliary'?'本地 agent':current.mode==='evolution'&&!current.effectiveModel?'等待 agent':'WSL OMP'} · {current.effectiveModel?.name||current.effectiveModel?.id||current.model||'默认模型'}</span></div>

@@ -37,6 +37,7 @@ func Request(route string, input any, output any) error {
 	return nil
 }
 func Enabled() bool { return os.Getenv("LUCYNA_ENGINE_CALLBACK") != "" }
+func Unified() bool { return Enabled() && os.Getenv("LUCYNA_UNIFIED_KNOWLEDGE") == "1" }
 func Create(path string, content []byte) error {
 	return Request("/internal/write", map[string]any{"path": path, "content": string(content), "expected": "new"}, nil)
 }

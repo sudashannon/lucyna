@@ -164,6 +164,24 @@ func scanComponents(workspaceRoot, workspaceAlias string, docsMode bool) ([]Comp
 }
 
 func classifyPath(path string) ComponentType {
+	// Lucyna-managed libraries use explicit, stable document-type folders.
+	// Check those before legacy filename conventions (for example design.md).
+	if managed.Enabled() {
+		parts := strings.Split(filepath.ToSlash(path), "/")
+		for _, part := range parts {
+			switch part {
+			case "知识": return TypeKnowledge
+			case "规范": return TypeSpec
+			case "计划": return TypePlan
+			case "提案": return TypeProposal
+			case "任务": return TypeTasks
+			case "报告": return TypeReport
+			case "设计": return TypeDesign
+			case "图表": return TypeDiagram
+			case "资料": return TypeArtifact
+			}
+		}
+	}
 	base := filepath.Base(path)
 	switch base {
 	case "proposal.md", "prd.md":
