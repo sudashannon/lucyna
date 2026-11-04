@@ -5,6 +5,7 @@ const {sensitiveDocument}=require('./work-knowledge-policy.cjs');
 const {validateAssessment,validateReview,signature,pairKey,groups}=require('./knowledge-governance-policy.cjs');
 
 const labels={idle:'等待知识变化',discovering:'查找相关文档',analyzing:'比较观点与范围',verifying:'单独复核判断',waiting_agent:'等待辅助模型',waiting_maintenance:'等待本轮维护完成',paused:'整理检查已暂停',error:'整理检查未完成'};
+const {excerpt}=require('./knowledge-text-segments.cjs');
 const finished=new Set(['confirmed','dismissed','clear','obsolete']);
 class KnowledgeGovernance{
  constructor({store,agent,maintenance,consolidation,search,clock=Date.now,idleMs=60000,intervalMs=1800000,discoveryBatch=8,comparisonBatch=3}){
@@ -30,11 +31,11 @@ class KnowledgeGovernance{
  tracked(id){const row=this.store.db.prepare('SELECT data FROM knowledge_governance_documents WHERE id=?').get(id);return row?JSON.parse(row.data):null;}
  track(id,data){this.store.db.prepare('INSERT INTO knowledge_governance_documents VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data').run(id,JSON.stringify(data));}
  charge(tokens){if(Number.isSafeInteger(tokens)&&tokens>=0)this.settings({...this.settings(),usedTokens:this.settings().usedTokens+tokens});}
- status(){const s=this.settings(),rows=this.jobs(200),counts=Object.fromEntries(this.store.db.prepare("SELECT json_extract(data,'$.state') AS state,count(*) AS count FROM knowledge_governance_jobs GROUP BY json_extract(data,'$.state')").all().map(r=>[r.state,r.count])),count=(...states)=>states.reduce((n,state)=>n+(counts[state]||0),0);return {...s,label:labels[s.state],running:!!this.job,model:this.consolidation?.config?.model||'',counts:{queued:count('queued','analyzing','verifying'),ready:count('ready'),review:count('review','error','waiting_sources'),confirmed:count('confirmed')},total:Object.values(counts).reduce((a,b)=>a+b,0),groups:groups(rows),jobs:rows.map(({input,assessment,review,...j})=>({...j,kind:assessment?.kind||'pending',title:assessment?.title||input.documents.map(d=>d.title).join(' / '),reason:j.reason||assessment?.reason,documents:input.documents.map(({content,...d})=>d),canConfirm:j.state==='ready'&&review?.passed===true})),coverage:s.coverage||{documents:0,eligible:0,scanned:0,remaining:0},warnings:s.warnings||[]};}
- configure(input){if(!input||Object.keys(input).some(k=>!['enabled','scan'].includes(k)))throw failure('无效整理设置');const s=this.settings();if(input.enabled!==undefined){if(typeof input.enabled!=='boolean')throw failure('整理开关无效');s.enabled=input.enabled;}if(input.scan)s.nextScan=0;this.settings(s);if(!s.enabled){this.active?.abort();this.state('paused');}else if(!this.active)this.state('idle');return this.status();}
+ status(){const s=this.settings(),scheduling=this.scheduler?.status('governance');if(scheduling?.waiting){s.state='waiting_maintenance';s.message=`等待${scheduling.label}完成本轮；队列第 ${scheduling.position} 位`;}const rows=this.jobs(200),counts=Object.fromEntries(this.store.db.prepare("SELECT json_extract(data,'$.state') AS state,count(*) AS count FROM knowledge_governance_jobs GROUP BY json_extract(data,'$.state')").all().map(r=>[r.state,r.count])),count=(...states)=>states.reduce((n,state)=>n+(counts[state]||0),0);return {...s,label:scheduling?.waiting?'排队等待执行':labels[s.state],scheduling,running:!!this.job,model:this.consolidation?.config?.model||'',counts:{queued:count('queued','analyzing','verifying'),ready:count('ready'),review:count('review','error','waiting_sources'),confirmed:count('confirmed')},total:Object.values(counts).reduce((a,b)=>a+b,0),groups:groups(rows),jobs:rows.map(({input,assessment,review,...j})=>({...j,kind:assessment?.kind||'pending',title:assessment?.title||input.documents.map(d=>d.title).join(' / '),reason:j.reason||assessment?.reason,documents:input.documents.map(({content,...d})=>d),canConfirm:j.state==='ready'&&review?.passed===true})),coverage:s.coverage||{documents:0,eligible:0,scanned:0,remaining:0},warnings:s.warnings||[]};}
+ configure(input){if(!input||Object.keys(input).some(k=>!['enabled','scan'].includes(k)))throw failure('无效整理设置');const s=this.settings();if(input.enabled!==undefined){if(typeof input.enabled!=='boolean')throw failure('整理开关无效');s.enabled=input.enabled;}if(input.scan)s.nextScan=0;this.settings(s);if(!s.enabled){this.active?.abort();this.state('paused');}else if(!this.active)this.state('idle');if(this.scheduler&&s.enabled&&(input.enabled===true||input.scan))void this.tick().catch(()=>{});return this.status();}
  start(){this.timer=setInterval(()=>void this.tick().catch(()=>{}),15000);this.timer.unref();}
  async stop(){this.stopped=true;clearInterval(this.timer);this.active?.abort();await this.job?.catch(()=>{});}
- async tick(){if(this.stopped||this.job)return;this.job=this.run().finally(()=>{this.job=null;});return this.job;}
+ async tick(){if(this.stopped||this.job)return;this.job=(this.scheduler?this.scheduler.run('governance',()=>this.stopped?undefined:this.run()):this.run()).finally(()=>{this.job=null;});return this.job;}
  async view(){const v=await inventory(this.store,this.consolidation),blocked=this.maintenance?.blocked()||new Set(),unavailable=new Set(v.warnings.map(w=>w.document));return {...v,eligible:new Map([...v.docs].filter(([id,d])=>d.readable&&!blocked.has(id)&&!(v.references.get(id)||[]).some(s=>s.missing||blocked.has(s.document)||unavailable.has(s.document)||s.baseline&&s.baseline!==s.revision)))};}
  snapshot(d,view){return {id:d.id,revision:d.revision,hash:d.hash,title:d.title,path:d.path,workspace:d.workspace,relative:d.relative,content:d.content,work:d.provenance?.root||null,sources:(view.references.get(d.id)||[]).map(s=>({key:s.key,revision:s.revision,label:s.label}))};}
  async current(j){const v=await this.view();const docs=j.input.documents.map(d=>v.eligible.get(d.id));if(docs.some(d=>!d)||signature(docs.map(d=>this.snapshot(d,v)))!==j.fingerprint)throw failure('原文版本或来源状态已变化，请重新扫描',409);return v;}
@@ -68,20 +69,21 @@ class KnowledgeGovernance{
  async process(j,signal){
   await this.current(j);
   j.input=this.get(j.id).input;if(j.input.documents.some(d=>d.contentError))throw failure('原文快照无法校验，请重新扫描',409);
-  if(!j.assessment){j.state='analyzing';j.model=this.consolidation.config.model;this.state('analyzing');this.event(j,'analyzing','内嵌 agent 比较两侧观点、版本、设备和环境');const result=await this.agent.assessKnowledge(this.consolidation.config,j.input,signal);this.charge(result.usedTokens);signal.throwIfAborted();j.assessment=validateAssessment(result,j.input.documents);await this.current(j);this.save(j);}
+  const query=j.input.documents.map(d=>d.title+' '+d.content.slice(0,2000)).join(' '),input={...j.input,documents:j.input.documents.map(d=>({...d,...excerpt(d.content,query)}))};j.partialComparison=input.documents.some(d=>d.partial);
+  if(!j.assessment){j.state='analyzing';j.model=this.consolidation.config.model;this.state('analyzing');this.event(j,'analyzing','内嵌 agent 比较两侧观点、版本、设备和环境');const result=await this.agent.assessKnowledge(this.consolidation.config,input,signal);this.charge(result.usedTokens);signal.throwIfAborted();validateAssessment(result,input.documents);j.assessment=validateAssessment(result,j.input.documents);if(j.partialComparison)j.assessment.recommendation.preserve.push('本次只比较所示片段，全文其余内容和限制仍须保留并核实');await this.current(j);this.save(j);}
   j.state='verifying';j.reviewModel=this.consolidation.config.model;this.state('verifying');this.event(j,'verifying','单独请求复核引用、适用范围、分类与建议');
-  const review=await this.agent.verifyKnowledgeAssessment(this.consolidation.config,{...j.input,assessment:j.assessment},signal);this.charge(review.usedTokens);signal.throwIfAborted();j.review=validateReview(review);await this.current(j);
+  const review=await this.agent.verifyKnowledgeAssessment(this.consolidation.config,{...input,assessment:j.assessment},signal);this.charge(review.usedTokens);signal.throwIfAborted();j.review=validateReview(review);await this.current(j);
   j.state=!j.review.passed||j.assessment.kind==='uncertain'?'review':j.assessment.kind==='related'?'clear':'ready';j.reason=j.review.passed?j.assessment.reason:j.review.reason;this.event(j,j.state,j.state==='ready'?'整理建议已准备好，等待你确认；原文未修改':j.state==='clear'?'仅主题相关，保留独立文档':j.reason);
  }
  async run(){
   if(!this.settings().enabled){this.state('paused');return;}
-  if(this.maintenance?.job||this.consolidation?.job||this.isBusy?.()){this.state('waiting_maintenance');return;}
+  if(!this.scheduler&&(this.maintenance?.job||this.consolidation?.job)||this.isBusy?.()){this.state('waiting_maintenance');return;}
   const controller=new AbortController();this.active=controller;
   try{
    if(this.clock()>=this.settings().nextScan)await this.scan(controller.signal);
-   const queue=this.jobs().reverse().filter(j=>j.state==='queued').slice(0,this.comparisonBatch);
+   const queue=this.jobs().reverse().filter(j=>j.state==='queued').slice(0,this.scheduler?1:this.comparisonBatch);
    if(queue.length&&!this.consolidation?.config){this.state('waiting_agent');return;}
-   for(let j of queue){controller.signal.throwIfAborted();try{await this.process(j,controller.signal);}catch(error){j=this.get(j.id);if(controller.signal.aborted){j.state='queued';this.event(j,'paused','已暂停，保留本次比较进度');throw error;}j.state=error.status===409?'obsolete':'error';j.reason=error.status||/^辅助模型/.test(error.message)?error.message:'整理比较未完成，可重试当前记录';this.event(j,j.state,j.reason);}}
+   for(let j of queue){if(this.stopped)break;controller.signal.throwIfAborted();try{await this.process(j,controller.signal);}catch(error){j=this.get(j.id);if(controller.signal.aborted){j.state='queued';this.event(j,'paused','已暂停，保留本次比较进度');throw error;}j.state=error.status===409?'obsolete':'error';j.reason=error.status||/^辅助模型/.test(error.message)?error.message:'整理比较未完成，可重试当前记录';this.event(j,j.state,j.reason);}}
    this.state('idle');
   }catch(error){if(controller.signal.aborted)this.state('paused');else this.state('error',error.status?error.message:'相关文档检查未完成，下轮将重试');}
   finally{this.active=null;}

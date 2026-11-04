@@ -1,12 +1,13 @@
 const path=require('node:path'),{randomUUID}=require('node:crypto');
 const {hash,failure}=require('./knowledge-library.cjs');
-const {inventory,readRevision,links}=require('./knowledge-maintenance-sources.cjs');
+const {inventory,readRevision,links,MAX_TEXT,SOURCE_POLICY}=require('./knowledge-maintenance-sources.cjs');
+const {segments,excerpt}=require('./knowledge-text-segments.cjs');
 const {sensitiveDocument}=require('./work-knowledge-policy.cjs');
 const DONE=new Set(['completed','confirmed','obsolete','dismissed','rolled_back']);
 const labels={idle:'等待来源变化',scanning:'检查来源与引用',waiting_agent:'等待辅助模型',analyzing:'核对受影响知识',verifying:'独立复核修改',applying:'保存新修订',indexing:'验证索引与检索',paused:'维护已暂停',error:'维护未完成'};
-const fingerprint=(doc,sources)=>hash(JSON.stringify([doc.revision,sources.map(s=>[s.key,s.revision,s.blocked||false]) ]));
-function validatePlan(plan,input){
- if(!plan||!['revise','valid','review'].includes(plan.decision)||typeof plan.reason!=='string'||!plan.reason.trim()||plan.reason.length>2000||!Array.isArray(plan.patches)||plan.patches.length>8)throw failure('维护建议格式无效，未修改原文');
+const fingerprint=(doc,sources)=>hash(JSON.stringify([SOURCE_POLICY,doc.revision,sources.map(s=>[s.key,s.revision,s.blocked||false]) ]));
+function validatePlan(plan,input,maxPatches=8){
+ if(!plan||!['revise','valid','review'].includes(plan.decision)||typeof plan.reason!=='string'||!plan.reason.trim()||plan.reason.length>2000||!Array.isArray(plan.patches)||plan.patches.length>maxPatches)throw failure('维护建议格式无效，未修改原文');
  let after=input.document.content;const ranges=[];
  if(plan.decision!=='revise'&&plan.patches.length)throw failure('非修订建议不能携带修改');
  if(plan.decision==='revise'&&!plan.patches.length)throw failure('修订建议缺少修改');
@@ -43,13 +44,18 @@ class KnowledgeMaintenance{
  latest(){const seen=new Set();return this.jobs().filter(j=>{if(seen.has(j.document)||j.state==='obsolete')return false;seen.add(j.document);return true;});}
  blocked(){return new Set([...this.latest().filter(j=>!['completed','confirmed'].includes(j.state)).map(j=>j.document),...(this.settings().warnings||[]).map(w=>w.document)]);}
  freshness(identity){if(!identity)return null;const d=this.store.doc(identity);if(!d)return null;const warning=this.settings().warnings?.find(w=>w.document===d.id);if(warning)return {state:'needs_review',message:warning.reason};const job=this.latest().find(j=>j.document===d.id&&!['completed','confirmed'].includes(j.state));return job?{state:'needs_review',job:job.id,message:job.reason||'来源已变化，此文档尚未完成维护验证'}:null;}
- status(){const all=this.jobs(),s=this.settings();return {...s,lastScan:s.scannedAt||s.lastScan,label:labels[s.status],running:!!this.active||!!this.job,model:this.consolidation?.config?.model||'',counts:{pending:all.filter(j=>['queued','analyzing','verifying','indexing','waiting_source'].includes(j.state)).length,review:all.filter(j=>['review','conflict','error','dismissed','rolled_back'].includes(j.state)).length,completed:all.filter(j=>['completed','confirmed'].includes(j.state)).length},jobs:all.slice(0,100).map(({input,plan,write,...j})=>({...j,hasChanges:!!plan?.patches?.length,canApply:j.state==='review'&&!!j.verdict?.supported&&!!j.verdict?.scopeUnchanged&&!!j.verdict?.complete&&!!plan?.patches?.length,canRollback:j.state==='completed'&&!!j.resultRevision&&!!write&&!write.external,checks:j.checks})),coverage:s.coverage||{documents:0,tracked:0,untracked:0}};}
- configure(input){if(Object.keys(input).some(k=>!['enabled','autoApply','scan'].includes(k)))throw failure('无效维护设置');const s=this.settings();for(const k of ['enabled','autoApply'])if(input[k]!==undefined){if(typeof input[k]!=='boolean')throw failure('维护设置必须为开关');s[k]=input[k];}if(input.scan)s.lastScan=0;this.settings(s);if(!s.enabled)this.active?.abort();this.state(s.enabled?'idle':'paused');return this.status();}
+ status(){const all=this.jobs(),s=this.settings(),scheduling=this.scheduler?.status('maintenance');if(scheduling?.waiting){s.status='waiting_turn';s.message=`等待${scheduling.label}完成本轮；队列第 ${scheduling.position} 位`;}return {...s,lastScan:s.scannedAt||s.lastScan,label:s.status==='waiting_turn'?'排队等待执行':labels[s.status],scheduling,running:!!this.active||!!this.job,model:this.consolidation?.config?.model||'',counts:{pending:all.filter(j=>['queued','analyzing','verifying','indexing','waiting_source'].includes(j.state)).length,review:all.filter(j=>['review','conflict','error','dismissed','rolled_back'].includes(j.state)).length,completed:all.filter(j=>['completed','confirmed'].includes(j.state)).length},jobs:all.slice(0,100).map(({input,plan,write,...j})=>({...j,hasChanges:!!plan?.patches?.length,canApply:j.state==='review'&&!!j.verdict?.supported&&!!j.verdict?.scopeUnchanged&&!!j.verdict?.complete&&!!plan?.patches?.length,canRollback:j.state==='completed'&&!!j.resultRevision&&!!write&&!write.external,checks:j.checks})),coverage:s.coverage||{documents:0,tracked:0,untracked:0}};}
+ configure(input){if(Object.keys(input).some(k=>!['enabled','autoApply','scan'].includes(k)))throw failure('无效维护设置');const s=this.settings();for(const k of ['enabled','autoApply'])if(input[k]!==undefined){if(typeof input[k]!=='boolean')throw failure('维护设置必须为开关');s[k]=input[k];}if(input.scan)s.lastScan=0;this.settings(s);if(!s.enabled)this.active?.abort();this.state(s.enabled?'idle':'paused');if(this.scheduler&&s.enabled&&(input.enabled===true||input.scan))void this.tick().catch(()=>{});return this.status();}
  start(){this.timer=setInterval(()=>void this.tick().catch(()=>{}),15000);this.timer.unref();}
  async stop(){this.stopped=true;clearInterval(this.timer);this.active?.abort();await this.job?.catch(()=>{});}
- async tick(){if(this.stopped||this.job)return;this.job=this.run().finally(()=>{this.job=null;});return this.job;}
+ async tick(){if(this.stopped||this.job)return;this.job=(this.scheduler?this.scheduler.run('maintenance',()=>this.stopped?undefined:this.run()):this.run()).finally(()=>{this.job=null;});return this.job;}
  async scan(){
-  this.state('scanning');const view=await inventory(this.store,this.consolidation),latest=new Map(this.latest().map(j=>[j.document,j])),blocked=new Set([...latest.values()].filter(j=>!['completed','confirmed'].includes(j.state)).map(j=>j.document));let tracked=0;
+  this.state('scanning');const view=await inventory(this.store,this.consolidation);
+  if(this.settings().sourcePolicy!==SOURCE_POLICY){
+   for(const j of this.latest())if(!DONE.has(j.state)&&!j.write&&!j.plan&&j.input.sources.some(s=>s.missing||s.blocked)){j.state='obsolete';this.event(j,'source_policy_updated','来源识别规则已更新，重新检查；此记录不代表事实有误');}
+   for(const [id,refs] of view.references){const old=this.tracked(id);if(!old)continue;for(const s of refs)if(!s.missing&&old.refs[s.key]?.startsWith('unavailable:'))old.refs[s.key]=old.refs[s.key].slice('unavailable:'.length);this.track(id,old);}
+  }
+  const latest=new Map(this.latest().map(j=>[j.document,j])),blocked=new Set([...latest.values()].filter(j=>!['completed','confirmed'].includes(j.state)).map(j=>j.document));let tracked=0;
   for(const warning of view.warnings)blocked.add(warning.document);
   // Traverse reverse references once; long dependency chains are not truncated.
   const dependents=new Map();
@@ -71,14 +77,35 @@ class KnowledgeMaintenance{
     if(prior){prior.state='obsolete';this.event(prior,'obsolete','来源或目标出现新版本，旧建议已失效；已保存修订保留在历史');}
     const inputs=refs.map(s=>({...s,previousRevision:old?.refs[s.key]||s.baseline,previousContent:s.document&&old?.refs[s.key]?readRevision(this.store,s.document,old.refs[s.key]):s.quote||''}));
     const manualConflict=!!prior&&(prior.state==='rolled_back'||prior.input.document.revision!==d.revision&&['ui','mcp','stele','maintenance-rollback'].includes(this.store.db.prepare('SELECT origin FROM revisions WHERE id=?').get(d.revision)?.origin));
-    const j={id:randomUUID(),document:d.id,title:d.title,path:d.path,workspace:d.workspace,fingerprint:fp,state:'queued',manualConflict,createdAt:this.clock(),reason:issues.some(s=>s.missing)?'来源缺失或暂不可读':issues.some(s=>s.blocked)?'上游知识尚待核实':'来源版本已变化',input:{document:{id:d.id,revision:d.revision,title:d.title,relative:d.relative,content:d.content,provenance:d.provenance},sources:inputs},events:[]};
-    if(Buffer.byteLength(JSON.stringify(j.input))>600000){j.state='review';j.reason='关联资料超过本轮读取范围，需缩小范围后核实';j.input.sources=j.input.sources.map(({content,previousContent,...s})=>({...s,content:'',previousContent:''}));}
+    const j={id:randomUUID(),document:d.id,title:d.title,path:d.path,workspace:d.workspace,fingerprint:fp,state:'queued',manualConflict,sourcePolicy:SOURCE_POLICY,createdAt:this.clock(),reason:issues.find(s=>s.missing)?.reason|| (issues.some(s=>s.missing)?'来源缺失或暂不可读':issues.some(s=>s.blocked)?'上游知识尚待核实':'来源版本已变化'),input:{document:{id:d.id,revision:d.revision,title:d.title,relative:d.relative,content:d.content,provenance:d.provenance},sources:inputs},events:[]};
+    if(Buffer.byteLength(JSON.stringify(j.input))>8*1024*1024){j.state='review';j.reason='关联来源超过 8 MB，请分批核实；未判为来源缺失';j.input.sources=j.input.sources.map(({content,previousContent,...s})=>({...s,content:'',previousContent:''}));}
     this.event(j,'detected',j.reason);
    }
   for(const [id,refs] of view.references)if(refs.length)tracked++;
-  this.settings({...this.settings(),lastScan:this.clock(),scannedAt:this.clock(),coverage:{documents:view.docs.size,tracked,untracked:view.docs.size-tracked},warnings:view.warnings});return view;
+  this.settings({...this.settings(),sourcePolicy:SOURCE_POLICY,lastScan:this.clock(),scannedAt:this.clock(),coverage:{documents:view.docs.size,tracked,untracked:view.docs.size-tracked,segmented:[...view.docs.values()].filter(d=>d.readable&&d.segmented).length},warnings:view.warnings});return view;
  }
  async current(j){const view=await inventory(this.store,this.consolidation),doc=view.docs.get(j.document);if(!doc)throw failure('目标文档已不存在',409);const blocked=this.blocked();blocked.delete(j.document);const refs=(view.references.get(j.document)||[]).map(s=>({...s,blocked:s.document?blocked.has(s.document):false}));if(fingerprint(doc,refs)!==j.fingerprint)throw failure('来源或目标已变化，请重新检查',409);return {doc,refs};}
+ async analyzeSegment(j,signal){
+  const parts=Buffer.byteLength(j.input.document.content)>MAX_TEXT?segments(j.input.document.content):[{start:0,end:j.input.document.content.length,content:j.input.document.content,lineStart:1}],done=j.segments||[],part=parts[done.length];
+  const sourceLimit=Math.max(2000,Math.min(MAX_TEXT,Math.floor(240000/Math.max(1,j.input.sources.length))));
+  const sources=j.input.sources.map(s=>{const selected=excerpt(s.content,part.content,sourceLimit),previous=excerpt(s.previousContent||'',part.content,Math.min(sourceLimit,10000));return {...s,content:selected.content,partial:selected.partial,ranges:selected.ranges,previousContent:previous.content,previousPartial:previous.partial};});
+  const input={...j.input,document:{...j.input.document,content:part.content},sources,segment:{index:done.length+1,total:parts.length,lineStart:part.lineStart},documentContext:parts.length>1?j.input.document.content.slice(0,3000):''};
+  if(Buffer.byteLength(JSON.stringify(input))>600000){j.state='review';this.event(j,'review','关联来源数量超过本轮分段上下文，请分批核实；原文未修改');return false;}
+  j.progress={completed:done.length,total:parts.length,lineStart:part.lineStart};j.state='analyzing';this.state('analyzing');this.event(j,'analyzing',`核对第 ${done.length+1} / ${parts.length} 段`);
+  if(!j.segmentProposal){const proposed=await this.agent.maintainKnowledge(this.consolidation.config,input,signal);this.charge(proposed.usedTokens);signal.throwIfAborted();j.segmentProposal=validatePlan(proposed,input);validatePlan(proposed,j.input);this.save(j);}
+  const plan=j.segmentProposal;
+  if(plan.decision==='review'){j.state='review';j.reason=plan.reason;this.event(j,'review',j.reason);return false;}
+  j.state='verifying';this.state('verifying');this.event(j,'verifying',`单独复核第 ${done.length+1} / ${parts.length} 段`);
+  const verdict=await this.agent.verifyKnowledgeMaintenance(this.consolidation.config,{...input,proposal:plan},signal);this.charge(verdict.usedTokens);signal.throwIfAborted();await this.current(j);
+  if(verdict.supported!==true||verdict.scopeUnchanged!==true||verdict.complete!==true){j.state='review';j.reason=verdict.reason||'分段复核未通过';this.event(j,'review',j.reason);return false;}
+  done.push({patches:plan.patches,reason:plan.reason,partialSources:sources.some(s=>s.partial)});j.segments=done;delete j.segmentProposal;j.progress.completed=done.length;
+  if(done.length<parts.length){j.state='queued';this.event(j,'segment_checked',`已复核 ${done.length} / ${parts.length} 段，原文尚未修改`);return false;}
+  const patches=done.flatMap(p=>p.patches);j.plan=validatePlan({decision:patches.length?'revise':'valid',reason:done.length===1?done[0].reason:`已逐段核对并复核全部 ${done.length} 段`,patches},j.input,64);
+  if(JSON.stringify((await links(j.plan.after)).sort())!==JSON.stringify((await links(j.input.document.content)).sort()))throw failure('模型建议改变了引用关系，请人工核对');
+  j.verdict={supported:true,scopeUnchanged:true,complete:!done.some(p=>p.partialSources),reason:'已分别复核全部目标分段'};this.save(j);
+  if(!j.verdict.complete){j.state='review';j.reason='长来源只选取了相关片段，尚未核对全文限制；保留建议供人工核实，不自动写入';this.event(j,'review',j.reason);return false;}
+  return true;
+ }
  async process(j,signal){
   await this.current(j);
   if(j.input.sources.some(s=>s.missing||s.blocked)){j.state='review';this.event(j,'review',j.reason+'；未修改原文');return;}
@@ -94,15 +121,7 @@ class KnowledgeMaintenance{
    else{j.state='review';this.event(j,'review','此 Work 的沉淀已暂停或来源未登记');}return;
   }
   if(!this.consolidation?.config){this.state('waiting_agent','在设置中配置辅助模型后继续；不创建 OMP 会话');return;}
-  j.state='analyzing';this.event(j,'analyzing','内嵌 agent 对照新旧来源核对结论');this.state('analyzing');
-  const proposed=await this.agent.maintainKnowledge(this.consolidation.config,j.input,signal);this.charge(proposed.usedTokens);
-  signal.throwIfAborted();j.plan=validatePlan(proposed,j.input);
-  if(JSON.stringify((await links(j.plan.after)).sort())!==JSON.stringify((await links(j.input.document.content)).sort()))throw failure('模型建议改变了引用关系，请人工核对');
-  this.save(j);
-  if(j.plan.decision==='review'){j.state='review';j.reason=j.plan.reason;this.event(j,'review',j.reason);return;}
-  j.state='verifying';this.event(j,'verifying','独立请求复核证据、适用范围和修改范围');this.state('verifying');
-  j.verdict=await this.agent.verifyKnowledgeMaintenance(this.consolidation.config,{...j.input,proposal:j.plan},signal);this.charge(j.verdict.usedTokens);signal.throwIfAborted();
-  if(j.verdict.supported!==true||j.verdict.scopeUnchanged!==true||j.verdict.complete!==true){j.state='review';j.reason=j.verdict.reason||'独立复核未通过';this.event(j,'review',j.reason);return;}
+  if(!await this.analyzeSegment(j,signal))return;
   await this.current(j);
   if(j.plan.decision==='valid'){j.state='indexing';j.write={external:true};j.resultRevision=j.input.document.revision;this.event(j,'indexing','来源变化但结论仍适用，正在验证检索');await this.finish(j);return;}
   const protectedType=/(?:^|\/)(规范|计划|提案|任务|设计|specs?|plans?|proposals?|tasks?|designs?)(?:\/|$)/i.test(j.input.document.relative)||/^type:\s*["']?(?:规范|计划|提案|任务|设计|spec|plan|proposal|tasks?|design)["']?\s*$/im.test(j.input.document.content.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]||'');
@@ -139,7 +158,7 @@ class KnowledgeMaintenance{
  async performAction(id,action,signal){
   const j=this.get(id);
   if(['obsolete','rolled_back','dismissed'].includes(j.state)&&action!=='confirm')throw failure('此记录已结束，请重新检查当前版本',409);
-  if(action==='retry'){if(j.write)j.state='indexing';else{await this.current(j);j.state='queued';j.createdAt=this.clock()-this.idleMs;}this.event(j,'retry','已安排重试');this.settings({...this.settings(),lastScan:0});return this.status();}
+  if(action==='retry'){if(j.write)j.state='indexing';else{await this.current(j);delete j.segments;delete j.segmentProposal;delete j.progress;delete j.plan;delete j.verdict;j.state='queued';j.createdAt=this.clock()-this.idleMs;}this.event(j,'retry','已安排重试');this.settings({...this.settings(),lastScan:0});return this.status();}
   if(action==='apply'){if(j.state!=='review'||!j.plan?.patches?.length||!j.verdict?.supported||!j.verdict?.scopeUnchanged||!j.verdict?.complete)throw failure('此记录没有通过复核的修订');await this.apply(j,signal);}
   else if(action==='confirm'){await this.current(j);j.state='confirmed';this.acknowledge(j);this.event(j,'confirmed','用户确认当前原文仍适用');}
   else if(action==='dismiss'){if(DONE.has(j.state))throw failure('此记录已结束');j.state='dismissed';this.event(j,'dismissed','已暂缓处理；检索仍提示待核实');}
@@ -150,18 +169,18 @@ class KnowledgeMaintenance{
   }else throw failure('不支持的维护操作');return this.status();
  }
  async run(){
-  if(this.governanceBusy?.())return;
+  if(!this.scheduler&&this.governanceBusy?.())return;
   if(!this.settings().enabled){this.state('paused');return;}
   try{
    // Recover durable publication before scanning the revision it created.
    for(let j of this.jobs().filter(j=>j.state==='indexing'&&j.write)){
-    if(!this.settings().enabled)return;
+    if(this.stopped||!this.settings().enabled)return;
     try{await this.finish(j);}catch(error){j=this.get(j.id);j.state=[409,412].includes(error.status)?'conflict':'error';j.reason=error.status?error.message:'检索验证未完成，请重试';this.event(j,j.state,j.reason);}
    }
    if(this.clock()-this.settings().lastScan>=this.intervalMs||!this.settings().lastScan)await this.scan();
-   if(this.consolidation?.active||this.consolidation?.job){this.state('idle','等待本轮知识沉淀完成');return;}
-   const jobs=this.jobs().reverse().filter(j=>['queued','indexing'].includes(j.state)&&this.clock()-j.createdAt>=this.idleMs).slice(0,3);
-   for(let j of jobs){if(!this.settings().enabled)break;const controller=new AbortController();this.active=controller;
+   if(!this.scheduler&&(this.consolidation?.active||this.consolidation?.job)){this.state('idle','等待本轮知识沉淀完成');return;}
+   const jobs=this.jobs().reverse().filter(j=>['queued','indexing'].includes(j.state)&&this.clock()-j.createdAt>=this.idleMs).slice(0,this.scheduler?1:3);
+   for(let j of jobs){if(this.stopped||!this.settings().enabled)break;const controller=new AbortController();this.active=controller;
     try{if(j.write)await this.finish(j);else await this.process(j,controller.signal);}
     catch(error){j=this.get(j.id);if(controller.signal.aborted){j.state=j.write?'indexing':'queued';this.event(j,'paused','维护已暂停，原文及已保存修订保留');break;}j.state=[409,412].includes(error.status)?'conflict':'error';j.reason=error.status||/^辅助模型/.test(error.message)?error.message:'维护未完成，请查看来源后重试';this.event(j,j.state,j.reason);}
     finally{this.active=null;}

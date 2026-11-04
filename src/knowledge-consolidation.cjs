@@ -89,7 +89,7 @@ class KnowledgeConsolidation{
  start(){this.timer=setInterval(()=>void this.tick().catch(()=>{}),10000);this.timer.unref();}
  keepAlive(){return !!this.active||this.all().some(p=>p.enabled&&p.registered);}
  async stop(){this.stopped=true;clearInterval(this.timer);this.active?.controller.abort();await this.job?.catch(()=>{});this.config=null;}
- async tick(){if(this.stopped||this.job)return;this.job=this.advance().finally(()=>{this.job=null;});return this.job;}
+ async tick(){if(this.stopped||this.job)return;this.job=(this.scheduler?this.scheduler.run('consolidation',()=>this.advance()):this.advance()).finally(()=>{this.job=null;});return this.job;}
  eligible(p){return p.enabled&&p.registered&&!(p.busy&&this.clock()-p.lastSeen<90000);}
  async publish(p){
   const pending=p.pending;if(!pending)return;
@@ -103,14 +103,14 @@ class KnowledgeConsolidation{
   this.status(p,p.enabled?'completed':'paused');
  }
  async advance(){
-  if(this.maintenanceBusy?.())return;
+  if(!this.scheduler&&this.maintenanceBusy?.())return;
   for(let p of this.all().sort((a,b)=>(a.lastRunAt||0)-(b.lastRunAt||0))){
-   if(!p.enabled||!p.registered)continue;
+   if(this.stopped)return;if(!p.enabled||!p.registered)continue;
    if(!this.eligible(p)){this.status(p,'busy');continue;}
    if(this.clock()-(p.lastRunAt||0)<this.cooldownMs)continue;
    try{
     if(p.pending){p.lastRunAt=this.clock();this.save(p);await this.publish(p);return;}
-    const snap=await this.read(p.directory);p=this.get(p.root);if(!this.eligible(p))continue;p.skipped=snap.skipped;
+    const snap=await this.read(p.directory);p=this.get(p.root);if(this.stopped)return;if(!this.eligible(p))continue;p.skipped=snap.skipped;
     if(snap.fingerprint!==p.observed){p.observed=snap.fingerprint;p.stableSince=this.clock();this.status(p,'stabilizing');continue;}
     if(this.clock()-p.stableSince<this.idleMs){this.save(p);continue;}
     const changed=snap.files.filter(f=>p.sources[f.path]?.hash!==f.hash&&p.failed?.[f.path]!==f.hash);
@@ -118,15 +118,15 @@ class KnowledgeConsolidation{
     if(!this.config){this.status(p,'waiting_agent','在设置中配置辅助模型后自动继续；无需 OMP 会话');continue;}
     const controller=new AbortController();this.active={root:p.root,controller};p.lastRunAt=this.clock();this.save(p);
     try{
-     for(const source of changed.slice(0,3)){
-      p=this.get(p.root);if(!this.eligible(p)||controller.signal.aborted)break;
+     for(const source of changed.slice(0,this.scheduler?1:3)){
+      p=this.get(p.root);if(this.stopped||!this.eligible(p)||controller.signal.aborted)break;
       p.currentSource=source.path;p.currentHash=source.hash;this.status(p,'running');
       const prior=Object.values(p.sources).flatMap(s=>s.facts||[]).map(({title,knowledge,appliesTo})=>({title,knowledge,appliesTo}));
       const result=await this.agent.consolidateKnowledge(this.config,{root:p.root,source,existing:prior.slice(0,40)},controller.signal);
       p=this.get(p.root);p.usedTokens=(p.usedTokens||0)+(result.usedTokens||0);this.save(p);
       const facts=validateExtraction(result,source);
       const current=await this.read(p.directory);
-      if(controller.signal.aborted||!this.eligible(this.get(p.root)))break;
+      if(this.stopped||controller.signal.aborted||!this.eligible(this.get(p.root)))break;
       if(current.files.find(f=>f.path===source.path)?.hash!==source.hash){this.status(p,'stabilizing','提炼期间原文已变化，等待稳定后重试');break;}
       if(p.failed)delete p.failed[source.path];
       const sources={...p.sources,[source.path]:{hash:source.hash,layer:source.layer,facts,at:this.clock()}},document=render(p.root,sources);
@@ -139,11 +139,11 @@ class KnowledgeConsolidation{
     }finally{this.active=null;}
     return;
    }catch(error){
-    p=this.get(p.root);p.lastRunAt=this.clock();
+    p=this.get(p.root);if(this.stopped){this.status(p,p.enabled?'idle':'paused','服务停止，未完成资料保留供下次处理');return;}p.lastRunAt=this.clock();
     if(!p.enabled||!p.registered||!this.eligible(p)){this.status(p,!p.enabled?'paused':!p.registered?'unregistered':'busy');continue;}
     if(!p.pending&&p.status==='running'&&p.currentSource&&p.currentHash){p.failed={...p.failed,[p.currentSource]:p.currentHash};}
     const message=error.consolidationSafe||/^辅助模型|请先填写辅助模型/.test(error.message)?error.message:error.status===412||error.status===409?'L3 文档已被修改，自动任务保留原文；请在知识库核对':'资料读取或入库失败，保留已有知识；可稍后重试';
-    p.history=[{at:this.clock(),state:'failed',message},...(p.history||[])].slice(0,20);this.status(p,[409,412].includes(error.status)?'conflict':'failed',message);
+    p.history=[{at:this.clock(),state:'failed',message},...(p.history||[])].slice(0,20);this.status(p,[409,412].includes(error.status)?'conflict':'failed',message);if(this.scheduler)return;
    }
   }
  }

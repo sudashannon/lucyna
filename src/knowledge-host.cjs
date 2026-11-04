@@ -4,6 +4,8 @@ const {KnowledgeLibrary,hash,inside,failure}=require('./knowledge-library.cjs');
 const {KnowledgeConsolidation}=require('./knowledge-consolidation.cjs');
 const {KnowledgeMaintenance}=require('./knowledge-maintenance.cjs');
 const {KnowledgeGovernance}=require('./knowledge-governance.cjs');
+const {KnowledgeScheduler}=require('./knowledge-scheduler.cjs');
+const {publishConnection}=require('./knowledge-connection.cjs');
 const {createMaintenanceAccess}=require('./knowledge-maintenance-access.cjs');
 const {KnowledgeSync}=require('./knowledge-sync.cjs');
 const {KnowledgeAutoSync}=require('./knowledge-auto-sync.cjs');
@@ -46,6 +48,7 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
  const maintenance=new KnowledgeMaintenance({store,agent:new AuxiliaryAgent(),consolidation,register,verify:(...args)=>maintenanceAccess.verify(...args),...maintenanceOptions});
  maintenanceAccess=createMaintenanceAccess({maintenance,store,nativeJSON,native});
  const governance=new KnowledgeGovernance({store,agent:new AuxiliaryAgent(),maintenance,consolidation,search:maintenanceAccess.search,...governanceOptions});
+ const scheduler=new KnowledgeScheduler();for(const service of [consolidation,maintenance,governance])service.scheduler=scheduler;
  consolidation.maintenanceBusy=()=>!!maintenance.job||!!governance.job;
  maintenance.governanceBusy=()=>!!governance.job;
  governance.isBusy=()=>sync.status().running||automaticSync.status().running;
@@ -124,7 +127,7 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
    if(upstream.body){for await(const chunk of upstream.body){if(response.destroyed)break;if(!response.write(Buffer.from(chunk)))await new Promise(resolve=>response.once('drain',resolve));}}response.end();
   }catch(error){if(!response.headersSent)json(response,{error:error.message},error.status||500);else response.destroy();}
  });
- const stop=async()=>{if(closing)return;closing=true;ready=false;clearInterval(idleTimer);await governance.stop();await maintenance.stop();await consolidation.stop();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await automaticSync.stop();child?.kill();await worker.terminate();store.close();try{const file=path.join(runtime,'connection.json'),saved=JSON.parse(fs.readFileSync(file,'utf8'));if(saved.instanceId===instanceId)fs.unlinkSync(file);}catch{};};
+ const stop=async()=>{if(closing)return;closing=true;ready=false;clearInterval(idleTimer);scheduler.close();await Promise.all([governance.stop(),maintenance.stop(),consolidation.stop()]);server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await automaticSync.stop();child?.kill();await worker.terminate();store.close();try{const file=path.join(runtime,'connection.json'),saved=JSON.parse(fs.readFileSync(file,'utf8'));if(saved.instanceId===instanceId)fs.unlinkSync(file);}catch{};};
  let idleTimer;
  try{
   await workerReady;await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const url='http://127.0.0.1:'+server.address().port;
@@ -135,10 +138,10 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
   for(const lib of store.list())await register(lib.id,{rebuild:false});
   await nativeJSON('/api/wiki/rebuild',{method:'POST'});
   ready=true;child.on('exit',()=>{ready=false;if(!closing)setImmediate(()=>void stop().then(()=>{if(standalone)process.exit(1);}));});
-  const connection={version:1,instanceId,url,token,pid:process.pid,root,sourceHash:manifest.sourceHash};store.atomic(path.join(runtime,'connection.json'),Buffer.from(JSON.stringify(connection)));
+  const connection={version:1,instanceId,url,token,pid:process.pid,root,sourceHash:manifest.sourceHash};await publishConnection(path.join(runtime,'connection.json'),connection);
   consolidation.start();maintenance.start();governance.start();automaticSync.start();
   idleTimer=setInterval(()=>{if(!activeRequests&&!consolidation.keepAlive()&&!maintenance.settings().enabled&&!governance.settings().enabled&&!automaticSync.status().enabled&&Date.now()-lastUsed>idleMs)void stop().then(()=>{if(standalone)process.exit(0);});},10000);idleTimer.unref();
-  return {...connection,stop,store,mcp,nativeJSON,consolidation,maintenance,maintenanceAccess,governance};
+  return {...connection,stop,store,mcp,nativeJSON,consolidation,maintenance,maintenanceAccess,governance,scheduler};
  }catch(error){await stop();throw error;}
 }
 function main(){
