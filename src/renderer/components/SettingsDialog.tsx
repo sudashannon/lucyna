@@ -14,13 +14,13 @@ import '../settings-navigation.css';
 import {visualThemes, type VisualTheme} from '../appearance';
 
 const settingsGroups=[
-  {id:'runtime',label:'运行与模型',sections:[{id:'runtime',label:'运行环境'},{id:'ssh',label:'SSH 主机'},{id:'model',label:'模型与速度'},{id:'auxiliary',label:'辅助模型'}]},
+  {id:'runtime',label:'运行与模型',sections:[{id:'runtime',label:'运行环境'},{id:'knowledge',label:'知识服务'},{id:'ssh',label:'SSH 主机'},{id:'model',label:'模型与速度'},{id:'auxiliary',label:'辅助模型'}]},
   {id:'experience',label:'外观与体验',sections:[{id:'appearance',label:'外观'},{id:'feedback',label:'声音与动效'},{id:'pet',label:'桌面伙伴'}]},
   {id:'storage',label:'数据与回退',sections:[{id:'storage',label:'数据与回退'}]},
 ] as const;
 type SettingsGroupId=(typeof settingsGroups)[number]['id'];
 type SettingsSectionId=(typeof settingsGroups)[number]['sections'][number]['id'];
-const settingsSectionLabels:Record<SettingsSectionId,string>={runtime:'运行环境',ssh:'SSH 主机',model:'模型与速度',auxiliary:'辅助模型',appearance:'外观',feedback:'声音与动效',pet:'桌面伙伴',storage:'数据与回退'};
+const settingsSectionLabels:Record<SettingsSectionId,string>={runtime:'运行环境',knowledge:'知识服务',ssh:'SSH 主机',model:'模型与速度',auxiliary:'辅助模型',appearance:'外观',feedback:'声音与动效',pet:'桌面伙伴',storage:'数据与回退'};
 const settingsSectionLabel=(id:SettingsSectionId)=>settingsSectionLabels[id];
 
 export function SettingsDialog({onClose,onApply,locked,theme,visualTheme}: {onClose:()=>void; onApply:(settings:ClientSettings,theme:string,changed:boolean,visualTheme:VisualTheme)=>Promise<void>; locked:boolean; theme:string; visualTheme:VisualTheme}) {
@@ -29,6 +29,7 @@ export function SettingsDialog({onClose,onApply,locked,theme,visualTheme}: {onCl
   const [error,setError]=useState(''),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[checking,setChecking]=useState(false),[check,setCheck]=useState<EnvironmentCheck|null>(null),[revision,setRevision]=useState(0);
   const [pet,setPet]=useState<PetSettings|null>(null),[initialPet,setInitialPet]=useState<PetSettings|null>(null),[petError,setPetError]=useState('');
   const [restoringPet,setRestoringPet]=useState(false),[petRecoveryStatus,setPetRecoveryStatus]=useState('');
+  const [restartingKnowledge,setRestartingKnowledge]=useState(false),[knowledgeRestartMessage,setKnowledgeRestartMessage]=useState(''),[knowledgeRestartError,setKnowledgeRestartError]=useState('');
   const [feedback,setFeedback]=useState<FeedbackPreferences|null>(null),[initialFeedback,setInitialFeedback]=useState<FeedbackPreferences|null>(null),[feedbackError,setFeedbackError]=useState('');
   const [auxiliary,setAuxiliary]=useState<AuxiliaryInput|null>(null),[initialAuxiliary,setInitialAuxiliary]=useState<AuxiliaryInput|null>(null),[auxiliaryError,setAuxiliaryError]=useState(''),[auxiliaryChecking,setAuxiliaryChecking]=useState(false);
   const settingsBody=useRef<HTMLDivElement>(null),[activeSection,setActiveSection]=useState<SettingsSectionId>('runtime');
@@ -67,6 +68,7 @@ export function SettingsDialog({onClose,onApply,locked,theme,visualTheme}: {onCl
   const update=(patch:Partial<ClientSettings>)=>{setDraft(prev=>prev?{...prev,...patch}:prev);setCheck(null);setError('');};
   const changed=JSON.stringify(draft)!==JSON.stringify(info?.settings), disabled=saving||checking||restoringPet||auxiliaryChecking;
   const test=async()=>{if(!draft)return;setChecking(true);setError('');setCheck(null);try{setCheck(await api.checkSettings(draft));}catch(e){setError(errorText(e));}finally{setChecking(false);}};
+  const restartKnowledge=async()=>{if(restartingKnowledge)return;setRestartingKnowledge(true);setKnowledgeRestartMessage('');setKnowledgeRestartError('');try{await api.knowledgeRequest('libraryRestart');setKnowledgeRestartMessage('知识服务已重启，可以继续使用。');}catch(e){setKnowledgeRestartError(errorText(e));}finally{setRestartingKnowledge(false);}};
   const save=async()=>{if(!draft)return;setSaving(true);setError('');try{if(auxiliary&&initialAuxiliary&&JSON.stringify(auxiliary)!==JSON.stringify(initialAuxiliary)){const saved=await api.saveAuxiliary!(auxiliary);setAuxiliary(saved);setInitialAuxiliary(saved);}await onApply(draft,appearance,changed,visualAppearance);if(pet&&initialPet){const patch=Object.fromEntries(Object.entries(pet).filter(([key,value])=>JSON.stringify(value)!==JSON.stringify(initialPet[key as keyof PetSettings])));if(Object.keys(patch).length)await api.savePet?.(patch);}if(feedback&&initialFeedback){const patch=Object.fromEntries(Object.entries(feedback).filter(([key,value])=>value!==initialFeedback[key as keyof FeedbackPreferences]));if(Object.keys(patch).length)await api.saveFeedback?.(patch);}onClose();}catch(e){setError(errorText(e));}finally{setSaving(false);}};
   return <Modal open title="Lucyna 设置" description="选择 OMP 的运行环境，管理客户端偏好。" onClose={()=>{if(!disabled)onClose();}} className="settings-modal">
     {loading?<div className="inline-loading"><Spinner size={15}/>读取设置…</div>:!draft?<div className="settings-body"><p role="alert" className="error-text">{error}</p><Button onClick={()=>setRevision(x=>x+1)}>重新读取</Button></div>:<>
@@ -96,6 +98,7 @@ export function SettingsDialog({onClose,onApply,locked,theme,visualTheme}: {onCl
           <Button variant="secondary" disabled={disabled} onClick={()=>void test()}>{checking?<Spinner size={13}/>:<RefreshCw size={13}/>}检测环境</Button>
           {check&&<div className="environment-result" role="status"><strong><Check size={14}/>{check.version} · 检测完成</strong>{check.configFiles.length>0&&<p>发现：{check.configFiles.join('、')}</p>}<small>{check.note}</small></div>}
         </section>
+        <section data-settings-section="knowledge" aria-labelledby="settings-knowledge-title"><h3 id="settings-knowledge-title">知识服务</h3><p className="settings-caption">单独重启 Lucyna 内置知识服务。OMP 会话和草稿会保留；重启期间的知识请求可能需要重试。正在整理资料或同步时请稍后重试。</p><Button variant="secondary" loading={restartingKnowledge} disabled={restartingKnowledge||disabled} onClick={()=>void restartKnowledge()}>{restartingKnowledge?'正在重启知识服务…':'重启知识服务'}</Button>{knowledgeRestartMessage&&<p className="settings-caption" role="status">{knowledgeRestartMessage}</p>}{knowledgeRestartError&&<p className="error-text" role="alert">{knowledgeRestartError}</p>}</section>
         <HostSettings/>
         <section data-settings-section="model" aria-labelledby="settings-model-title"><h3 id="settings-model-title">模型与速度</h3><p className="settings-effect">保存后用于新连接；当前会话可在输入框旁切换模型。</p><label className="settings-field">默认模型<Input aria-label="默认模型" placeholder="留空，跟随 OMP 默认模型" value={draft.model} disabled={disabled} onChange={v=>update({model:v})}/><small>可填写 provider/model。临时切换模型仍使用会话输入框旁的模型菜单。</small></label><label className="settings-field">思考强度<select aria-label="默认思考强度" value={draft.thinking} disabled={disabled} onChange={e=>update({thinking:e.target.value})}>{[['inherit','跟随 OMP 配置'],['off','关闭'],['minimal','最低'],['low','低'],['medium','中'],['high','高'],['xhigh','很高'],['max','最高'],['auto','自动']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><small>较低强度通常适合简单任务；支持情况和实际耗时取决于模型。仅对新连接生效。</small></label></section>
         <section data-settings-section="auxiliary" aria-labelledby="settings-auxiliary-title"><h3 id="settings-auxiliary-title">辅助模型</h3>{auxiliaryError&&<p role="alert" className="error-text">{auxiliaryError}</p>}{auxiliary?<AuxiliarySettings value={auxiliary} onChange={setAuxiliary} disabled={disabled} onChecking={setAuxiliaryChecking}/>:!auxiliaryError&&<p className="settings-caption">正在读取辅助模型设置…</p>}</section>

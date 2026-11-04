@@ -29,7 +29,7 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
  const manifest=JSON.parse(fs.readFileSync(path.join(engineDirectory,'manifest.json'),'utf8')),binary=path.join(engineDirectory,manifest.binary);
  if(path.basename(manifest.binary)!==manifest.binary||hash(fs.readFileSync(binary))!==manifest.sha256)throw Error('内置 Stele 运行包校验失败，请重新构建知识引擎');
  for(const [relative,digest] of Object.entries(manifest.embeddingFiles||{})){const target=path.resolve(__dirname,'../third_party/ternlight-base',relative);if(!inside(path.resolve(__dirname,'../third_party/ternlight-base'),target)||hash(fs.readFileSync(target))!==digest)throw Error('内置向量运行包校验失败，请重新构建知识引擎');}
- const store=new KnowledgeLibrary(root),sync=new KnowledgeSync(store,{...syncOptions,onImported:async()=>{for(const lib of store.list())await register(lib.id);}}),automaticSync=new KnowledgeAutoSync(sync,automaticSyncOptions),instanceId=randomUUID(),token=randomBytes(32).toString('hex');store.onWrite=()=>automaticSync.changed();let engineURL='',child,ready=false,closing=false,lastUsed=Date.now(),embeddingReady=false,activeRequests=0;
+ const store=new KnowledgeLibrary(root),sync=new KnowledgeSync(store,{...syncOptions,onImported:async()=>{for(const lib of store.list())await register(lib.id);}}),automaticSync=new KnowledgeAutoSync(sync,automaticSyncOptions),instanceId=randomUUID(),token=randomBytes(32).toString('hex');store.onWrite=()=>automaticSync.changed();let engineURL='',child,ready=false,closing=false,draining=false,lastUsed=Date.now(),embeddingReady=false,activeRequests=0;
  const pending=new Map();let sequence=0;
  const worker=new Worker(path.join(__dirname,'knowledge-embedding.cjs'),{workerData:{module:path.resolve(__dirname,'../third_party/ternlight-base/src/index.js')}});
  const workerReady=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('向量运行时初始化超时')),20000);worker.on('message',message=>{if(message.ready){embeddingReady=true;clearTimeout(timer);resolve();}else if(message.id){const task=pending.get(message.id);if(task){pending.delete(message.id);clearTimeout(task.timer);message.error?task.reject(Error(message.error)):task.resolve(message.output);}}else if(message.error){clearTimeout(timer);reject(Error(message.error));}});worker.on('error',reject);});
@@ -79,10 +79,18 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
    const authorization=request.headers.authorization||'',expected='Bearer '+token;if(authorization.length!==expected.length||!timingSafeEqual(Buffer.from(authorization),Buffer.from(expected)))throw failure('Unauthorized',401);
    if(request.headers.origin)throw failure('Browser origins are not allowed on the knowledge control API',403);
    lastUsed=Date.now();const url=new URL(request.url,'http://localhost');
+   if(draining&&url.pathname!=='/api/health')throw failure('知识服务正在重启，请稍后重试',503);
+   if(url.pathname==='/internal/restart'&&request.method==='POST'){
+    if(activeRequests>1||consolidation.active||consolidation.job||maintenance.active||maintenance.job||governance.job||sync.status().running||automaticSync.status().running)throw failure('知识服务正在处理请求、整理资料或同步，请稍后重试',409);
+    draining=true;
+    try{const activity=await nativeJSON('/api/activity');if(activity.length)throw failure('知识服务正在处理任务，请稍后重试',409);if(consolidation.active||consolidation.job||maintenance.active||maintenance.job||governance.job||sync.status().running||automaticSync.status().running)throw failure('知识服务正在整理资料或同步，请稍后重试',409);}
+    catch(error){draining=false;throw error;}
+    automaticSync.cancelTimer();clearInterval(consolidation.timer);clearInterval(maintenance.timer);clearInterval(governance.timer);response.once('finish',()=>void stop().then(()=>{if(standalone)process.exit(0);}));return json(response,{stopping:true});
+   }
    if(url.pathname==='/internal/embed'){return json(response,await embed(JSON.parse((await body(request)).toString())));}
    if(url.pathname==='/internal/write'){const input=JSON.parse((await body(request)).toString());return json(response,await store.write({...managedPath(input.path),content:input.content,expected:input.expected,origin:'stele'}));}
    if(url.pathname==='/internal/shutdown'){json(response,{stopping:true});setImmediate(()=>void stop().then(()=>{if(standalone)process.exit(0);}));return;}
-   if(url.pathname==='/api/health')return json(response,{instanceId,ready,embeddingReady,unified:store.isUnified(),sourceHash:manifest.sourceHash,storageSchema:1,pid:process.pid,capabilities:['managed-libraries','directory-import','document-revisions','mcp','semantic-search','knowledge-consolidation','knowledge-maintenance','knowledge-governance']});
+   if(url.pathname==='/api/health')return json(response,{instanceId,ready:ready&&!draining,embeddingReady,unified:store.isUnified(),sourceHash:manifest.sourceHash,storageSchema:1,pid:process.pid,capabilities:['managed-libraries','directory-import','document-revisions','mcp','semantic-search','knowledge-consolidation','knowledge-maintenance','knowledge-governance','safe-restart']});
    if(!ready)throw failure('内置知识引擎正在启动',503);
    if(url.pathname==='/api/governance/status'&&request.method==='GET')return json(response,governance.status());
    if(url.pathname==='/api/governance/get'&&request.method==='GET')return json(response,governance.get(url.searchParams.get('id')));

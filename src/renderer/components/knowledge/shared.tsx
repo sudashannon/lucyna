@@ -24,7 +24,7 @@ export function useOperation(){
 export function OperationNotice({operation}:{operation:{error:string;message:string}}){return <>{operation.error&&<p className="knowledge-operation-error" role="alert">{operation.error}</p>}{operation.message&&<p className="knowledge-operation-message" role="status">{operation.message}</p>}</>;}
 export function RemoteState({busy,error,empty,onRetry,children,emptyText='这里还没有内容'}:{busy:boolean;error:string;empty?:boolean;onRetry:()=>void;children:ReactNode;emptyText?:string}){
   if(error)return <div className="knowledge-empty" role="alert"><p>{error}</p><Button variant="secondary" compact onClick={onRetry}><RefreshCw size={14}/>重试读取</Button></div>;
-  if(busy)return <div className="knowledge-empty" role="status"><Spinner size={22}/><p>正在读取 Stele…</p></div>;
+  if(busy)return <div className="knowledge-empty" role="status"><Spinner size={22}/><p>正在读取知识库…</p></div>;
   if(empty)return <div className="knowledge-empty"><BookOpen size={28}/><h2>{emptyText}</h2><Button compact variant="secondary" onClick={onRetry}>刷新内容</Button></div>;
   return <>{children}</>;
 }

@@ -18,17 +18,19 @@ export function SearchView({active,revision,workspace,onEvidence,onQuote,seed}:{
   const [query,setQuery]=useState(''),[submitted,setSubmitted]=useState(''),[selected,setSelected]=useState(''),[reading,setReading]=useState(false),[showSemantic,setShowSemantic]=useState(false);
   useEffect(()=>{if(seed){setQuery(seed.query);setSubmitted(seed.query.trim());setSelected('');setReading(false);}},[seed]);
   const remote=useRemote<SearchResult[]>('search',{query:submitted,workspace},active&&!!submitted,revision);
-  const scoped=(remote.data||[]).filter(r=>!workspace||r.workspace===workspace);
+  const catalog=useRemote<KnowledgeCatalog>('catalog',{},active&&!!submitted,revision);
+  const preview=useMemo(()=>{const q=submitted.trim().toLocaleLowerCase();if(!q||!remote.busy)return [];return (catalog.data?.documents||[]).filter(d=>d.type!=='session'&&(!workspace||d.workspace===workspace)&&[d.title,d.path,...['tags','_derivedTags','_inheritedTags'].flatMap(k=>Array.isArray(d.frontmatter?.[k])?d.frontmatter![k] as string[]:[])].some(value=>String(value||'').toLocaleLowerCase().includes(q))).slice(0,80).map(d=>({id:d.id,title:d.title,workspace:d.workspace,type:d.type,updatedAt:d.updatedAt,rankScore:0,reasons:['catalog-match'],matchedTerms:[submitted],keywordScore:1}));},[catalog.data,remote.busy,submitted,workspace]);
+  const scoped=(remote.data||preview).filter(r=>!workspace||r.workspace===workspace);
   const direct=scoped.filter(r=>(r.keywordScore??1)>0),semanticCount=scoped.length-direct.length;
   const results=showSemantic||!direct.length?scoped:direct,item=results.find(r=>r.id===selected)||results[0];
-  const evidence=useRemote<KnowledgeEvidence&{bodyMatch:boolean;matchedTerms:string[]}>('searchEvidence',{id:item?.id||'',workspace:item?.workspace||'',query:submitted},active&&!!item&&!remote.busy,revision);
+  const evidence=useRemote<KnowledgeEvidence&{bodyMatch:boolean;matchedTerms:string[]}>('searchEvidence',{id:item?.id||'',workspace:item?.workspace||'',query:submitted},active&&!!item,revision);
   const ref=evidence.data;
   return <div className="knowledge-search-view">
     <form className="knowledge-search-form" onSubmit={e=>{e.preventDefault();if(query.trim()){if(submitted===query.trim())remote.refresh();setSubmitted(query.trim());setSelected('');setReading(false);}}}>
       <Search size={17}/><Input aria-label="证据检索关键词" placeholder="搜索正文、标题或问题…" value={query} onChange={setQuery}/><Button variant="cta" compact type="submit" disabled={!query.trim()||remote.busy}>检索证据</Button>
     </form>
-    {!submitted?<div className="knowledge-empty"><Search size={28}/><h2>从问题找到原始证据</h2><p>输入关键词或问题，选中结果后定位正文片段。来源和版本可逐条核对。</p></div>:<RemoteState {...remote} empty={!scoped.length} onRetry={remote.refresh} emptyText="没有找到匹配的证据">
-      <div className="knowledge-search-caption"><span>{results.length} 条结果 · {workspace||'全部来源'}{!direct.length?' · 暂无关键词匹配，以下为语义相关结果':''}</span>{direct.length>0&&semanticCount>0&&<label><input type="checkbox" checked={showSemantic} onChange={e=>setShowSemantic(e.target.checked)}/>包含仅语义相关的 {semanticCount} 条</label>}</div>
+    {!submitted?<div className="knowledge-empty"><Search size={28}/><h2>从问题找到原始证据</h2><p>输入关键词或问题，选中结果后定位正文片段。来源和版本可逐条核对。</p></div>:<RemoteState {...remote} busy={remote.busy&&!preview.length} empty={!scoped.length} onRetry={remote.refresh} emptyText="没有找到匹配的证据">
+      <div className="knowledge-search-caption"><span>{remote.busy?'已找到标题、路径或标签匹配；正在搜索正文和语义':`${results.length} 条结果 · ${workspace||'全部来源'}${!direct.length?' · 暂无关键词匹配，以下为语义相关结果':''}`}</span>{!remote.busy&&direct.length>0&&semanticCount>0&&<label><input type="checkbox" checked={showSemantic} onChange={e=>setShowSemantic(e.target.checked)}/>包含仅语义相关的 {semanticCount} 条</label>}</div>
       <Split reading={reading} onBack={()=>setReading(false)} list={<>{results.map(r=><button type="button" className={'knowledge-native-row '+(item?.id===r.id?'selected':'')} aria-current={item?.id===r.id?'true':undefined} key={r.id} onClick={()=>{setSelected(r.id);setReading(true);}}>
         <span className="knowledge-native-meta">{r.workspace}<span>{names[r.type]||r.type}</span></span><strong><SearchHighlight text={r.title} terms={r.matchedTerms}/></strong>
         <p>{(r.matchedTerms?.length||0)>0?'匹配关键词：'+r.matchedTerms!.join('、'):'语义相关 · 请核对适用范围'}</p><small>{r.updatedAt?'更新于 '+date(r.updatedAt):'更新时间未知'}</small>

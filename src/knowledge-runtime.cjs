@@ -2,7 +2,7 @@ const fs=require('node:fs'),fsp=require('node:fs/promises'),path=require('node:p
 const {randomUUID}=require('node:crypto');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 class KnowledgeRuntime {
- constructor(directory,{executable=process.execPath,startTimeout=240000}={}){this.directory=path.resolve(directory);this.executable=executable;this.startTimeout=startTimeout;this.pending=null;this.connection=null;}
+ constructor(directory,{executable=process.execPath,startTimeout=240000}={}){this.directory=path.resolve(directory);this.executable=executable;this.startTimeout=startTimeout;this.pending=null;this.restarting=null;this.connection=null;}
  async record(){try{const record=JSON.parse(await fsp.readFile(path.join(this.directory,'runtime/connection.json'),'utf8'));if(record.root!==this.directory||!/^http:\/\/127\.0\.0\.1:\d+$/.test(record.url)||!/^[a-f0-9]{64}$/.test(record.token)||!Number.isInteger(record.pid)||record.pid<=0)return null;return record;}catch{return null;}}
  alive(pid){try{process.kill(pid,0);return true;}catch(error){return error.code==='EPERM';}}
  async probe(){
@@ -10,7 +10,27 @@ class KnowledgeRuntime {
    const response=await fetch(record.url+'/api/health',{headers:{authorization:'Bearer '+record.token},signal:AbortSignal.timeout(1200)});if(!response.ok)return null;const health=await response.json();if(health.instanceId!==record.instanceId||!health.ready||!health.embeddingReady)return null;return {...record,health};
   }catch{return null;}
  }
- ensure(){if(this.pending)return this.pending;this.pending=this.start().finally(()=>{this.pending=null;});return this.pending;}
+ ensure(){if(this.restarting)return this.restarting;if(this.pending)return this.pending;this.pending=this.start().finally(()=>{this.pending=null;});return this.pending;}
+ restart(){if(this.restarting)return this.restarting;const task=this.performRestart();this.restarting=task.finally(()=>{this.restarting=null;});return this.restarting;}
+ async performRestart(){
+  if(this.pending)await this.pending;
+  const old=await this.probe();
+  if(!old){const record=await this.record();if(record&&this.alive(record.pid))throw Error('知识服务暂未响应，未强制结束；请稍后重试');return this.start();}
+  const headers={authorization:'Bearer '+old.token},safe=old.health.capabilities?.includes('safe-restart');
+  if(!safe){
+   // Older hosts lack the atomic drain endpoint. Avoid interrupting known
+   // background jobs, then use their existing graceful shutdown endpoint.
+   const [activity,sync]=await Promise.all(['/api/activity','/api/library/sync/status'].map(async route=>{const r=await fetch(old.url+route,{headers,signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('无法确认知识服务状态，未重启');return r.json();}));
+   const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(path.join(this.directory,'catalog.sqlite'),{readOnly:true});let busy;
+   try{busy=db.prepare('SELECT data FROM knowledge_consolidation').all().some(row=>['running','publishing'].includes(JSON.parse(row.data).status));}finally{db.close();}
+   if(busy||activity.length||sync.running||sync.automatic?.running)throw Error('知识服务正在整理资料、处理任务或同步，请稍后重试');
+  }
+  const response=await fetch(old.url+(safe?'/internal/restart':'/internal/shutdown'),{method:'POST',headers,signal:AbortSignal.timeout(20000)});
+  if(!response.ok){let detail='';try{detail=(await response.json()).error||'';}catch{}throw Error(detail||'知识服务未确认停止，请稍后重试');}
+  const deadline=Date.now()+this.startTimeout;
+  while(Date.now()<deadline){const current=await this.record();if(current&&current.instanceId!==old.instanceId){const next=await this.probe();if(next)return next;}if(!this.alive(old.pid))return this.start();await pause(150);}
+  throw Error('知识服务停止超时，未强制结束；请稍后重试');
+ }
  async waitForLiveHost(){const record=await this.record();if(!record||!this.alive(record.pid))return null;const end=Date.now()+this.startTimeout;while(Date.now()<end){const found=await this.probe();if(found)return found;const current=await this.record();if(!current||current.instanceId!==record.instanceId||!this.alive(record.pid))return null;await pause(250);}throw Error('知识服务正在处理任务，请稍后重试');}
  async start(){
   const existing=await this.probe();if(existing)return this.connection=existing;

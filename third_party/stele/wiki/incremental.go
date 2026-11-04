@@ -162,6 +162,7 @@ func (a *API) IncrementalUpdate(changedFiles []string) error {
 	}
 	a.AddDirty(dirty)
 	a.mu.Unlock()
+	a.scheduleChangedBodyIndex(changedFiles)
 
 	if a.indexCacheDir != "" {
 		cachePath := filepath.Join(a.indexCacheDir, "embeddings.bin")

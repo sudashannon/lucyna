@@ -5,11 +5,18 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"stele/internal/source"
 )
 
 const maxSearchSnapshotBytes = 32 << 20
+
+func isSearchMarkdown(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".md" || ext == ".markdown"
+}
 
 func cloneSearchSnapshot(components map[string]Component, embeddings map[string][]float32) (map[string]Component, map[string][]float32) {
 	componentCopy := make(map[string]Component, len(components))
@@ -48,9 +55,28 @@ func (a *API) rankDocumentSearch(query string, requiredTags []string, queryVec [
 	for i, result := range ranked {
 		byID[result.id] = i
 	}
+	if a.bodyIndex != nil {
+		if matches, ready := a.bodyIndex.waitCandidates(query, 10*time.Second); ready {
+			for _, id := range matches {
+				if _, ok := components[id]; !ok {
+					continue
+				}
+				if index, ok := byID[id]; ok {
+					if ranked[index].lexicalRank == semanticNoLexicalMatch {
+						ranked[index].lexicalRank = semanticBodyMatch
+						ranked[index].score = 0.35
+					}
+					continue
+				}
+				component := components[id]
+				ranked = append(ranked, semanticScoredResult{id: id, score: 0.35, lexicalRank: semanticBodyMatch, typeOrder: semanticTypeOrder(component.Type)})
+			}
+			return sortDocumentResults(ranked), evidence
+		}
+	}
 	for _, id := range ids {
 		component := components[id]
-		if component.Type == TypeSession || !strings.EqualFold(filepath.Ext(component.Path), ".md") {
+		if component.Type == TypeSession || !isSearchMarkdown(component.Path) {
 			continue
 		}
 		info, err := os.Stat(component.Path)
@@ -72,6 +98,10 @@ func (a *API) rankDocumentSearch(query string, requiredTags []string, queryVec [
 		}
 		ranked = append(ranked, semanticScoredResult{id: id, score: 0.35, lexicalRank: semanticBodyMatch, typeOrder: semanticTypeOrder(component.Type)})
 	}
+	return sortDocumentResults(ranked), evidence
+}
+
+func sortDocumentResults(ranked []semanticScoredResult) []semanticScoredResult {
 	sort.Slice(ranked, func(i, j int) bool {
 		if ranked[i].lexicalRank != ranked[j].lexicalRank {
 			return ranked[i].lexicalRank < ranked[j].lexicalRank
@@ -84,20 +114,43 @@ func (a *API) rankDocumentSearch(query string, requiredTags []string, queryVec [
 		}
 		return ranked[i].id < ranked[j].id
 	})
-	return ranked, evidence
+	return ranked
 }
 func (a *API) selectedEvidence(query string, results []semanticScoredResult, components map[string]Component, evidence map[string]source.EvidenceReference) {
+	type evidenceJob struct {
+		id        string
+		component Component
+	}
+	jobs := make(chan evidenceJob)
+	var workers sync.WaitGroup
+	var evidenceMu sync.Mutex
+	for i := 0; i < 8; i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for job := range jobs {
+				reference, err := a.ReadEvidence(job.id, job.component.Workspace, query)
+				if err == nil {
+					evidenceMu.Lock()
+					evidence[job.id] = reference
+					evidenceMu.Unlock()
+				}
+			}
+		}()
+	}
 	for _, result := range results {
-		if _, ok := evidence[result.id]; ok {
+		evidenceMu.Lock()
+		_, exists := evidence[result.id]
+		evidenceMu.Unlock()
+		if exists {
 			continue
 		}
 		component, ok := components[result.id]
 		if !ok {
 			continue
 		}
-		reference, err := a.ReadEvidence(result.id, component.Workspace, query)
-		if err == nil {
-			evidence[result.id] = reference
-		}
+		jobs <- evidenceJob{result.id, component}
 	}
+	close(jobs)
+	workers.Wait()
 }

@@ -25,6 +25,7 @@ import (
 
 type API struct {
 	mu                   sync.RWMutex
+	bodyIndex            *bodySearchIndex
 	rebuildMu            sync.Mutex
 	graph                *Graph
 	ws                   []WorkspaceConfig
@@ -60,7 +61,9 @@ func NewAPIWithWorkspaces(ws []WorkspaceConfig, indexCacheDir string) (*API, err
 	if err != nil {
 		return nil, err
 	}
-	return &API{graph: g, ws: ws, indexCacheDir: indexCacheDir, ready: true}, nil
+	a := &API{graph: g, ws: ws, indexCacheDir: indexCacheDir, ready: true, bodyIndex: newBodySearchIndex()}
+	a.scheduleBodyIndex()
+	return a, nil
 }
 
 // NewAPIWithWorkspacesAsync constructs an API immediately with an empty,
@@ -70,7 +73,7 @@ func NewAPIWithWorkspaces(ws []WorkspaceConfig, indexCacheDir string) (*API, err
 // start serving (HandleIndex/HandleLint return `[]` until the build
 // completes) instead of waiting tens of seconds for a large tree to scan.
 func NewAPIWithWorkspacesAsync(ws []WorkspaceConfig, indexCacheDir string) *API {
-	return &API{graph: BuildGraph(nil, nil), ws: ws, indexCacheDir: indexCacheDir}
+	return &API{graph: BuildGraph(nil, nil), ws: ws, indexCacheDir: indexCacheDir, bodyIndex: newBodySearchIndex()}
 }
 
 // SetLister wires a live WorkspaceLister so HandleRebuild rebuilds from the
@@ -974,6 +977,7 @@ func (a *API) Rebuild() error {
 	a.ready = true
 	a.ResetDirty()
 	a.mu.Unlock()
+	a.scheduleBodyIndex()
 	return nil
 }
 
