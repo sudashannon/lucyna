@@ -1,8 +1,7 @@
 /* Hallmark · component: conversation timeline · genre: modern-minimal · theme: Cindy · v2.0.0 */
 /* Hallmark · pre-emit critique: a persistent reading margin, no dismissible card, no content overlap. */
-.chat-stage.has-messages { container-type: inline-size; container-name: conversation; }
-.transcript-region .transcript { padding-right: var(--space-lg); }
-.conversation-timeline.is-docked { position: relative; inset: auto; width: 36px; flex: 0 0 36px; min-height: 0; z-index: 1; margin-block: var(--space-sm); }
+.workspace-conversation:has(.conversation-timeline.is-docked) { --conversation-timeline-width: 36px; }
+.conversation-timeline.is-docked { position: relative; inset: auto; flex: 0 0 var(--conversation-timeline-width); min-height: 0; z-index: 1; margin-block: var(--space-sm); }
 .timeline-outline { display: none; min-width: 0; min-height: 0; height: 100%; flex-direction: column; }
 .timeline-outline header { display: flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm) var(--space-md); flex: none; }
 .timeline-outline header strong { flex: 1; font-size: var(--font-size-small); font-weight: 500; white-space: nowrap; }
@@ -46,7 +45,7 @@
 .timeline-marker-tip { display: block; max-width: 230px; font-size: var(--font-size-small); line-height: 1.65; overflow-wrap: anywhere; }
 .timeline-marker-tip small { display: block; font-size: var(--font-size-caption); margin-bottom: var(--space-2xs); }
 @container conversation (min-width: 960px) {
- .conversation-timeline.is-docked { width: 240px; flex-basis: 240px; border-left: 1px solid var(--soft-border); }
+ .workspace-conversation:has(.conversation-timeline.is-docked) { --conversation-timeline-width: 240px; }
+ .conversation-timeline.is-docked { border-left: 1px solid var(--soft-border); }
  .timeline-outline { display: flex; margin-right: 32px; }
- .chat-stage.has-messages > .composer-area { width: min(720px,calc(100% - 304px)); margin-left: max(32px,calc((100% - 960px) / 2)); margin-right: auto; }
 }

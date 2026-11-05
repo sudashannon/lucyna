@@ -17,11 +17,12 @@ export function workRecord(text:string){
     if(/^\s*(```|~~~)/.test(line)){fence=!fence;return [];}
     if(fence)return [];
     const match=/^\s*[-*]\s+(?:\*\*)?([^:：\n*]{1,30})(?:\*\*)?[:：]\s*(.+)$/.exec(line);
-    return match?[{label:match[1],text:plainText(match[2]),anchor:s.anchor,section:s.title}]:[];
+    return match?[{label:match[1],text:plainText(match[2]),markdown:match[2],anchor:s.anchor,section:s.title}]:[];
   });});
   const first=(pattern:RegExp)=>fields.find(f=>pattern.test(f.label));
+  const state=first(/^状态$/)?.text.replace(/<!--.*?(?:-->|$)/g,'').trim()||'';
   const latest=sections.filter(s=>/^\d{4}-\d{2}-\d{2}/.test(s.title)).sort((a,b)=>b.title.slice(0,10).localeCompare(a.title.slice(0,10)));
-  return {...outline,sections,fields,latest,goal:first(/^目标$/),current:first(/^当前$/),state:first(/^状态$/)?.text||'',recorded:first(/^最近更新$/)?.text||'',
+  return {...outline,sections,fields,latest,goal:first(/^目标$/),current:first(/^当前$/),state,recorded:first(/^最近更新$/)?.text||'',
     pending:fields.filter(f=>/未决|阻塞|风险|下一步/.test(f.label)),checks:fields.filter(f=>/验收|非目标|授权|整体验证|环境安全/.test(f.label))};
 }
 export function groupRepositories(members:WorkMember[]){

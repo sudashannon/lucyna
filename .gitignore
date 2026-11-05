@@ -53,6 +53,7 @@ docs/*
 !docs/work-evolution-preparation.md
 !docs/knowledge-consolidation.md
 !docs/knowledge-maintenance.md
+!docs/knowledge-review-advice.md
 !docs/knowledge-governance.md
 !docs/agent-optimization/
 !docs/agent-optimization/**
@@ -124,6 +125,9 @@ test/*
 !test/knowledge-consolidation-desktop.cjs
 !test/knowledge-maintenance-native.cjs
 !test/knowledge-maintenance-desktop.cjs
+!test/knowledge-review-desktop.cjs
+!test/knowledge-review-preload.cjs
+!test/knowledge-delete-native.cjs
 !test/knowledge-governance-native.cjs
 !test/knowledge-governance-desktop.cjs
 !test/work-assistant-desktop.cjs

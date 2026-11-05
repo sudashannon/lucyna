@@ -40,7 +40,8 @@
 .draft-assistance-preview-head strong { display:block; overflow-wrap:anywhere; }
 .draft-assistance-preview-head p { margin:2px 0; color:var(--text-secondary); font-size:var(--font-size-caption); overflow-wrap:anywhere; }
 .draft-assistance-select-hint { margin:5px 0; color:var(--text-secondary); font-size:var(--font-size-caption); }
-.draft-assistance-preview pre { max-height:180px; overflow:auto; margin:6px 0; padding:8px; border:1px solid var(--soft-border); border-radius:var(--studio-radius,6px); background:var(--surface); color:var(--text-primary-body-strong); font:var(--font-size-code)/1.55 var(--font-code); white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
+.draft-assistance-preview-body { min-width:0; max-height:180px; overflow:auto; margin:6px 0; padding:8px; border:1px solid var(--soft-border); border-radius:var(--studio-radius,6px); background:var(--surface); color:var(--text-primary-body-strong); overflow-wrap:anywhere; user-select:text; }
+.draft-assistance-preview-body > pre { margin:0; font:var(--font-size-code)/1.55 var(--font-code); white-space:pre-wrap; }
 .draft-assistance-footnote { margin:7px 0 0; color:var(--text-secondary); font-size:var(--font-size-caption); }
 .draft-assistance-spin { animation:draft-assistance-rotate 1s linear infinite; }
 @keyframes draft-assistance-rotate { to { transform:rotate(360deg); } }
@@ -51,5 +52,5 @@
   .draft-assistance-progress { max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .draft-assistance-asset { align-items:flex-start; flex-direction:column; gap:6px; }
   .draft-assistance-asset small { max-width:calc(100vw - 52px); }
-  .draft-assistance-preview pre { max-height:140px; }
+  .draft-assistance-preview-body { max-height:140px; }
 }

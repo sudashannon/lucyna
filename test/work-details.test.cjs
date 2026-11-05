@@ -3,7 +3,7 @@ require.extensions['.ts']=(mod,file)=>mod._compile(ts.transpileModule(fs.readFil
 const {workRecord,relatedHistory,groupRepositories}=require('../src/renderer/work-detail-data.ts');
 const {createWorkDetails}=require('../src/work-details.cjs');
 test('Work record keeps pending text despite all checkboxes checked, with source anchors and newest updates',()=>{
- const r=workRecord('# Work\n## 定位\n- **状态**: `active`\n- **目标**: Goal\n- 当前: Ready locally\n- **未决**: CI and device incomplete\n- **最近更新**: 2026-10-26 19:31 +08:00\n## 待执行任务\n- [x] done\n## 遗留状态\n- 接手者下一步: Verify\n## 2026-10-29 New event\nLatest\n## 2026-10-21 Old event\nOlder');
+ const r=workRecord('# Work\n## 定位\n- **状态**: `active` <!-- Review note -->\n- **目标**: Goal\n- 当前: Ready locally\n- **未决**: CI and device incomplete\n- **最近更新**: 2026-10-26 19:31 +08:00\n## 待执行任务\n- [x] done\n## 遗留状态\n- 接手者下一步: Verify\n## 2026-10-29 New event\nLatest\n## 2026-10-21 Old event\nOlder');
  assert.equal(r.state,'active');assert.equal(r.completed,1);assert.equal(r.tasks.length,0);assert.equal(r.pending.length,2);assert.equal(r.current.anchor,'定位');assert.equal(r.latest[0].title,'2026-10-29 New event');assert.match(r.recorded,/10-26/);
 });
 test('one repository groups multiple worktrees, journal links reject ambiguous short ids and copies',()=>{

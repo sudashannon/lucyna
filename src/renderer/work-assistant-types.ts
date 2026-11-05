@@ -62,6 +62,7 @@ export type WorkAssistantSnapshot = {
   sourceRevision?:number;
   summaryRevision?:number;
   updatedAt?:number;
+  lastAttemptAt?:number;
   usedTokens:number;
   usageUnknown?:boolean;
 };

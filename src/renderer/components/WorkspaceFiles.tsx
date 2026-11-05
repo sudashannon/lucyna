@@ -5,7 +5,8 @@ import {Input} from '@cindy/components/ui/input';
 import {Spinner} from '@cindy/components/ui/spinner';
 import {api} from '../api';
 import type {FilePreview,Work} from '../types';
-import type {GitCommit,GitInspection,GitReadOptions,WorkDetail} from '../work-detail-data';
+import type {GitCommit,GitReadOptions,WorkDetail} from '../work-detail-data';
+import {useWorkspaceGitRead} from '../useWorkspaceGitRead';
 import type {ReaderPosition} from '../reader-position';
 import {FileBrowser} from './FileBrowser';
 import {DocumentReader} from './ToolPanels';
@@ -18,17 +19,6 @@ export type GitLocation={member:string;view:FilesView;scope?:string;revision:num
 const views=[['browse','浏览',FileText],['changes','改动',GitBranch],['history','历史',History],['branches','分支',GitBranch],['worktrees','Worktree',GitFork]] as const;
 const short=(value?:string)=>value?.slice(0,10)||'—';
 const stamp=(value?:string)=>value?new Date(value).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-
-function useGitRead(work:Work,member:string,action:string,options:GitReadOptions,active:boolean,revision:number){
-  const key=JSON.stringify([work.root,work.hostId,member,action,options,revision]);
-  const [result,setResult]=useState<{key:string;data?:GitInspection;error?:string}>();
-  useEffect(()=>{if(!active||!member||!action)return;let live=true;
-    const timer=setTimeout(()=>void api.workGit(work.root,member,action,options,work.hostId).then(data=>{if(live)setResult({key,data});}).catch(error=>{if(live)setResult({key,error:String(error)});}),options.query?250:0);
-    return()=>{live=false;clearTimeout(timer);};
-  },[key,active]);
-  return {data:result?.key===key?result.data:undefined,error:result?.key===key?result.error:undefined,
-    busy:!!(active&&member&&action&&result?.key!==key)};
-}
 
 export function WorkspaceFiles({work,active,selected,target,onError,onDiscuss,onImage}:{work:Work;active:boolean;selected:FilePreview|null;target?:GitLocation;onError:(error:unknown)=>void;onDiscuss:(text:string)=>void;onImage:(url:string)=>void}){
   const [view,setView]=useState<FilesView>('browse'),[detail,setDetail]=useState<WorkDetail>(),[detailError,setDetailError]=useState('');
@@ -50,11 +40,11 @@ export function WorkspaceFiles({work,active,selected,target,onError,onDiscuss,on
   useEffect(()=>{setCursor('');setPages([]);setCommit(undefined);},[revision]);
   useEffect(()=>{if(!active)setListOpen(false);},[active]);
   useEffect(()=>{if(!listOpen)return;const close=(e:KeyboardEvent)=>{if(e.key==='Escape'){setListOpen(false);listTrigger.current?.focus();}};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close);},[listOpen]);
-  const listing=useGitRead(work,member,view==='changes'?'changes':view==='history'?'history':view==='branches'?'refs':view==='worktrees'?'worktrees':'',view==='history'?{query,cursor}:{},active,revision);
+  const listing=useWorkspaceGitRead(work,member,view==='changes'?'changes':view==='history'?'history':view==='branches'?'refs':view==='worktrees'?'worktrees':'',view==='history'?{query,cursor}:{},active,revision);
   useEffect(()=>{if(listing.data?.kind==='history')setPages(old=>cursor?[...old.filter(c=>!listing.data!.commits?.some(n=>n.oid===c.oid)),...(listing.data!.commits||[])]:listing.data!.commits||[]);},[listing.data]);
   const diffAction=view==='changes'?'diff':view==='history'&&commit?'commit':view==='branches'&&compare?'compare':'';
   const diffOptions:GitReadOptions=view==='changes'?{scope,file:path}:view==='history'?{commit:commit?.oid}:{base:compare,target:'HEAD'};
-  const diff=useGitRead(work,member,diffAction,diffOptions,active&&(view!=='changes'||!!path||scope==='baseline'),revision);
+  const diff=useWorkspaceGitRead(work,member,diffAction,diffOptions,active&&(view!=='changes'||!!path||scope==='baseline'),revision);
   const changed=listing.data?.files||[];
   const count=listing.data?.kind==='changes'?new Set(changed.map(f=>f.path)).size:currentMember?.changedFiles;
   const memberForFile=detail?.members.find(m=>file?.path?.startsWith('repos/'+m.name+'/'));

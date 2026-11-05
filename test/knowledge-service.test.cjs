@@ -1,7 +1,37 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createKnowledgeService}=require('../src/knowledge-service.cjs');
+const {createManagedKnowledge}=require('../src/knowledge-managed.cjs');
 const doc={id:'/fixture/doc.md',path:'/fixture/doc.md',workspace:'fixture',title:'Fixture',type:'knowledge'};
 function fixture(handler){const calls=[];const service=createKnowledgeService(async(url,options={})=>{calls.push({url,options});if(url.pathname==='/api/workspaces')return Response.json([{alias:'fixture',path:'/fixture'}]);if(url.pathname==='/api/wiki/index')return Response.json([doc]);return handler(url,options);});return {service,calls};}
+
+test('review advice forwards only versioned identity and explicit generation options',async()=>{
+  const {service,calls}=fixture(()=>Response.json(null));
+  await assert.rejects(service('reviewAdvice',{id:'review',workspace:'fixture',generate:true}),/内容版本/);
+  assert.equal(calls.length,0);
+  assert.equal(await service('reviewAdvice',{id:'review:1 a',workspace:'fixture',revision:'v1',generate:true,refresh:true,rule:'invented',document:'outside',instructions:'ignored'}),null);
+  const request=calls.at(-1);assert.equal(request.url.pathname,'/api/reviews/advice');assert.equal(request.options.method,'POST');
+  assert.deepEqual(JSON.parse(request.options.body),{id:'review:1 a',workspace:'fixture',revision:'v1',generate:true,refresh:true});
+});
+
+test('review deletion preserves the raw review id and forwards its confirmation snapshot and durable operation ID',async()=>{
+  const {service,calls}=fixture(()=>Response.json({deleted:true,indexed:false})),operationId='e2812457-0d76-4e52-a3ee-57de8ae0c254';
+  await assert.rejects(service('reviewDelete',{id:'review/raw: 1',workspace:'fixture',revision:'v1',documentId:doc.id,documentRevision:'doc-v1'}),/操作标识/);
+  assert.equal(calls.length,0);
+  assert.deepEqual(await service('reviewDelete',{id:'review/raw: 1',workspace:'fixture',revision:'analyzer hash:1',documentId:'stable-doc-id',documentRevision:'managed-revision',operationId,document:'/untrusted/path'}),{deleted:true,indexed:false});
+  const request=calls.at(-1);assert.equal(request.url.pathname,'/api/reviews/delete');assert.equal(request.options.method,'POST');
+  assert.deepEqual(JSON.parse(request.options.body),{id:'review/raw: 1',workspace:'fixture',revision:'analyzer hash:1',documentId:'stable-doc-id',documentRevision:'managed-revision',operationId});
+});
+
+test('old managed hosts explain how to load the review advice capability before calling its route',async()=>{
+  const knowledge=createManagedKnowledge({directory:require('node:path').resolve('.runtime/review-advice-capability-test')});
+  knowledge.runtime.ensure=async()=>({health:{capabilities:['knowledge-maintenance']}});
+  await assert.rejects(knowledge('reviewAdvice',{id:'review',workspace:'fixture',revision:'v1'}),/重启知识服务/);
+});
+test('old managed hosts explain how to load the review deletion capability before calling its route',async()=>{
+  const knowledge=createManagedKnowledge({directory:require('node:path').resolve('.runtime/review-delete-capability-test')});
+  knowledge.runtime.ensure=async()=>({health:{capabilities:['knowledge-review-advice']}});
+  await assert.rejects(knowledge('reviewDelete',{id:'review',workspace:'fixture',revision:'v1',documentId:'doc',documentRevision:'rev',operationId:'e2812457-0d76-4e52-a3ee-57de8ae0c254'}),/重启知识服务/);
+});
 test('operation allowlist rejects route injection and preserves versioned candidate requests',async()=>{
   const {service,calls}=fixture(()=>Response.json({status:'adopted'}));await assert.rejects(service('/api/secrets'),/不支持/);await assert.rejects(service('candidateAction',{id:'c',action:'delete',revision:'v1'}),/无效/);await assert.rejects(service('candidateAction',{id:'c',action:'adopt'}),/内容版本/);assert.equal(calls.length,0);
   await service('candidateAction',{id:'c 1',action:'adopt',revision:'version-1',untrusted:'ignored'});const request=calls.at(-1);assert.equal(request.url.pathname,'/api/wiki/candidates/c%201');assert.deepEqual(JSON.parse(request.options.body),{action:'adopt',revision:'version-1'});

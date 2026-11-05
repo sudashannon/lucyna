@@ -21,7 +21,7 @@ for (const protocol of ['chat-completions', 'responses']) {
         const content = (body.messages || body.input).at(-1).content;
         const prompt = typeof content === 'string' ? content : content.map(part => part.text || '').join('');
         const input = JSON.parse(prompt);
-        const citations = input.messages.map(message => ({sessionId: message.sessionId, messageId: message.messageId, role: message.role, quote: message.text}));
+        const citations = input.messages.map(message => ({evidenceId: message.excerpts[0].evidenceId}));
         const summary = {overview: {text: '两个会话共同推进 Work 协作摘要。', sources: citations}, goals: [], decisions: [], progress: [], openQuestions: [], nextSteps: []};
         const text = JSON.stringify(summary);
         res.setHeader('Content-Type', 'application/json');
@@ -57,6 +57,8 @@ for (const protocol of ['chat-completions', 'responses']) {
     assert.equal(view.usedTokens, 150);
     assert.equal(requests.length, 1);
     assert.ok(!requests[0].tools?.length);
+    assert.equal(requests[0].max_tokens,undefined);
+    assert.equal(requests[0].max_output_tokens,undefined);
     if (protocol === 'responses') assert.equal(requests[0].store, false);
     await assistant.summarize(view.workId);
     assert.equal(requests.length, 1);

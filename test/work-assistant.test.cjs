@@ -25,11 +25,11 @@ function summaryFor(prompt,{quote,messageIndex=0}={}){
   const payload=JSON.parse(prompt);
   const source=payload.messages[messageIndex];
   return {
-    overview:{text:'根据会话来源整理的工作摘要。',sources:[{
+    overview:{text:'根据会话来源整理的工作摘要。',sources:[quote===undefined?{evidenceId:source.excerpts[0].evidenceId}:{
       sessionId:source.sessionId,
       messageId:source.messageId,
       role:source.role,
-      quote:quote??source.text
+      quote
     }]},
     goals:[],decisions:[],progress:[],openQuestions:[],nextSteps:[]
   };
@@ -126,7 +126,7 @@ test('scheduled summaries across Works are serialized and stale results cannot r
   const {assistant}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
     calls++;active++;maxActive=Math.max(maxActive,active);
     const payload=JSON.parse(prompt);
-    const quote=payload.messages[0].text;
+    const quote=payload.messages[0].excerpts[0].text;
     await new Promise(resolve=>setTimeout(resolve,55));
     active--;
     return {text:JSON.stringify(summaryFor(prompt,{quote})),finishReason:'stop',totalUsage:{inputTokens:3,outputTokens:2}};
@@ -221,6 +221,70 @@ test('initial persistence failure releases the active summary slot for retry',as
   await assistant.summarize(workId);
   assert.equal(calls,1);
   assert.equal((await assistant.view(identity)).summaryRevision,(await assistant.view(identity)).sourceRevision);
+});
+
+test('Work synthesis uses a background deadline without capping reasoning output and records the attempt',async t=>{
+  const {assistant}=await fixture(t,{run:async(config,_instructions,prompt,_signal,options,timeout)=>{
+    assert.equal(config.timeoutSeconds,30);
+    assert.equal(options.maxOutputTokens,undefined);
+    assert.deepEqual(timeout,{stepMs:600000,totalMs:600000});
+    return {text:JSON.stringify(summaryFor(prompt)),finishReason:'stop',totalUsage:{inputTokens:8,outputTokens:4}};
+  }});
+  assistant.config=async()=>({baseURL:'http://fixture.invalid/v1',model:'fixture',timeoutSeconds:30});
+  const input={root:'/work/background-summary'};
+  const collected=await assistant.ingest({...input,sessionId:'session',messages:[{id:'m1',role:'user',content:'完整汇总这个 Work 的多会话讨论，并保留引用。'}]},{schedule:false});
+  await assistant.summarize(collected.workId);
+  const result=await assistant.view(input);
+  assert.equal(result.status,'idle');assert.ok(result.summary);assert.ok(result.lastAttemptAt>0);assert.ok(result.updatedAt>=result.lastAttemptAt);
+});
+
+test('summary failures preserve sanitized model diagnostics and never expose arbitrary upstream text',async t=>{
+  let failure=Object.assign(Error('辅助模型请求超时或已取消'),{publicMessage:'辅助模型请求超时或已取消'});
+  const {assistant,directory}=await fixture(t,{run:async()=>{throw failure;}});
+  const identity={root:'/work/diagnostics'};
+  const collected=await assistant.ingest({...identity,sessionId:'session',messages:[{id:'m1',role:'user',content:'需要整理当前工作中尚未完成的事项。'}]},{schedule:false});
+  await assistant.summarize(collected.workId);
+  let result=await assistant.view(identity);
+  assert.equal(result.error,'辅助模型请求超时或已取消');assert.ok(result.lastAttemptAt>0);assert.equal(result.updatedAt,0);
+  failure=Error('PRIVATE_PROMPT API_KEY_SECRET arbitrary response');
+  await assistant.summarize(collected.workId);result=await assistant.view(identity);
+  assert.equal(result.status,'error');assert.ok(!/PRIVATE_PROMPT|API_KEY_SECRET/.test(result.error));
+  const saved=await fs.readFile(path.join(directory,collected.workId+'.json'),'utf8');assert.ok(!saved.includes('API_KEY_SECRET'));
+  assistant.config=async()=>{throw Error('已保存的 API Key 无法解密，请重新填写');};
+  await assistant.summarize(collected.workId);assert.equal((await assistant.view(identity)).error,'已保存的 API Key 无法解密，请重新填写');
+});
+
+test('truncated model output remains a failed attempt and cannot masquerade as a validated summary',async t=>{
+  const {assistant}=await fixture(t,{run:async()=>({text:'{"overview":',finishReason:'length',totalUsage:{inputTokens:10,outputTokens:4096}})});
+  const identity={root:'/work/truncated-summary'};
+  const collected=await assistant.ingest({...identity,sessionId:'session',messages:[{id:'m1',role:'user',content:'汇总任务当前的决定和下一步计划。'}]},{schedule:false});
+  await assistant.summarize(collected.workId);const result=await assistant.view(identity);
+  assert.match(result.error,/截断/);assert.equal(result.summary,null);assert.equal(result.summaryRevision,0);assert.equal(result.usedTokens,4106);
+});
+
+test('opening a legacy failed summary retries the new protocol once, without a polling retry loop',async t=>{
+  let calls=0;
+  const {assistant,directory}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
+    calls++;
+    return {text:JSON.stringify(summaryFor(prompt,{quote:'这段原文中不存在的伪造引用'})),finishReason:'stop',totalUsage:{inputTokens:5,outputTokens:3}};
+  }});
+  const identity={root:'/work/legacy-failure'};
+  const snapshot=await assistant.ingest({...identity,sessionId:'session',messages:[{id:'m1',role:'user',content:'旧版本的摘要失败后需要自动恢复一次。'}]},{schedule:false});
+  const {state,identity:resolved}=await assistant.load(identity);
+  state.status='error';state.error='Work 摘要暂未生成，请检查辅助模型设置和连接';
+  delete state.summaryFormatVersion;
+  await assistant.persist(resolved,state);
+  assistant.states.delete(snapshot.workId);
+  assert.equal((await assistant.view(identity)).status,'collecting');
+  await until(async()=> (await assistant.view(identity)).status==='error');
+  for(let i=0;i<4;i++)await assistant.view(identity);
+  await new Promise(resolve=>setTimeout(resolve,60));
+  assert.equal(calls,1);
+  const saved=JSON.parse(await fs.readFile(path.join(directory,snapshot.workId+'.json'),'utf8'));
+  assert.equal(saved.summaryFormatVersion,2);
+  assistant.states.delete(snapshot.workId);
+  assert.equal((await assistant.view(identity)).status,'error');
+  assert.equal(calls,1,'restart must not silently retry an already attempted v2 failure');
 });
 
 test('a direct history ingest that finishes loading after close does not mutate or persist',async t=>{

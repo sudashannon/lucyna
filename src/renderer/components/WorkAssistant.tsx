@@ -80,17 +80,27 @@ function WorkWorkflowReminders({work,active,draftTargetKey,onCommand,sessionById
   };
   const visible=snapshot?.reminders.filter(item=>item.active&&['new','viewed'].includes(item.state))||[];
   const staleCount=visible.filter(item=>item.stale).length;
+  const hasConversationSources=!!snapshot&&snapshot.sourceRevision>0&&(snapshot.coverage?.visibleMessages||0)>0;
+  const succeededForCurrentSource=!!snapshot&&snapshot.lastSuccessAt>0&&snapshot.currentAnalysis===true;
+  const awaitingCurrentSource=hasConversationSources&&!succeededForCurrentSource&&snapshot.status!=='analyzing'&&snapshot.status!=='error';
+  const analyzeLabel=snapshot?.lastAttemptAt?'重新分析':'开始分析';
   if(!api.workWorkflow)return <div className="work-workflow-state">此客户端尚未接入 Work 流程提醒。</div>;
   return <section className="work-workflow" aria-label="Work 流程提醒">
-    <header className="work-workflow-heading"><div><h4>工作流程提醒</h4><p>根据跨会话对话与 SESSION.md 提示可复用的工作做法。</p></div><Button compact variant="secondary" disabled={!!currentBusy} onClick={()=>void refreshAnalysis()}><RefreshCw size={13}/>{currentBusy==='refresh'?'正在重新分析…':'重新分析'}</Button></header>
+    <header className="work-workflow-heading"><div><h4>工作流程提醒</h4><p>根据跨会话对话与 SESSION.md 提示可复用的工作做法。</p></div><Button compact variant="secondary" disabled={!!currentBusy||!hasConversationSources} onClick={()=>void refreshAnalysis()}><RefreshCw size={13}/>{currentBusy==='refresh'?'正在分析…':analyzeLabel}</Button></header>
     {!snapshot&&active&&<p className="work-workflow-state"><Spinner size={13}/>正在读取流程提醒…</p>}
     {snapshot?.status==='analyzing'&&<p className="work-workflow-state"><Spinner size={13}/>正在整理跨会话流程线索…</p>}
-    {snapshot?.status==='error'&&<p className="work-workflow-warning" role="alert">{snapshot.error||'流程提醒暂不可用。'}</p>}
+    {snapshot?.status==='error'&&<p className="work-workflow-warning" role="alert">{snapshot.error||'流程提醒暂不可用，请修复设置或连接后重新分析。'}</p>}
     {!snapshot?.recordAvailable&&snapshot&&<p className="work-workflow-warning">当前未能读取 SESSION.md；本次提醒没有使用其中的流程记录。{snapshot.recordWarning?` ${snapshot.recordWarning}`:''}</p>}
     {snapshot?.recordWarning&&snapshot.recordAvailable&&<p className="work-workflow-warning">SESSION.md 读取提示：{snapshot.recordWarning}</p>}
     {staleCount>0&&<p className="work-workflow-warning" role="status">对话或 SESSION.md 已变化，{staleCount} 条提醒暂不可操作。重新分析后再使用。</p>}
     {errors[identity]&&<p className="work-workflow-warning" role="alert">{errors[identity]}</p>}
-    {snapshot&&visible.length===0&&snapshot.status!=='analyzing'&&<p className="work-workflow-empty">暂无待处理的流程提醒。完成新的跨会话工作后，可在这里查看交接、复用和维护提示。</p>}
+    {snapshot&&!errors[identity]&&visible.length===0&&snapshot.status!=='analyzing'&&snapshot.status!=='error'&&(
+      !hasConversationSources
+        ?<p className="work-workflow-empty" role="status">还没有可分析的跨会话对话。</p>
+        :succeededForCurrentSource
+          ?<p className="work-workflow-empty" role="status">已检查当前对话，暂未发现需要处理的流程提醒。</p>
+          :<p className="work-workflow-empty is-unchecked" role="status">{awaitingCurrentSource?'当前 Work 资料尚未完成分析。':'这些对话尚未分析。'}分析完成后会显示检查结果；也可点击“{analyzeLabel}”立即运行。</p>
+    )}
     {visible.map(reminder=><article className={`work-workflow-reminder${reminder.stale?' is-stale':''}`} key={reminder.id}>
       <div className="work-workflow-reminder-heading"><span className="work-workflow-kind">{reminderKinds[reminder.kind]||'工作流程'}</span><span className="work-workflow-state-label">{reminder.stale?'资料已变化':reminderStates[reminder.state]}</span></div>
       <h5>{reminder.title}</h5><p className="work-workflow-reason">{reminder.reason}</p>
@@ -105,7 +115,11 @@ function WorkWorkflowReminders({work,active,draftTargetKey,onCommand,sessionById
       </div>
       {currentBusy===reminder.id&&<p className="work-workflow-state"><Spinner size={12}/>正在更新提醒…</p>}
     </article>)}
-    {snapshot&&<p className="work-workflow-meta">上次检查 {displayTime(snapshot.updatedAt)}{typeof snapshot.coverage?.visibleMessages==='number'?` · 参考 ${snapshot.coverage.visibleMessages} 条对话`:''}</p>}
+    {snapshot&&<p className="work-workflow-meta" aria-label="流程提醒分析记录">
+      {snapshot.lastAttemptAt>0?<span>最近尝试 {displayTime(snapshot.lastAttemptAt)}</span>:<span>尚未开始分析</span>}
+      {succeededForCurrentSource?<span>最近成功 {displayTime(snapshot.lastSuccessAt)}</span>:snapshot.lastSuccessAt>0?<span>最近成功 {displayTime(snapshot.lastSuccessAt)} · 当前 Work 资料待分析</span>:<span>尚无成功分析记录</span>}
+      {typeof snapshot.coverage?.visibleMessages==='number'&&<span>参考 {snapshot.coverage.visibleMessages} 条对话</span>}
+    </p>}
   </section>;
 }
 
@@ -257,7 +271,7 @@ export function WorkAssistant({work,active,onCommand,onError,draftTargetKey}:Pro
         <span><strong>{snapshot.coverage.sessions}</strong> 条会话已纳入资料</span>
         <span><strong>{snapshot.coverage.visibleMessages}</strong> / {snapshot.coverage.totalMessages} 条对话已载入</span>
         {!work.hostId&&<span><strong>{historyCoverage.loaded} / {historyCoverage.available}</strong> 条本机历史已读取</span>}
-        <span className="wd-caption">覆盖范围检查于 {displayTime(historyCoverage.checkedAt||snapshot.updatedAt)}</span>
+        {!work.hostId&&<span className="wd-caption">{(historyCoverage.checkedAt||0)>0?`覆盖范围检查于 ${displayTime(historyCoverage.checkedAt)}`:'本机历史尚未检查'}</span>}
         {!!snapshot.coverage.contextMessages&&<span><strong>{snapshot.coverage.contextMessages}</strong> 条消息进入本次摘要上下文</span>}
         {!!snapshot.coverage.omittedMessages&&<span><strong>{snapshot.coverage.omittedMessages}</strong> 条消息因容量限制未进入上下文</span>}
       </div>}
@@ -271,11 +285,15 @@ export function WorkAssistant({work,active,onCommand,onError,draftTargetKey}:Pro
         </section>
         {sectionLabels.map(([key,label])=>{const items=snapshot.summary?.[key]||[];return items.length?<section className="work-assistant-group" key={key}><h4>{label}<span>{items.length}</span></h4>{renderItems(items)}</section>:null;})}
         <div className="work-assistant-continue"><Button variant="cta" compact disabled={!current||busy||summaryStale} onClick={()=>onCommand(current)}><BookOpen size={14}/>继续当前工作到草稿</Button><p className="wd-caption">只加入当前 OMP 输入框草稿，不会自动发送。</p></div>
-      </>:snapshot.coverage.sessions===0?<div className="work-assistant-empty"><Clock3 size={17}/><div><strong>还没有可整理的会话</strong><p>可以先打开本机历史会话，让 Work 助手将它们纳入这个 Work 的上下文。</p></div></div>:<div className="work-assistant-empty"><Clock3 size={17}/><div><strong>{snapshot.enabled?'会话已收集，摘要尚未生成':'自动整理已暂停'}</strong><p>{snapshot.enabled?'更新摘要可立即整理当前 Work 的会话。':'恢复自动整理后，会从最新对话继续维护摘要。'}</p></div></div>}
+      </>:snapshot.coverage.sessions===0?<div className="work-assistant-empty"><Clock3 size={17}/><div><strong>还没有可整理的会话</strong><p>可以先打开本机历史会话，让 Work 助手将它们纳入这个 Work 的上下文。</p></div></div>:<div className="work-assistant-empty"><Clock3 size={17}/><div><strong>{snapshot.status==='error'?'摘要未生成':snapshot.enabled?'会话已收集，摘要尚未生成':'自动整理已暂停'}</strong><p>{snapshot.status==='error'?'请查看上方错误信息，修复设置或连接后重试。':snapshot.enabled?'更新摘要可立即整理当前 Work 的会话。':'恢复自动整理后，会从最新对话继续维护摘要。'}</p></div></div>}
       {snapshot.sessions.length>0&&<details className="work-assistant-sessions"><summary>已纳入资料的会话 · {snapshot.sessions.length}</summary>
         {snapshot.sessions.map(session=><div key={session.sessionId}><span>{sessionLabel(session)}</span><small>{session.messageCount} 条对话 · {displayTime(session.lastActivityAt)}</small></div>)}
       </details>}
-      <p className="work-assistant-updated">{snapshot.updatedAt?<><Clock3 size={12}/> 上次整理 {displayTime(snapshot.updatedAt)}</>:<>摘要仍在准备中</>}{snapshot.usedTokens>0&&<> · 已知用量 {snapshot.usedTokens.toLocaleString()} Token{snapshot.usageUnknown?'，起始请求用量不完整':''}</>}</p>
+      <p className="work-assistant-updated">
+        {snapshot.updatedAt?<><Clock3 size={12}/> 上次成功整理 {displayTime(snapshot.updatedAt)}</>:snapshot.lastAttemptAt?<><Clock3 size={12}/> 最近尝试 {displayTime(snapshot.lastAttemptAt)} · 尚无成功摘要</>:<>尚未生成摘要</>}
+        {(snapshot.lastAttemptAt||0)>0&&(snapshot.updatedAt||0)>0&&(snapshot.lastAttemptAt||0)>(snapshot.updatedAt||0)&&<> · 最近尝试 {displayTime(snapshot.lastAttemptAt||0)}</>}
+        {snapshot.usedTokens>0&&<> · 已知用量 {snapshot.usedTokens.toLocaleString()} Token{snapshot.usageUnknown?'，起始请求用量不完整':''}</>}
+      </p>
     </>}
   </section>;
 }

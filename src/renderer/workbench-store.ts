@@ -2,7 +2,7 @@ import type {Desktop, Work, History, HistoryEntry, OmpEvent, WorkEvent} from './
 import {emptyView, nativeQueue, projectEvent, restoreMessages, textContent, type SessionView, type Queued, type Run} from './session-view';
 import {normalizeCommands, type SlashCommand} from './command-completion';
 import {errorText} from './errors';
-import {resultExcerpt} from '../result-excerpt.cjs';
+import {navigationExcerpt} from '../result-excerpt.cjs';
 import {historyFileKey as fileKey,copiesHistory} from './history-entry';
 import {composeTextPrompt,validateTextAttachments,type DraftTextAttachment} from './text-attachments';
 import {validateInput,type PromptImage} from './composer-input';
@@ -106,7 +106,7 @@ class Conversation {
       void this.tasks.reconcileHistory();
       this.view={...this.view,messages:[...restoreMessages(messages.messages||[]),...this.view.messages.filter(m=>m.optimistic)],queued:nativeQueue(state.queuedMessages)};
       this.timelineRevision++;
-      this.summary='';for(let i=this.view.messages.length-1;i>=0;i--){const message=this.view.messages[i];if(message.role==='assistant'){this.summary=resultExcerpt(message.content);if(this.summary)break;}}
+      this.summary='';for(let i=this.view.messages.length-1;i>=0;i--){const message=this.view.messages[i];if(message.role==='assistant'){this.summary=navigationExcerpt(message.content);if(this.summary)break;}}
       this.syncState(state);this.connection='ready';this.waiting?.resolve();this.waiting=null;
       this.log(this.view.messages.length?'OMP 已连接，历史记录已恢复':'OMP 已连接');
       if(!this.creatingWork)void this.owner.refreshHistory(this.work.root,this.work.hostId);
@@ -132,7 +132,7 @@ class Conversation {
     if(event.type==='available_commands_update'){
       try{this.nativeCommands=normalizeCommands(event.commands);this.commandsStatus='ready';this.commandsError='';this.changed();}catch(e){this.commandsStatus='error';this.commandsError=String(e);this.changed();}return;
     }
-    if(event.type==='message_end'&&event.message?.role==='assistant'&&!event.message.content?.some?.((block:any)=>block?.type==='toolCall'))this.summary=resultExcerpt(event.message.content);
+    if(event.type==='message_end'&&event.message?.role==='assistant'&&!event.message.content?.some?.((block:any)=>block?.type==='toolCall'))this.summary=navigationExcerpt(event.message.content);
     if(event.type==='process_exit'&&this.forcingStop)this.dispatch({type:'local_force_stopped'});
     this.dispatch(event);
     if(event.type==='question_resolved'){this.questions=this.questions.filter(q=>q.id!==event.id);this.changed();return;}

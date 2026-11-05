@@ -14,7 +14,7 @@ function clientId(value = 'legacy') {
 // One native harness per conversation. This layer only owns routing and lifetime;
 // prompt admission, queues, tools and cancellation remain native OMP operations.
 class SessionManager {
-  constructor({create, send,onState=async()=>{},writeAttachments=writeTextAttachments,restoreAttachments=restoreTextAttachments,startTimeout=60000,titles}) {this.create=create; this.send=send; this.onState=onState;this.writeAttachments=writeAttachments;this.restoreAttachments=restoreAttachments;this.startTimeout=startTimeout;this.titles=titles;this.records=new Map(); this.files=new Map(); this.starting=new Set();this.journalMutations=new Map();}
+  constructor({create, send,onState=async()=>{},writeAttachments=writeTextAttachments,restoreAttachments=restoreTextAttachments,startTimeout=60000,titles,turnChanges}) {this.create=create; this.send=send; this.onState=onState;this.writeAttachments=writeAttachments;this.restoreAttachments=restoreAttachments;this.startTimeout=startTimeout;this.titles=titles;this.turnChanges=turnChanges;this.records=new Map(); this.files=new Map(); this.starting=new Set();this.journalMutations=new Map();}
   reserveJournal(file,id) {
     const key=sessionKey(file);
     if(this.journalMutations.has(key))throw Error('该会话正在移入回收站或恢复，请稍候');
@@ -57,6 +57,7 @@ class SessionManager {
       }
       if(event.type==='process_exit') {for(const [key,owner] of this.files)if(owner===id)this.files.delete(key);record.questions.clear();}
       if(!record.creation)this.titles?.observe(record,event,this);
+      this.turnChanges?.observe(record,event);
       this.send({...event,clientSessionId:id,workRoot:record.root,runtime:record.settings?.runtime});
     });
     this.records.set(id,record);
@@ -92,6 +93,7 @@ class SessionManager {
     const titleRevision=type==='get_messages'?this.titles?.revision(record):undefined;
     if(['prompt','set_session_name','abort','abort_and_restore_queue'].includes(type))this.titles?.cancel(record);
     const prompt=type==='prompt',wasBusy=record.busy;
+    if(prompt&&record.turnPreparing)throw Error('正在准备上一条消息，请稍候');
     if(prompt&&record.creation){
       if(record.prompting)throw Error('建根消息正在提交，请稍候');
       if(record.creation.state.target || /^\s*\/move(?:\s|$)/.test(data.message))throw Error('请使用会话中的 Work 交接入口');
@@ -100,21 +102,37 @@ class SessionManager {
     if(prompt)record.activityRevision=(record.activityRevision||0)+1;
     if(prompt)record.prompting=(record.prompting||0)+1;
     if(prompt&&!wasBusy)this.emit(record,{type:'client_prompt',titleHint:resultExcerpt(data.message,120)||(data.images?.length?'图片任务':'')});
-    if(['abort','abort_and_restore_queue'].includes(type))this.emit(record,{type:'client_stopping'});
-    let result;
+    if(['abort','abort_and_restore_queue'].includes(type)){
+      this.turnChanges?.cancel(record,true);
+      this.emit(record,{type:'client_stopping'});
+    }
+    let result,reviewCapture;
     try{
       if(prompt&&record.creation&&!record.creation.started){
         const commands=await record.session.request('get_available_commands');
         if(!commands?.commands?.some(command=>command.name==='work-start'))throw Error('WSL OMP 未加载 /work-start，请检查当前 OMP 配置目录');
       }
+      if(prompt&&!wasBusy&&this.turnChanges&&record.sessionFile&&!record.creation){
+        record.turnPreparing=true;
+        try{
+          reviewCapture=await this.turnChanges.begin(record,event=>{
+            if(this.records.get(id)===record)this.emit(record,event);
+          });
+          if(reviewCapture===false||!record.session.child)throw Error('消息发送前已停止');
+          this.turnChanges.sent(record,reviewCapture);
+        }finally{record.turnPreparing=false;}
+      }
       result=type==='get_messages'?await record.session.messages():['abort','abort_and_restore_queue'].includes(type)?await stopSession(record.session,type,data):await record.session.request(type,data);
       if(prompt&&record.creation)record.creation.started=true;
     }
-    catch(error){if(prompt&&!wasBusy)this.emit(record,{type:'client_prompt_failed'});throw error;}
+    catch(error){if(prompt&&!wasBusy){if(reviewCapture)this.turnChanges.cancel(record,false,reviewCapture);this.emit(record,{type:'client_prompt_failed'});}throw error;}
     finally{if(prompt)record.prompting--;}
     if(type==='get_state'&&record.movingWork)await record.movingWork.catch(()=>{});
     if(type==='get_state'&&requestRoot!==record.root)result=await record.session.request('get_state');
-    if(prompt&&!wasBusy&&result?.agentInvoked===false)this.emit(record,{type:'client_command_complete'});
+    if(prompt&&!wasBusy&&result?.agentInvoked===false){
+      if(reviewCapture)this.turnChanges.cancel(record,false,reviewCapture);
+      this.emit(record,{type:'client_command_complete'});
+    }
     if(type==='get_state'&&result?.sessionFile){
       if(record.expectedResume&&sessionKey(record.expectedResume)!==sessionKey(result.sessionFile))throw Error('OMP 未在所选原会话中续聊，可能被另一进程占用或已迁出。请先结束原会话的其他连接，再重试；原记录和草稿已保留。');
       this.ownIdentity(record,result.sessionId);this.ownFile(record,result.sessionFile);result.sessionFile=record.sessionFile;await this.onState(record);record.expectedResume=undefined;
@@ -161,8 +179,8 @@ class SessionManager {
     return saved;
   }
   respond(id,data){const record=this.get(id);if(!record.questions.has(data.id))throw new Error('该问题不属于当前会话或已结束');record.session.sendFrame(data);record.questions.delete(data.id);this.emit(record,{type:'question_resolved',id:data.id});}
-  close(id){const record=this.records.get(clientId(id));if(record?.movingWork)return record.movingWork.catch(()=>{}).then(()=>this.close(id));if(record){this.titles?.cancel(record);record.controller.abort(Error('会话启动已取消'));this.emit(record,{type:'client_closing'});}return record?record.session.close():Promise.resolve();}
-  terminate(id){const record=this.get(id);if(record.movingWork)throw Error('正在切换到新 Work，请稍候');this.titles?.cancel(record);this.emit(record,{type:'client_closing'});return record.session.terminate();}
+  close(id){const record=this.records.get(clientId(id));if(record?.movingWork)return record.movingWork.catch(()=>{}).then(()=>this.close(id));if(record){this.turnChanges?.cancel(record);this.titles?.cancel(record);record.controller.abort(Error('会话启动已取消'));this.emit(record,{type:'client_closing'});}return record?record.session.close():Promise.resolve();}
+  terminate(id){const record=this.get(id);if(record.movingWork)throw Error('正在切换到新 Work，请稍候');this.turnChanges?.cancel(record);this.titles?.cancel(record);this.emit(record,{type:'client_closing'});return record.session.terminate();}
   list(){return [...this.records.values()].filter(r=>r.session.child).map(r=>({id:r.id,root:r.root,agentDir:r.agentDir,sessionFile:r.sessionFile,runtime:r.settings.runtime,ready:r.session.ready,busy:r.busy,questions:[...r.questions.values()],...(r.creation?{creatingWork:true}:r.creationWork?{creationWork:r.creationWork}:{})}));}
   async closeAll(){await Promise.allSettled([...this.records.values()].map(r=>this.close(r.id)));}
 }

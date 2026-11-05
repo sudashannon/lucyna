@@ -35,7 +35,7 @@ app.whenReady().then(async()=>{
   const readKnowledge=handlers.knowledge;
   handlers.knowledge=(kind,...args)=>{const result=readKnowledge(kind,...args);return kind==='document'?{...result,content:result.content+'\n\n[知识链接](https://example.com/knowledge)'}:result;};
   for(const [name,fn]of Object.entries(handlers))ipcMain.handle('test:'+name,(_, ...args)=>fn(...args));
-  win=new BrowserWindow({width:1350,height:900,show:false,icon:applicationIcon,title:'Lucyna · 功能验收预览（演示数据）',...windowOptions(),useContentSize:true,webPreferences:{preload:path.join(__dirname,'experience-preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,offscreen:!process.argv.includes('--preview'),backgroundThrottling:false,additionalArguments:['--lucyna-titlebar']}});
+  win=new BrowserWindow({width:1440,height:900,show:false,icon:applicationIcon,title:'Lucyna · 功能验收预览（演示数据）',...windowOptions(),useContentSize:true,webPreferences:{preload:path.join(__dirname,'experience-preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,offscreen:!process.argv.includes('--preview'),backgroundThrottling:false,additionalArguments:['--lucyna-titlebar']}});
   installWindowChrome(win);win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.resolve(__dirname,'../dist/renderer/index.html'));await until('document.querySelectorAll(".work-row").length===2');
   await click('.work-row');await until('document.querySelectorAll(".sidebar .open-session").length===1');await click('.work-group:nth-child(2) .work-row');await until('document.querySelectorAll(".sidebar .open-session").length===1');
@@ -54,7 +54,13 @@ app.whenReady().then(async()=>{
   await click('.work-group:nth-child(2) .work-row');await click('.work-row');await until('document.querySelectorAll(".message").length===160');assert.equal(calls.filter(c=>c.type==='close').length,0);
   // Jumping across a huge history renders only a bounded neighborhood.
   await click('button[aria-label="收起工具面板"]');await pause(100);
+  assert.ok(await js('document.querySelector(".workspace-conversation").clientWidth>=960'),'wide fixture crosses the workspace outline breakpoint');
   assert.ok(await js('document.querySelector(".timeline-outline").getBoundingClientRect().width>190'),'wide timeline is always visible');
+  assert.ok(await js(`(()=>{
+    const scroll=document.querySelector('.transcript'),a=document.querySelector('.message-column').getBoundingClientRect();
+    const b=document.querySelector('.composer').getBoundingClientRect();
+    return scroll.scrollHeight>scroll.clientHeight&&Math.abs(a.left-b.left)<1&&Math.abs(a.right-b.right)<1;
+  })()`),'long history and composer stay aligned with a vertical scrollbar');
   assert.equal(await js('!!document.querySelector(".timeline-toggle,.timeline-popover")'),false,'no open/close floating timeline');
   await click('.timeline-marker');await until('document.querySelectorAll(".message").length===80');assert.ok((await js('document.querySelector(".message").textContent')).includes('历史记录 0'));
   const reading=await js('document.querySelector(".transcript").scrollTop');await click('button[aria-label="打开活跃会话"]');await until('!document.querySelector(".session-monitor").hidden');assert.equal(await js('document.querySelectorAll(".monitor-session").length'),1);
@@ -77,7 +83,7 @@ app.whenReady().then(async()=>{
   win.webContents.sendInputEvent({type:'keyDown',keyCode:'Home'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Home'});
   assert.ok(await js('document.activeElement===document.querySelector(".timeline-marker")'),'compact rail supports keyboard navigation');
   win.webContents.invalidate();await pause(250);await fs.writeFile(path.join(out,'timeline-compact.png'),(await win.webContents.capturePage()).toPNG());
-  win.setContentSize(375,812);await pause(120);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));win.setContentSize(1350,900);await pause(100);
+  win.setContentSize(375,812);await pause(120);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));win.setContentSize(1440,900);await pause(100);
   await click('.jump-latest');await until('document.querySelectorAll(".message").length===80&&!document.querySelector(".load-later")');
   win.webContents.invalidate();await pause(900);await fs.writeFile(path.join(out,'timeline.png'),(await win.webContents.capturePage()).toPNG());
   const a=[...connections.keys()][0];await input('#message-input','A 保留草稿');emit(a,'agent_start');emit(a,'tool_execution_start',{toolCallId:'failed-tool',toolName:'read',args:{path:'missing.md'}});emit(a,'tool_execution_end',{toolCallId:'failed-tool',isError:true,result:{content:[{type:'text',text:'Fixture: file not found'}]}});emit(a,'queue_update',{followUp:['恢复 A 的排队消息'],steering:[]});
@@ -91,7 +97,7 @@ app.whenReady().then(async()=>{
   await input('input[aria-label="搜索会话时间轴"]','工具失败');assert.equal(await js('document.querySelectorAll(".timeline-entry").length'),0);await input('input[aria-label="搜索会话时间轴"]','');
   await click('.activity-group-heading');await until('document.querySelector(".tool-row.failed")');await click('.tool-row.failed .activity-row');await until('document.querySelector(".tool-row.failed .activity-body")?.textContent.includes("Fixture: file not found")');
   win.webContents.invalidate();await pause(250);await fs.writeFile(path.join(out,'timeline-with-failed-tool.png'),(await win.webContents.capturePage()).toPNG());
-  win.setContentSize(960,700);await pause(150);assert.equal(await js('document.querySelectorAll(".timeline-marker.failure").length'),0);win.setContentSize(1350,900);await pause(150);
+  win.setContentSize(960,700);await pause(150);assert.equal(await js('document.querySelectorAll(".timeline-marker.failure").length'),0);win.setContentSize(1440,900);await pause(150);
   await click('button[aria-label="打开活跃会话"]');emit(b,'extension_ui_request',{method:'confirm',id:'question-b',title:'继续任务 B？'});await until('document.querySelector(".monitor-state.attention")');assert.ok(await js('!document.querySelector("[role=dialog]")'),'background question does not cover monitor');
   await js(`document.querySelector('[data-monitor-session="${b}"] .monitor-actions button').click()`);await until('document.querySelector("[role=dialog]")');emit(b,'question_resolved',{id:'question-b'});await until('!document.querySelector("[role=dialog]")');assert.equal(await js('document.querySelector("#message-input").value'),'B 保留草稿');
   emit(b,'message_end',{messageId:'external-link',message:{role:'assistant',content:'[对话链接](https://example.com/conversation)'}});await until('document.querySelector(".message.assistant a")?.getAttribute("href")==="https://example.com/conversation"');await click('.message.assistant a[href="https://example.com/conversation"]');await pause(80);assert.equal(externalUrls.at(-1),'https://example.com/conversation');
@@ -105,6 +111,6 @@ app.whenReady().then(async()=>{
   await click('button[aria-label="展开侧栏 · Ctrl B"]');win.setContentSize(375,812);await pause(150);rail=await railGeometry();for(const b of rail){assert.ok(b.width>=36&&b.height>=36);assert.ok(b.center<1);}assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));win.setContentSize(960,700);await click('button[aria-label="打开活跃会话"]');
   assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));assert.deepEqual(errors,[]);
   console.log(JSON.stringify({passed:true,checks:['empty session cleanup','delete cancellation','recycle bin delete/restore with original unchanged','visible slow import','switch during import without focus stealing','2000-message history initially renders 80','load earlier preserves scroll','switch retains history window','timeline jumps render at most 80 messages','timeline search and reading position','failed tools omitted from wide and compact timeline while transcript details remain accessible','parallel monitor opens native questions without global blockage','background stop restores only owner text and images','close leaves peer task running','960px dark monitor','demo knowledge catalog and detail','36px rail targets and centered count badge at 960px/375px'],profile:folder}));
-  if(process.argv.includes('--preview')){preview=true;win.setContentSize(1350,900);await click('button[aria-label="切换浅色外观"]');win.setTitle('Lucyna · 功能验收预览（演示数据）');win.show();win.focus();}
+  if(process.argv.includes('--preview')){preview=true;win.setContentSize(1440,900);await click('button[aria-label="切换浅色外观"]');win.setTitle('Lucyna · 功能验收预览（演示数据）');win.show();win.focus();}
  }catch(error){console.error(error.stack);console.error(errors);process.exitCode=1;}finally{clearTimeout(timer);if(!preview)app.exit(process.exitCode||0);}
 });

@@ -26,7 +26,7 @@ function createKnowledgeService(fetchImpl=fetch,{origin='http://127.0.0.1:18989'
     try {
       const response=await fetchImpl(url,{method,redirect:'error',signal:controller.signal,
         headers:{...(body?{'content-type':'application/json'}:{}),...headers},body:form||raw||(body?JSON.stringify(body):undefined)});
-      if(!response.ok){const detail=(await response.text()).slice(0,1200);let message=detail;try{const parsed=JSON.parse(detail);message=parsed.error||parsed.message||detail;}catch{}throw Error([409,412].includes(response.status)?`内容在操作期间发生变化，请刷新后重新核对。${message}`:`Stele 请求失败（${response.status}）：${message}`);}
+      if(!response.ok){const detail=(await response.text()).slice(0,1200);let message=detail;try{const parsed=JSON.parse(detail);message=parsed.error||parsed.message||detail;}catch{if(response.status===404&&url.pathname==='/api/reviews/advice')message='当前知识服务尚不支持 agent 处理建议，请更新并重启 Lucyna 后重试。';}throw Error([409,412].includes(response.status)?`内容在操作期间发生变化，请刷新后重新核对。${message}`:`Stele 请求失败（${response.status}）：${message}`);}
       if(response.status===204)return null;
       if(progress)return await readChat(response,progress);
       const reader=response.body.getReader(),chunks=[],limit=snapshot?2*1024*1024:binary?64*1024*1024:16*1024*1024;let length=0;
@@ -80,6 +80,15 @@ function createKnowledgeService(fetchImpl=fetch,{origin='http://127.0.0.1:18989'
       case 'candidateCreate':return call('/api/wiki/candidates',{method:'POST',body:{workspace:workspace(),componentId:text(args.componentId,'文档'),title:text(args.title,'标题',500),text:text(args.text,'候选内容',256000),references:args.references||[]}});
       case 'candidateAction':if(!['edit','adopt','reject'].includes(args.action))throw Error('无效的候选操作');return call('/api/wiki/candidates/'+id(args.id),{method:'POST',timeout:120000,body:{...fields(args,['action','title','text','reason']),revision:revision()}});
       case 'reviewAction':if(!['reverify','retract','dismiss','todo'].includes(args.action))throw Error('无效的复核操作');return call('/api/wiki/reviews/'+id(args.id),{method:'POST',body:{...fields(args,['action','reason','title']),workspace:workspace(),revision:revision()}});
+      case 'reviewAdvice':{
+        const request={id:text(args.id,'待核实记录',1024),workspace:workspace(),revision:revision()};
+        for(const key of ['generate','refresh'])if(args[key]!==undefined){if(typeof args[key]!=='boolean')throw Error('建议生成选项无效');request[key]=args[key];}
+        return call('/api/reviews/advice',{method:'POST',body:request,timeout:request.generate?720000:20000});
+      }
+      case 'reviewDelete':{
+        const request={id:text(args.id,'待核实记录',1024),workspace:workspace(),revision:revision(),documentId:text(args.documentId,'文档标识',128),documentRevision:text(args.documentRevision,'文档版本',128),operationId:text(args.operationId,'操作标识',64)};
+        return call('/api/reviews/delete',{method:'POST',body:request,timeout:600000});
+      }
       case 'sessions':return call('/api/wiki/sessions');
       case 'session':return call('/api/wiki/session',{params:{id:text(args.id,'会话')}});
       case 'calendarMonth':return call('/api/wiki/calendar/month',{params:{year:args.year,month:args.month}});

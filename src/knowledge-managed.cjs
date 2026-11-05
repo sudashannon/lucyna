@@ -5,6 +5,14 @@ function createManagedKnowledge({directory,chooseDirectory,executable=process.ex
  const runtime=new KnowledgeRuntime(directory,{executable}),service=createKnowledgeService(runtime.fetch.bind(runtime)),selections=new Map();
  const knowledge=async(kind,args={},progress)=>{
   switch(kind){
+   case 'reviewAdvice':{
+    const state=await runtime.ensure();if(!state.health?.capabilities?.includes('knowledge-review-advice'))throw Error('当前知识服务尚未加载 Agent 处理建议；请在现有任务结束后重启知识服务');
+    return service(kind,args,progress);
+   }
+   case 'reviewDelete':{
+    const state=await runtime.ensure();if(!state.health?.capabilities?.includes('knowledge-review-delete'))throw Error('当前知识服务尚未加载待核实文档删除；请在现有任务结束后重启知识服务');
+    return service(kind,args,progress);
+   }
    case 'governanceStatus':case 'governanceGet':case 'governanceConfigure':case 'governanceAction':{
     const state=await runtime.ensure();if(!state.health?.capabilities?.includes('knowledge-governance'))throw Error('当前知识服务尚未加载重复与冲突检查；请在现有任务结束后重启知识服务');
     if(kind==='governanceStatus')return runtime.call('/api/governance/status');

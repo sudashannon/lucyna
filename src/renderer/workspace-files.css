@@ -1,7 +1,6 @@
 .workspace-content-tabs{display:flex;gap:6px;padding:0 24px;border-bottom:1px solid var(--soft-border);flex-shrink:0;overflow-x:auto;background:var(--surface-elevated)}
 .workspace-content-tabs button{display:inline-flex;align-items:center;gap:6px;padding:12px 16px;font-size:14px;color:var(--muted-readable);border-bottom:2px solid transparent;white-space:nowrap}
 .workspace-content-tabs button:focus-visible{outline-offset:-3px}
-.workspace-tab-count{font-size:var(--font-size-caption);font-variant-numeric:tabular-nums}
 .workspace-section-title{font-size:var(--text-section);font-weight:600}
 .workspace-content-tabs button[aria-selected=true]{color:var(--accent-emphasis);border-bottom-color:var(--accent-emphasis);font-weight:600}
 .workspace-conversation{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0;overflow:hidden}

@@ -5,6 +5,7 @@ app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'lucyna-blue-')));
 app.disableHardwareAcceleration();
 const nativeChrome=process.argv.includes('--native-chrome');
 const out=path.resolve(nativeChrome?'.runtime/blue-theme-native-review':'.runtime/blue-theme-review'),pause=ms=>new Promise(r=>setTimeout(r,ms));
+require('./desktop-log.cjs').installDesktopLog(out);
 let win;const checks=[],errors=[],overlays=[];
 const js=code=>win.webContents.executeJavaScript(code);
 async function until(code){const end=Date.now()+15000;while(Date.now()<end){if(await js(`Boolean(${code})`))return;await pause(60);}throw Error('Timeout '+code);}
@@ -26,7 +27,7 @@ app.whenReady().then(async()=>{fs.mkdirSync(out,{recursive:true});const timer=se
   assert.equal(await js('document.documentElement.dataset.visualTheme'),'blue');
   await overlay('#112341');
   assert.ok(await js('document.querySelector(".workspace-main").getBoundingClientRect().width>=638'));
-  assert.ok(await js('document.querySelector(".application-navigation").getBoundingClientRect().right<=document.querySelector(".work-directory").getBoundingClientRect().left+1'));
+  assert.ok(await js('document.querySelector(".workbench-top").getBoundingClientRect().bottom<=document.querySelector(".work-directory").getBoundingClientRect().top+1'));
   await shot('blue-empty');
   await label('技能与命令');await until('document.querySelector(".composer-footnote").textContent.includes("会话已连接")');await label('关闭命令补全');
   await js('window.gallery.conversation()');await until('document.querySelector(".message.assistant")');await shot('blue-workbench');
@@ -54,7 +55,24 @@ app.whenReady().then(async()=>{fs.mkdirSync(out,{recursive:true});const timer=se
   assert.equal(await js('document.documentElement.dataset.visualTheme'),'classic');pass('settings keep appearance drafts local until Save; Cancel retains the active theme');
   await set('select[aria-label="视觉主题"]','blue');await label('技能与命令');await until('document.querySelector(".composer-footnote").textContent.includes("会话已连接")');await label('关闭命令补全');await js('window.gallery.conversation()');await until('document.querySelector(".message.assistant")');
   await label('切换深色外观');await overlay('#0b192f');await shot('blue-dark');await label('切换浅色外观');await overlay('#112341');
-  await label('打开知识库');await until('document.querySelectorAll(".knowledge-row").length===4');await click('.knowledge-row');await until('document.querySelector(".knowledge-reader [data-streamdown=mermaid-block] svg[aria-roledescription]")');await shot('blue-knowledge');
+  await js('window.__sharedTop=document.querySelector(".workbench-top");window.__workHeaderHeight=document.querySelector(".workspace-header").getBoundingClientRect().height');
+  await label('打开知识库');await until('document.querySelectorAll(".knowledge-row").length===4');
+  const shellGeometry=await js(`(()=>{
+    const top=document.querySelector('.workbench-top'),aside=document.querySelector('#workspace-navigation');
+    const page=document.querySelector('#primary-panel-knowledge'),heading=page.querySelector('.knowledge-workspace-heading');
+    return {
+      sameTop:top===window.__sharedTop, legacyNav:!!document.querySelector('.application-navigation'),
+      rowsInSidebar:!!aside.querySelector('.knowledge-sidebar .knowledge-row'),
+      gap:page.getBoundingClientRect().top-top.getBoundingClientRect().bottom,
+      workHeight:window.__workHeaderHeight, knowledgeHeight:heading.getBoundingClientRect().height,
+    };
+  })()`);
+  assert.ok(shellGeometry.sameTop&&!shellGeometry.legacyNav&&shellGeometry.rowsInSidebar
+    &&Math.abs(shellGeometry.gap)<1&&Math.abs(shellGeometry.workHeight-shellGeometry.knowledgeHeight)<=2,JSON.stringify(shellGeometry));
+  await click('.knowledge-row');await until('document.querySelector(".knowledge-reader [data-streamdown=mermaid-block] svg[aria-roledescription]")');await shot('blue-knowledge');
+  await label('打开工作台');assert.ok(await js('document.querySelector(".workbench-top")===window.__sharedTop'));
+  pass('Workbench and Knowledge share one top navigation and keep distinct, single-column directories');
+  await label('打开知识库');
   await label('打开活跃会话');await shot('blue-sessions');await label('打开工作台');
   win.setContentSize(960,700);await pause(150);assert.equal(await js('document.querySelector("#tools-panel").hidden'),true);await shot('blue-960');
   await js('document.querySelector(\'button[aria-label="展开工具面板"]\').focus()');await label('展开工具面板');await until('document.querySelector("#tools-panel").getAttribute("role")==="dialog"');

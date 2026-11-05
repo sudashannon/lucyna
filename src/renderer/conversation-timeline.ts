@@ -1,4 +1,4 @@
-import {resultExcerpt} from '../result-excerpt.cjs';
+import {navigationExcerpt} from '../result-excerpt.cjs';
 import type {Message} from './session-view';
 export type TimelineEntry={id:string;index:number;kind:'user'|'answer'|'completed'|'question';label:string};
 export const timelineLabels={user:'提问',answer:'回答',completed:'本轮完成',question:'等待回复'};
@@ -7,8 +7,8 @@ export function buildTimeline(messages:Message[],completed=false):TimelineEntry[
  const entries:TimelineEntry[]=[];let answer:TimelineEntry|undefined;
  for(let index=0;index<messages.length;index++){
   const message=messages[index];
-  if(message.role==='user'){if(answer)entries.push(answer);answer=undefined;entries.push({id:message.id,index,kind:'user',label:resultExcerpt(message.content,100)||'图片或技能消息'});}
-  else if(message.role==='assistant'&&!message.streaming){const label=resultExcerpt(message.content,100);if(label)answer={id:message.id,index,kind:'answer',label};}
+  if(message.role==='user'){if(answer)entries.push(answer);answer=undefined;entries.push({id:message.id,index,kind:'user',label:navigationExcerpt(message.content,100)||'图片或技能消息'});}
+  else if(message.role==='assistant'&&!message.streaming){const label=navigationExcerpt(message.content,100);if(label)answer={id:message.id,index,kind:'answer',label};}
  }
  if(answer)entries.push({...answer,kind:completed?'completed':'answer'});
  return entries.sort((a,b)=>a.index-b.index);

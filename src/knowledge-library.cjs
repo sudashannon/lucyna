@@ -21,6 +21,9 @@ class KnowledgeLibrary {
    CREATE TABLE IF NOT EXISTS library_redirects(old_id TEXT PRIMARY KEY, target TEXT NOT NULL REFERENCES libraries(id));
    CREATE TABLE IF NOT EXISTS document_path_aliases(path TEXT PRIMARY KEY COLLATE NOCASE,document TEXT NOT NULL REFERENCES documents(id));`);
   this.db.exec(`CREATE TABLE IF NOT EXISTS document_origins(document TEXT PRIMARY KEY,provenance TEXT NOT NULL);
+   CREATE TABLE IF NOT EXISTS document_tombstones(document TEXT PRIMARY KEY,library TEXT NOT NULL,relative TEXT NOT NULL COLLATE NOCASE,revision TEXT NOT NULL,hash TEXT NOT NULL,operation_id TEXT NOT NULL UNIQUE,deleted TEXT NOT NULL,trash_relative TEXT NOT NULL,review_id TEXT NOT NULL,review_workspace TEXT NOT NULL,input_revision TEXT NOT NULL,title TEXT);
+   CREATE INDEX IF NOT EXISTS document_tombstones_path ON document_tombstones(library,relative);
+   CREATE TABLE IF NOT EXISTS knowledge_delete_operations(operation_id TEXT PRIMARY KEY,signature TEXT NOT NULL,status TEXT NOT NULL,document TEXT,library TEXT,relative TEXT,revision TEXT,hash TEXT,trash_relative TEXT,request TEXT NOT NULL,result TEXT,created TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS work_materials(id TEXT PRIMARY KEY,work_key TEXT NOT NULL,root TEXT NOT NULL,relative TEXT NOT NULL,title TEXT NOT NULL,kind TEXT NOT NULL,category TEXT NOT NULL,revision TEXT NOT NULL,metadata TEXT NOT NULL,UNIQUE(work_key,relative));
    CREATE TABLE IF NOT EXISTS work_material_versions(id TEXT PRIMARY KEY,material TEXT NOT NULL,hash TEXT,created TEXT NOT NULL,metadata TEXT NOT NULL);`);
   this.queue=Promise.resolve();this.importJobs=new Map();this.recover();
@@ -46,7 +49,124 @@ class KnowledgeLibrary {
  history(identity){const doc=this.doc(identity);if(!doc)throw failure('内部文档不存在',404);return this.db.prepare('SELECT id,parent,hash,created,origin FROM revisions WHERE document=? ORDER BY rowid DESC').all(doc.id);}
  revisionPath(document,revision){return path.join(this.root,'revisions',document,revision);}
  atomic(file,bytes){fs.mkdirSync(path.dirname(file),{recursive:true});const temp=file+'.'+randomUUID()+'.tmp';const fd=fs.openSync(temp,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}try{fs.renameSync(temp,file);}finally{if(fs.existsSync(temp))fs.unlinkSync(temp);}}
- recover(){for(const operation of this.db.prepare("SELECT * FROM operations WHERE status='committed'").all()){const result=JSON.parse(operation.result),bytes=fs.readFileSync(this.revisionPath(result.id,result.revision));if(fs.existsSync(result.path)){const current=fs.readFileSync(result.path),currentHash=hash(current);if(currentHash!==hash(bytes)&&currentHash!==result.previousHash)this.atomic(path.join(this.root,'recovery-conflicts',randomUUID()),current);}this.atomic(result.path,bytes);this.db.prepare("UPDATE operations SET status='done' WHERE id=?").run(operation.id);}this.db.exec("DELETE FROM operations WHERE status='prepared'");}
+ assertProjectionPath(libraryPath,file){
+  const target=path.resolve(file),base=path.resolve(libraryPath);
+  if(!inside(this.root,target)||!inside(base,target))throw failure('文档路径越界',403);
+  for(let current=target;current!==this.root;current=path.dirname(current)){
+   if(!inside(this.root,current))throw failure('文档路径越界',403);
+   if(fs.existsSync(current)){const stat=fs.lstatSync(current);if(stat.isSymbolicLink())throw failure('知识目录不能包含链接',403);if(current!==target&&!stat.isDirectory())throw failure('文档父路径不是目录',409);if(current===target&&!stat.isFile())throw failure('文档必须是普通文件',409);}
+  }
+  if(fs.existsSync(this.root)&&fs.lstatSync(this.root).isSymbolicLink())throw failure('知识库数据目录不能是链接',403);
+  return target;
+ }
+ deleteRequestSignature({reviewId,workspace,inputRevision,documentId,documentRevision}){
+  return hash(JSON.stringify({reviewId,workspace,inputRevision,documentId,documentRevision}));
+ }
+ findReviewDelete({reviewId,workspace,inputRevision,documentId,documentRevision,operationId}){
+  const signature=this.deleteRequestSignature({reviewId,workspace,inputRevision,documentId,documentRevision}),operation=this.db.prepare('SELECT * FROM knowledge_delete_operations WHERE operation_id=?').get(operationId);
+  if(!operation){if(this.db.prepare('SELECT 1 FROM operations WHERE id=?').get(operationId))throw failure('操作标识已用于其他内容',409);return null;}
+  if(operation.signature!==signature)throw failure('操作标识已用于其他内容',409);
+  if(['prepared','moved','committed'].includes(operation.status))this.recoverDelete(operation);
+  const current=this.db.prepare('SELECT * FROM knowledge_delete_operations WHERE operation_id=?').get(operationId);
+  if(current.status==='conflict')throw failure('删除操作遇到路径冲突，原内容已保留，请刷新后重新核对',409);
+  if(current.status!=='done'||!current.result)throw failure('删除操作需要先恢复核对',409);
+  return JSON.parse(current.result);
+ }
+ deleteManagedDocumentSync({reviewId,workspace,inputRevision,documentId,documentRevision,operationId,title,componentId}){
+  if(typeof operationId!=='string'||!/^[a-f0-9-]{36}$/i.test(operationId))throw failure('无效的操作标识');
+  const request={reviewId,workspace,inputRevision,documentId,documentRevision},signature=this.deleteRequestSignature(request),prior=this.db.prepare('SELECT * FROM knowledge_delete_operations WHERE operation_id=?').get(operationId);
+  if(prior){if(prior.signature!==signature)throw failure('操作标识已用于其他内容',409);return this.findReviewDelete({...request,operationId});}
+  if(this.db.prepare('SELECT 1 FROM operations WHERE id=?').get(operationId))throw failure('操作标识已用于其他内容',409);
+  if(typeof reviewId!=='string'||!reviewId||reviewId.length>1024||typeof workspace!=='string'||!workspace||workspace.length>256||typeof inputRevision!=='string'||!inputRevision||inputRevision.length>1024||typeof documentId!=='string'||!documentId||documentId.length>128||typeof documentRevision!=='string'||!documentRevision||documentRevision.length>128)throw failure('待核实删除请求缺少当前文档版本');
+  const current=this.db.prepare('SELECT * FROM documents WHERE id=?').get(documentId);
+  if(!current)throw failure('待核实文档已不存在，请刷新列表后重试',409);
+  if(current.revision!==documentRevision)throw failure('文档内容已变化，请刷新列表后重新确认删除',409);
+  const lib=this.get(current.library),relative=safeRelative(current.relative),file=this.assertProjectionPath(lib.path,path.join(lib.path,...relative.split('/'))),revision=this.db.prepare('SELECT * FROM revisions WHERE id=? AND document=?').get(current.revision,current.id);
+  if(!revision||revision.hash!==current.hash)throw failure('文档当前版本索引无效，请刷新列表后重试',409);
+  if(!fs.existsSync(file))throw failure('文档投影已变化或不存在，请刷新列表后重试',409);
+  const visible=fs.readFileSync(file);if(hash(visible)!==current.hash)throw failure('文档内容已变化，请刷新列表后重新确认删除',409);
+  const trashRelative=['trash',operationId,current.id,...relative.split('/')].join('/'),trashPath=path.join(this.root,...trashRelative.split('/'));
+  const trashRoot=path.join(this.root,'trash');if(fs.existsSync(trashRoot)&&fs.lstatSync(trashRoot).isSymbolicLink())throw failure('回收目录不能是链接',403);
+  title=typeof title==='string'?title.slice(0,500):undefined;
+  this.db.prepare('INSERT INTO knowledge_delete_operations(operation_id,signature,status,document,library,relative,revision,hash,trash_relative,request,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(operationId,signature,'prepared',current.id,lib.id,relative,current.revision,current.hash,trashRelative,JSON.stringify({...request,title,componentId}),new Date().toISOString());
+  fs.mkdirSync(path.dirname(trashPath),{recursive:true});this.assertProjectionPath(trashRoot,trashPath);
+  try{fs.renameSync(file,trashPath);}catch(error){this.db.prepare("UPDATE knowledge_delete_operations SET status='conflict' WHERE operation_id=?").run(operationId);throw failure('无法安全移动文档到内部回收目录，原内容已保留',409);}
+  const moved=fs.readFileSync(trashPath);if(hash(moved)!==current.hash){if(!fs.existsSync(file))fs.renameSync(trashPath,file);this.db.prepare("UPDATE knowledge_delete_operations SET status='conflict' WHERE operation_id=?").run(operationId);throw failure('文档在删除期间发生变化，原内容已保留',409);}
+  this.db.prepare("UPDATE knowledge_delete_operations SET status='moved' WHERE operation_id=?").run(operationId);
+  const operation=this.db.prepare('SELECT * FROM knowledge_delete_operations WHERE operation_id=?').get(operationId);this.commitDelete(operation);return JSON.parse(this.db.prepare('SELECT result FROM knowledge_delete_operations WHERE operation_id=?').get(operationId).result);
+ }
+ deleteManagedDocument(input){return this.serial(()=>this.deleteManagedDocumentSync(input));}
+ commitDelete(operation){
+  const request=JSON.parse(operation.request),trashPath=path.join(this.root,...operation.trash_relative.split('/')),sourcePath=path.join(this.get(operation.library).path,...safeRelative(operation.relative).split('/'));
+  this.assertProjectionPath(path.join(this.root,'trash'),trashPath);
+  if(!fs.existsSync(trashPath)||hash(fs.readFileSync(trashPath))!==operation.hash){this.db.prepare("UPDATE knowledge_delete_operations SET status='conflict' WHERE operation_id=?").run(operation.operation_id);throw failure('回收副本校验失败，原文档状态已保留，请人工核对',409);}
+  if(fs.existsSync(sourcePath)&&hash(fs.readFileSync(sourcePath))===operation.hash){this.db.prepare("UPDATE knowledge_delete_operations SET status='conflict' WHERE operation_id=?").run(operation.operation_id);throw failure('删除期间原路径出现新内容，未删除该路径内容',409);}
+  const active=this.db.prepare('SELECT * FROM documents WHERE id=?').get(operation.document);
+  if(!active||active.library!==operation.library||active.relative!==operation.relative||active.revision!==operation.revision||active.hash!==operation.hash){
+   this.db.prepare("UPDATE knowledge_delete_operations SET status='conflict' WHERE operation_id=?").run(operation.operation_id);throw failure('文档已产生新修订，未删除新内容',409);
+  }
+  const result={deleted:true,documentId:operation.document,...(request.title?{title:request.title}:{}),operationId:operation.operation_id,indexed:false};
+  this.db.exec('BEGIN IMMEDIATE');try{
+   this.db.prepare('DELETE FROM document_path_aliases WHERE document=?').run(operation.document);
+   this.db.prepare('DELETE FROM documents WHERE id=?').run(operation.document);
+   this.db.prepare('INSERT INTO document_tombstones(document,library,relative,revision,hash,operation_id,deleted,trash_relative,review_id,review_workspace,input_revision,title) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(document) DO NOTHING').run(operation.document,operation.library,operation.relative,operation.revision,operation.hash,operation.operation_id,new Date().toISOString(),operation.trash_relative,request.reviewId,request.workspace,request.inputRevision,request.title||null);
+   // Any write that committed before its projection/status update is now obsolete.
+   for(const pending of this.db.prepare("SELECT id,result FROM operations WHERE status IN ('prepared','committed')").all()){
+    let value;try{value=JSON.parse(pending.result||'{}');}catch{}
+    if(value?.id===operation.document)this.db.prepare("UPDATE operations SET status='done' WHERE id=?").run(pending.id);
+   }
+   this.db.prepare("UPDATE knowledge_delete_operations SET status='committed',result=? WHERE operation_id=?").run(JSON.stringify(result),operation.operation_id);this.db.exec('COMMIT');
+  }catch(error){this.db.exec('ROLLBACK');throw error;}
+  this.db.prepare("UPDATE knowledge_delete_operations SET status='done' WHERE operation_id=?").run(operation.operation_id);
+  return result;
+ }
+ recoverDelete(operation){
+  if(operation.status==='done')return operation.result?JSON.parse(operation.result):null;
+  const request=JSON.parse(operation.request),tombstone=this.db.prepare('SELECT * FROM document_tombstones WHERE document=?').get(operation.document);
+  if(tombstone){this.db.prepare("UPDATE knowledge_delete_operations SET status='done',result=COALESCE(result,?) WHERE operation_id=?").run(JSON.stringify({deleted:true,documentId:operation.document,...(request.title?{title:request.title}:{}),operationId:operation.operation_id,indexed:false}),operation.operation_id);return JSON.parse(this.db.prepare('SELECT result FROM knowledge_delete_operations WHERE operation_id=?').get(operation.operation_id).result);}
+  const lib=this.get(operation.library),sourcePath=this.assertProjectionPath(lib.path,path.join(lib.path,...safeRelative(operation.relative).split('/'))),trashPath=this.assertProjectionPath(path.join(this.root,'trash'),path.join(this.root,...operation.trash_relative.split('/')));
+  const active=this.db.prepare('SELECT * FROM documents WHERE id=?').get(operation.document);
+  if(!active||active.library!==operation.library||active.relative!==operation.relative||active.revision!==operation.revision||active.hash!==operation.hash){this.db.prepare("UPDATE knowledge_delete_operations SET status='conflict' WHERE operation_id=?").run(operation.operation_id);return null;}
+  if(!fs.existsSync(trashPath)){
+   if(fs.existsSync(sourcePath)&&hash(fs.readFileSync(sourcePath))===operation.hash){fs.mkdirSync(path.dirname(trashPath),{recursive:true});this.assertProjectionPath(path.join(this.root,'trash'),trashPath);fs.renameSync(sourcePath,trashPath);}
+   else{this.db.prepare("UPDATE knowledge_delete_operations SET status='conflict' WHERE operation_id=?").run(operation.operation_id);return null;}
+  }
+  if(hash(fs.readFileSync(trashPath))!==operation.hash||fs.existsSync(sourcePath)&&hash(fs.readFileSync(sourcePath))===operation.hash){this.db.prepare("UPDATE knowledge_delete_operations SET status='conflict' WHERE operation_id=?").run(operation.operation_id);return null;}
+  if(operation.status==='prepared')this.db.prepare("UPDATE knowledge_delete_operations SET status='moved' WHERE operation_id=?").run(operation.operation_id);
+  this.commitDelete({...operation,status:'moved'});return JSON.parse(this.db.prepare('SELECT result FROM knowledge_delete_operations WHERE operation_id=?').get(operation.operation_id).result);
+ }
+ tombstone(identity,relative){
+  if(relative!==undefined){const lib=this.get(identity);return this.db.prepare('SELECT * FROM document_tombstones WHERE library=? AND relative=? COLLATE NOCASE ORDER BY deleted DESC LIMIT 1').get(lib.id,relative)||null;}
+  return this.db.prepare('SELECT * FROM document_tombstones WHERE document=?').get(identity)||null;
+ }
+ reviewDeleteComponent(operationId){const row=this.db.prepare('SELECT request FROM knowledge_delete_operations WHERE operation_id=?').get(operationId);if(!row)return null;try{return JSON.parse(row.request).componentId||null;}catch{return null;}}
+ deletedReviewIdentity(identity,workspace){
+  if(typeof identity!=='string'||!identity)return false;
+  if(this.tombstone(identity))return true;
+  for(const operation of this.db.prepare("SELECT document,library,relative,request FROM knowledge_delete_operations WHERE status IN ('committed','done')").all()){
+   let request;try{request=JSON.parse(operation.request);}catch{continue;}
+   if(request.componentId!==identity||request.workspace!==workspace)continue;
+   if(!this.db.prepare('SELECT 1 FROM documents WHERE library=? AND relative=? COLLATE NOCASE').get(operation.library,operation.relative))return true;
+  }
+  return false;
+ }
+ reviewDeleteIndex(operationId,{indexed,warning}={}){
+  const row=this.db.prepare('SELECT result FROM knowledge_delete_operations WHERE operation_id=? AND status=\'done\'').get(operationId);if(!row?.result)throw failure('删除操作记录不存在',404);
+  const result=JSON.parse(row.result);result.indexed=!!indexed;if(warning)result.warning=String(warning).slice(0,500);else delete result.warning;
+  this.db.prepare('UPDATE knowledge_delete_operations SET result=? WHERE operation_id=?').run(JSON.stringify(result),operationId);return result;
+ }
+ recover(){
+  for(const operation of this.db.prepare("SELECT * FROM knowledge_delete_operations WHERE status IN ('prepared','moved','committed') ORDER BY created").all())this.recoverDelete(operation);
+  for(const operation of this.db.prepare("SELECT * FROM operations WHERE status='committed'").all()){
+   const result=JSON.parse(operation.result),active=this.db.prepare('SELECT revision FROM documents WHERE id=?').get(result.id),deleted=this.db.prepare('SELECT 1 FROM document_tombstones WHERE document=?').get(result.id);
+   // Never replay an old outbox onto a deleted document or over a later revision.
+   if(deleted||!active||active.revision!==result.revision){this.db.prepare("UPDATE operations SET status='done' WHERE id=?").run(operation.id);continue;}
+   const lib=this.get(result.library),relative=safeRelative(result.relative),file=path.join(lib.path,...relative.split('/')),bytes=fs.readFileSync(this.revisionPath(result.id,result.revision));this.assertProjectionPath(lib.path,file);
+   if(fs.existsSync(file)){const current=fs.readFileSync(file),currentHash=hash(current);if(currentHash!==hash(bytes)&&currentHash!==result.previousHash)this.atomic(path.join(this.root,'recovery-conflicts',randomUUID()),current);}
+   this.atomic(file,bytes);this.db.prepare("UPDATE operations SET status='done' WHERE id=?").run(operation.id);
+  }
+  this.db.exec("DELETE FROM operations WHERE status='prepared'");
+ }
  write(input){return this.serial(()=>this.writeSync(input));}
  writeSync({library,relative,document,category,content,bytes,expected,operationId=randomUUID(),origin='ui',provenance,syncIdentity}){
   const lib=this.get(library||this.doc(document)?.library);let name=safeRelative(relative||this.doc(document)?.relative);
@@ -54,8 +174,13 @@ class KnowledgeLibrary {
   const data=bytes?Buffer.from(bytes):Buffer.from(typeof content==='string'?content:'');if(data.length>32*1024*1024||/\.md$/i.test(name)&&data.length>2*1024*1024)throw failure('文件超过导入或正文大小限制',413);
   if(/\.(md|markdown|txt)$/i.test(name)){try{new TextDecoder('utf-8',{fatal:true}).decode(data);}catch{throw failure('文本文档必须使用有效 UTF-8 编码');}}
   const signature=hash(JSON.stringify({library:lib.id,relative:name,hash:hash(data),expected}));
-  const prior=this.db.prepare('SELECT * FROM operations WHERE id=?').get(operationId);if(prior){if(prior.signature!==signature)throw failure('操作标识已用于其他内容',409);if(prior.status==='done')return JSON.parse(prior.result);throw failure('此操作需要先恢复核对',409);}
+  if(this.db.prepare('SELECT 1 FROM knowledge_delete_operations WHERE operation_id=?').get(operationId))throw failure('操作标识已用于其他内容',409);
+  const prior=this.db.prepare('SELECT * FROM operations WHERE id=?').get(operationId);if(prior){if(prior.signature!==signature)throw failure('操作标识已用于其他内容',409);const previous=JSON.parse(prior.result||'{}');if(this.db.prepare('SELECT 1 FROM document_tombstones WHERE document=?').get(previous.id))throw failure('文档已删除，旧操作不能重新应用',409);if(prior.status==='done')return previous;throw failure('此操作需要先恢复核对',409);}
   const current=this.db.prepare('SELECT * FROM documents WHERE library=? AND relative=?').get(lib.id,name);
+  const oldDeleted=this.db.prepare('SELECT 1 FROM document_tombstones WHERE document=?').get(document||syncIdentity?.document||'');
+  if(oldDeleted)throw failure('文档已删除，旧操作不能重新创建它',409);
+  const pathDeleted=this.db.prepare('SELECT document FROM document_tombstones WHERE library=? AND relative=? COLLATE NOCASE ORDER BY deleted DESC LIMIT 1').get(lib.id,name);
+  if(!current&&pathDeleted&&!(origin==='ui'&&!document&&!syncIdentity&&expected==='new'))throw failure('此路径对应已删除文档；只有显式新建操作可以创建新版本',409);
   if(current){const old=this.read(current.id);if(fs.existsSync(old.path)&&hash(fs.readFileSync(old.path))!==current.hash)throw failure('内部文件在应用外发生变化，请先核对；原文件已保留',409);if(expected!==current.revision&&expected!==old.etag)throw failure('文档已变化，请重新读取版本后保存',412);}
   else if(expected&&expected!=='new')throw failure('原文档已不存在',412);
   const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);

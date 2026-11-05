@@ -25,6 +25,7 @@ interface SegmentedControlProps<T extends string> {
   'aria-label': string;
   disabled?: boolean;
   role?: 'radiogroup' | 'tablist';
+  orientation?: 'horizontal' | 'vertical';
   className?: string;
   optionClassName?: string;
   style?: CSSProperties;
@@ -44,6 +45,7 @@ export function SegmentedControl<T extends string>({
   onValueChange,
   disabled = false,
   role = 'radiogroup',
+  orientation,
   'aria-label': ariaLabel,
   className,
   optionClassName,
@@ -102,6 +104,7 @@ export function SegmentedControl<T extends string>({
       ref={root}
       role={role}
       aria-label={ariaLabel}
+      aria-orientation={orientation}
       aria-disabled={disabled || undefined}
       data-disabled={disabled || undefined}
       className={cn('cindy-segmented', fullWidth && 'cindy-segmented-full', className)}

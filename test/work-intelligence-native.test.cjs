@@ -22,14 +22,15 @@ for (const protocol of ['chat-completions', 'responses']) {
         const message = (body.messages || body.input).at(-1).content;
         const input = JSON.parse(typeof message === 'string' ? message : message.map(part => part.text || '').join(''));
         const source = (input.sources || input.conversations).find(row => row.role === 'user');
-        const citation = {sessionId: source.sessionId, messageId: source.messageId, role: source.role, quote: source.text};
-        const result = input.sources ? {
-          completions: [{text: '，先整理构建日志并保留未决问题。', reason: '沿用此前确认的工作顺序', basis: 'inferred', sources: [citation]}],
+        const workflowResult = input.sources ? {
+          completions: [{text: '，先整理构建日志并保留未决问题。', reason: '沿用此前确认的工作顺序', basis: 'inferred', sources: [{sessionId: source.sessionId, messageId: source.messageId, role: source.role, quote: source.text}]}],
           assets: [{id: input.assets[0].id, reason: '名称对应正在整理的构建日志'}],
-        } : {reminders: [{kind: 'record_update', key: 'build-order', title: '核对 Work 的执行顺序',
-          reason: '用户改变了执行顺序，而 Work 记录仍描述原顺序。', draftText: '请核对新决定，并将确认后的执行顺序更新到 SESSION.md。',
-          sources: [{type: 'conversation', ...citation}, {type: 'record', path: 'SESSION.md', quote: input.record.text}]}]};
-        const text = JSON.stringify(result);
+        } : {
+          reminders: [{kind: 'record_update', key: 'build-order', title: '核对 Work 的执行顺序',
+            reason: '用户改变了执行顺序，而 Work 记录仍描述原顺序。', draftText: '请核对新决定，并将确认后的执行顺序更新到 SESSION.md。',
+            sources: [{evidenceId: source.excerpts[0].evidenceId}, {evidenceId: input.record.excerpts[0].evidenceId}]}],
+        };
+        const text = JSON.stringify(workflowResult);
         res.setHeader('Content-Type', 'application/json');
         if (protocol === 'responses') {
           res.end(JSON.stringify({id: 'response', object: 'response', created_at: 1, model: 'local-fixture', status: 'completed',

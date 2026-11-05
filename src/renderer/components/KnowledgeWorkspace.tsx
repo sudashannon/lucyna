@@ -1,6 +1,6 @@
-import {memo,useEffect,useState} from 'react';
+import {Fragment,memo,useEffect,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {BookOpen,Compass,FolderOpen,Inbox,ListChecks,Plus,RefreshCw,Wrench} from 'lucide-react';
+import {BookOpen,ChevronDown,ChevronRight,Compass,FolderOpen,Inbox,ListChecks,Plus,RefreshCw,Wrench} from 'lucide-react';
 import {Button} from '@cindy/components/ui/button';
 import {SegmentedControl} from '@cindy/components/ui/segmented-control';
 import {api} from '../api';
@@ -9,6 +9,7 @@ import {GraphView,SearchView,SessionsView,CalendarView} from './knowledge/Explor
 import {KnowledgeGovernance} from './knowledge/KnowledgeGovernance';
 import {AutomaticMaintenance} from './knowledge/AutomaticMaintenance';
 import {MaintenanceView} from './knowledge/Maintenance';
+import {ReviewsView} from './knowledge/Reviews';
 import {SourceCaptureDialog,SourcesView} from './knowledge/Sources';
 import {LibrariesView} from './knowledge/Libraries';
 import {TodosView,ReportsView,ActivityView,SettingsView} from './knowledge/Tools';
@@ -19,7 +20,7 @@ import '../knowledge-workspace.css';
 
 const groups=[{id:'documents',label:'文档库',icon:BookOpen},{id:'libraries',label:'知识库管理',icon:FolderOpen},{id:'explore',label:'探索',icon:Compass},{id:'sources',label:'来源资料',icon:Inbox},{id:'maintenance',label:'知识维护',icon:Wrench},{id:'tools',label:'待办与报告',icon:ListChecks}];
 const tabs:Record<string,{value:string;label:string}[]>={documents:[],libraries:[],sources:[],explore:[{value:'search',label:'证据检索'},{value:'graph',label:'知识图谱'},{value:'sessions',label:'会话记忆'},{value:'calendar',label:'时间线'}],maintenance:[{value:'automatic',label:'自动维护'},{value:'governance',label:'重复与冲突'},{value:'candidates',label:'候选知识'},{value:'reviews',label:'待核实'}],tools:[{value:'todos',label:'待办'},{value:'reports',label:'报告'},{value:'activity',label:'处理活动'},{value:'settings',label:'知识库设置'}]};
-export const KnowledgeWorkspace=memo(function KnowledgeWorkspace({active,workName,onQuote,onBack,sidebarTarget,sidebarExpanded=true}:{active:boolean;workName:string;onQuote:(text:string)=>void;onBack?:()=>void;sidebarTarget?:HTMLElement|null;sidebarExpanded?:boolean}){
+export const KnowledgeWorkspace=memo(function KnowledgeWorkspace({active,workName,onQuote,onBack,sidebarTarget,sidebarExpanded=true,compactHeader=false}:{active:boolean;workName:string;onQuote:(text:string)=>void;onBack?:()=>void;sidebarTarget?:HTMLElement|null;sidebarExpanded?:boolean;compactHeader?:boolean}){
   const [libraryTarget,setLibraryTarget]=useState<HTMLDivElement|null>(null);
   const [group,setGroup]=useState('documents'),[tab,setTab]=useState(''),[workspace,setWorkspace]=useState(''),[visited,setVisited]=useState(new Set(['documents'])),[revision,setRevision]=useState(0),[documentId,setDocumentId]=useState(''),[sessionId,setSessionId]=useState(''),[capture,setCapture]=useState(false),[captured,setCaptured]=useState<{workspace:string;id:string}>(),[evidence,setEvidence]=useState<KnowledgeEvidence>(),[ask,setAsk]=useState<KnowledgeDocument>(),[summaryDoc,setSummaryDoc]=useState<KnowledgeDocument>(),[edit,setEdit]=useState<KnowledgeDocument>(),operation=useOperation();
   const catalog=useRemote<KnowledgeCatalog>('catalog',{},active,revision),current=['documents','sources','libraries'].includes(group)?group:tab;
@@ -30,17 +31,24 @@ export const KnowledgeWorkspace=memo(function KnowledgeWorkspace({active,workNam
   const open=(id:string)=>{const node=catalog.data?.documents.find(doc=>doc.id===id);if(node?.type==='session'){setSessionId(id);setWorkspace(node.workspace);navigate('explore','sessions');return;}setDocumentId(id);navigate('documents');};
   useEffect(()=>{if(!active)return;const timer=setInterval(()=>{if(document.visibilityState==='visible')change();},60000);return()=>clearInterval(timer);},[active]);
   const data=catalog.data||null;
-  const context=!['documents','libraries'].includes(group)&&<div className="knowledge-workspace-context"><div>{tabs[group].length>0?(sidebarTarget&&sidebarExpanded?<nav className="knowledge-sidebar-subnav" aria-label="知识功能视图">{tabs[group].map(t=><button key={t.value} aria-current={tab===t.value?'page':undefined} onClick={()=>navigate(group,t.value)}>{t.label}</button>)}</nav>:<SegmentedControl value={tab} options={tabs[group]} onValueChange={v=>navigate(group,v)} aria-label="知识功能视图"/>):<span>保留原文，留下来源</span>}</div>{!['graph','activity','settings','automatic','governance'].includes(current)&&<select aria-label="知识功能来源" value={workspace} onChange={e=>setWorkspace(e.target.value)}><option value="">{group==='sources'?'请选择知识来源':'全部来源'}</option>{data?.workspaces.map(w=><option key={w.alias} value={w.alias}>{w.name||w.alias}</option>)}</select>}</div>;
-  const navigation=<nav className={sidebarTarget&&sidebarExpanded?'knowledge-sidebar-nav':'knowledge-workspace-nav'} aria-label="知识库功能">{groups.map(({id,label,icon:Icon})=><button type="button" key={id} title={label} aria-label={label} aria-current={group===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={16}/><span>{label}</span></button>)}</nav>;
-  const actions=<><button type="button" className="nav-action new-chat" aria-label="添加来源" title="添加来源" onClick={()=>setCapture(true)}><Plus size={16}/><span>添加来源</span></button><button type="button" className="icon-button" title="刷新知识库" aria-label="刷新知识库" disabled={catalog.busy} onClick={change}><RefreshCw size={16}/></button></>;
-  return <>{sidebarTarget&&createPortal(<div className={`knowledge-sidebar ${sidebarExpanded?'':'is-compact'}`} hidden={!active}>
-    <div className="knowledge-sidebar-actions">{actions}</div>{navigation}
-    {sidebarExpanded&&context}
+  const showScope=!['documents','libraries','graph','activity','settings','automatic','governance'].includes(current);
+  const scope=showScope&&<label className="knowledge-source-scope"><span>{group==='sources'?'资料所属来源':'来源范围'}</span><select aria-label="知识功能来源" value={workspace} onChange={e=>setWorkspace(e.target.value)}><option value="">{group==='sources'?'请选择知识来源':'全部来源'}</option>{data?.workspaces.map(w=><option key={w.alias} value={w.alias}>{w.name||w.alias}</option>)}</select></label>;
+  const context=!['documents','libraries'].includes(group)&&<div className="knowledge-workspace-context"><div>{tabs[group].length>0?<SegmentedControl value={tab} options={tabs[group]} onValueChange={v=>navigate(group,v)} aria-label="知识功能视图"/>:<span>保留原文，留下来源</span>}</div>{scope}</div>;
+  const navigation=(docked:boolean)=><nav className={docked?'knowledge-sidebar-nav':'knowledge-workspace-nav'} aria-label="知识库功能">{groups.map(({id,label,icon:Icon})=>{
+    const selected=group===id,children=tabs[id],nested=docked&&sidebarExpanded,expanded=nested&&selected&&children.length>0;
+    const button=<button type="button" className="knowledge-nav-entry" title={label} aria-label={label} aria-current={selected?children.length?(nested?undefined:'true'):'page':undefined} aria-expanded={nested&&children.length?expanded:undefined} aria-controls={expanded?`knowledge-nav-${id}`:undefined} onClick={()=>navigate(id,selected?tab:undefined)}><Icon size={16}/><span>{label}</span>{nested&&children.length>0&&(expanded?<ChevronDown className="knowledge-nav-chevron" size={14}/>:<ChevronRight className="knowledge-nav-chevron" size={14}/>)}</button>;
+    return nested?<div className={`knowledge-sidebar-group${selected?' is-active-group':''}`} key={id}>{button}{expanded&&<nav id={`knowledge-nav-${id}`} className="knowledge-sidebar-subnav" aria-label="知识功能视图">{children.map(t=><button type="button" key={t.value} aria-label={t.label} aria-current={tab===t.value?'page':undefined} onClick={()=>navigate(id,t.value)}>{t.label}</button>)}</nav>}</div>:<Fragment key={id}>{button}</Fragment>;
+  })}</nav>;
+  const actions=<><button type="button" className="nav-action knowledge-add-source" aria-label="添加来源" title="添加来源" onClick={()=>setCapture(true)}><Plus size={16}/><span>添加来源</span></button><button type="button" className="icon-button" title="刷新知识库" aria-label="刷新知识库" disabled={catalog.busy} onClick={change}><RefreshCw size={16}/></button></>;
+  const groupLabel=groups.find(item=>item.id===group)?.label;
+  const viewLabel=tabs[group].find(item=>item.value===tab)?.label||groupLabel||'知识库';
+  return <>{sidebarTarget&&createPortal(<div className={`knowledge-sidebar ${sidebarExpanded?'':'is-compact'} ${current==='documents'?'has-library':''}`} hidden={!active}>
+    <div className="knowledge-sidebar-actions">{actions}</div>
+    <div className="knowledge-sidebar-scroll">{navigation(true)}{sidebarExpanded&&scope}{sidebarExpanded&&group!=='documents'&&<p className="knowledge-sidebar-note">{data?`${data.workspaces.length} 个来源 · ${data.documents.length.toLocaleString()} 篇文档`:catalog.error?'知识库暂时无法连接':'正在连接知识库'}</p>}</div>
     <div className="knowledge-sidebar-library" ref={setLibraryTarget} hidden={current!=='documents'||!sidebarExpanded}/>
-    {sidebarExpanded&&group!=='documents'&&<p className="knowledge-sidebar-note">{data?`${data.workspaces.length} 个来源 · ${data.documents.length.toLocaleString()} 篇文档`:'正在连接 Stele'}<br/>切换页面会保留当前会话和草稿。</p>}
   </div>,sidebarTarget)}<section id="primary-panel-knowledge" role="tabpanel" aria-labelledby="primary-tab-knowledge" className="knowledge-screen knowledge-workspace" hidden={!active} aria-label="知识库">
-    <header className="knowledge-workspace-heading"><div><BookOpen size={19}/><h1>知识库</h1><span>{sidebarTarget?groups.find(g=>g.id===group)?.label:'把做过的事，变成下次的起点。'}</span></div>{!sidebarTarget&&<div>{actions}{onBack&&<Button compact variant="secondary" onClick={onBack}>返回工作台</Button>}</div>}</header>
-    {(!sidebarTarget||!sidebarExpanded)&&navigation}
+    <header className="knowledge-workspace-heading"><div><BookOpen size={17}/><h1>{compactHeader?viewLabel:'知识库'}</h1>{!compactHeader&&<span>{sidebarTarget?groupLabel:'把做过的事，变成下次的起点。'}</span>}</div>{!sidebarTarget&&<div>{actions}{onBack&&<Button compact variant="secondary" onClick={onBack}>返回工作台</Button>}</div>}</header>
+    {(!sidebarTarget||!sidebarExpanded)&&navigation(false)}
     {(!sidebarTarget||!sidebarExpanded)&&context}
     {catalog.error&&<div className="knowledge-alert" role="alert"><span>{catalog.error}</span><Button compact variant="secondary" onClick={catalog.refresh}>重试连接</Button></div>}
     <div className="knowledge-workspace-content">
@@ -53,7 +61,8 @@ export const KnowledgeWorkspace=memo(function KnowledgeWorkspace({active,workNam
       {visited.has('sources')&&<div className="knowledge-view" hidden={current!=='sources'}><SourcesView active={active&&current==='sources'} revision={revision} workspace={workspace} focusId={captured?.workspace===workspace?captured.id:undefined} onCapture={()=>setCapture(true)} onEvidence={setEvidence} onChanged={()=>{setCaptured(undefined);change();}} onCandidate={()=>navigate('maintenance','candidates')}/></div>}
       {visited.has('governance')&&<div className="knowledge-view" hidden={current!=='governance'}><KnowledgeGovernance active={active&&current==='governance'} onOpen={open} onChanged={change}/></div>}
       {visited.has('automatic')&&<div className="knowledge-view" hidden={current!=='automatic'}><AutomaticMaintenance active={active&&current==='automatic'} onOpen={open} onChanged={change}/></div>}
-      {(['candidates','reviews'] as const).map(view=>visited.has(view)&&<div className="knowledge-view" key={view} hidden={current!==view}><MaintenanceView tab={view} active={active&&current===view} revision={revision} workspace={workspace} catalog={data} onEvidence={setEvidence} onOpen={open} onChanged={change}/></div>)}
+      {visited.has('candidates')&&<div className="knowledge-view" hidden={current!=='candidates'}><MaintenanceView tab="candidates" active={active&&current==='candidates'} revision={revision} workspace={workspace} catalog={data} onEvidence={setEvidence} onOpen={open} onChanged={change}/></div>}
+      {visited.has('reviews')&&<div className="knowledge-view" hidden={current!=='reviews'}><ReviewsView active={active&&current==='reviews'} revision={revision} workspace={workspace} catalog={data} onOpen={open} onChanged={change}/></div>}
       {visited.has('todos')&&<div className="knowledge-view" hidden={current!=='todos'}><TodosView active={active&&current==='todos'} revision={revision} workspace={workspace} catalog={data} onOpen={open} onChanged={change}/></div>}
       {visited.has('reports')&&<div className="knowledge-view" hidden={current!=='reports'}><ReportsView active={active&&current==='reports'} revision={revision} workspace={workspace}/></div>}
       {visited.has('activity')&&<div className="knowledge-view" hidden={current!=='activity'}><ActivityView active={active&&current==='activity'} revision={revision}/></div>}

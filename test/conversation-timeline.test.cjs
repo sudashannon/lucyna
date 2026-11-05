@@ -12,3 +12,12 @@ test('large transcripts retain bounded jump windows and bounded rail density',()
  const entries=buildTimeline(messages,true),markers=railEntries(entries,messages.length);assert.ok(markers.length<=51);assert.equal(markers[0].id,'m0');assert.equal(markers.at(-1).id,'m19999');
  const compact=railEntries(entries,messages.length,8);assert.ok(compact.length<=11);assert.equal(compact[0].id,'m0');assert.equal(compact.at(-1).id,'m19999');
 });
+test('timeline labels keep prose and leave Markdown tables in their source message',()=>{
+ const table='项 | 结果\n--- | ---\n本地分支 | 已删除\n远端分支 | 已合并';
+ const entries=buildTimeline([
+  {id:'a',role:'assistant',content:`**清理完成。**\n\n${table}\n\n可继续核对。`},
+  {id:'u',role:'user',content:'继续'},
+  {id:'b',role:'assistant',content:table},
+ ],true);
+ assert.deepEqual(entries.map(entry=>[entry.id,entry.label]),[['a','清理完成。 可继续核对。'],['u','继续'],['b','表格']]);
+});

@@ -1,5 +1,5 @@
 import { memo, useEffect, useState, type ReactNode } from 'react';
-import { Brain, Check, ChevronRight, CircleAlert, Clock3, Code2, Square } from 'lucide-react';
+import { Brain, Check, ChevronRight, CircleAlert, Clock3, Code2, GitPullRequest, Square } from 'lucide-react';
 import { Spinner } from '@cindy/components/ui/spinner';
 import { answerContent, hasVisibleAnswer, phaseLabels, textContent, thinkingContent, toolSummary, type Message, type Run } from '../session-view';
 import { Document, MessageContent, type DocumentMedia } from './Document';
@@ -8,6 +8,7 @@ import {messageDomId} from '../conversation-timeline';
 import { BrandAvatar } from './BrandVisuals';
 import {SessionTaskCard} from './SessionTasks';
 import {taskActive,type SessionTask} from '../session-tasks';
+import type {TurnChangeSummary} from '../types';
 
 const duration = (ms: number) => {const s = Math.max(0, Math.floor(ms / 1000)); return s < 60 ? `${s} 秒` : `${Math.floor(s / 60)} 分 ${s % 60} 秒`;};
 function useClock(active: boolean) {
@@ -15,15 +16,28 @@ function useClock(active: boolean) {
   useEffect(() => {if (!active) return; setNow(Date.now()); const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id);}, [active]);
   return now;
 }
-export function RunActivity({run, waitingInput, onEvents}: {run: Run | null; waitingInput: boolean; onEvents: () => void}) {
+export function RunActivity({run, waitingInput, onEvents, compact, review, reviewOpen, onReview}: {
+  run: Run | null; waitingInput: boolean; onEvents: () => void;
+  compact?: boolean; review?: TurnChangeSummary; reviewOpen?: boolean; onReview?: (id: string) => void;
+}) {
   const now = useClock(!!run?.active);
   if (!run) return null;
   const label = waitingInput ? '等待你回复' : phaseLabels[run.phase] || 'OMP 正在运行';
   const silence = now - run.updatedAt;
   const waitingMs=(run.waitingMs||0)+(run.waitingSince?now-run.waitingSince:0);
+  const elapsed=(run.endedAt||now)-run.startedAt;
+  const splitTime=compact&&!run.active&&waitingMs>=1000;
   return <div id="run-status" data-outcome={run.outcome} className={`run-activity ${run.active ? 'working-status' : 'finished'} ${run.outcome === 'error' ? 'failed' : ''}`}>
-    <div className="run-heading"><span className="run-label" role="status">{run.active ? <span className="run-mascot"><BrandAvatar kind="cat" size={22}/><Spinner size={12}/></span> : run.outcome === 'completed' ? <Check size={14}/> : run.outcome === 'aborted' ? <Square size={12}/> : <CircleAlert size={14}/>} {label}</span><time>{duration((run.endedAt || now) - run.startedAt)}</time><button type="button" onClick={onEvents}>查看事件</button></div>
-    {waitingMs>1000&&<div className="run-detail">总历时中，等待你确认 {duration(waitingMs)}</div>}
+    <div className="run-heading"><span className="run-label" role="status">{run.active ? <span className="run-mascot"><BrandAvatar kind="cat" size={22}/><Spinner size={12}/></span> : run.outcome === 'completed' ? <Check size={14}/> : run.outcome === 'aborted' ? <Square size={12}/> : <CircleAlert size={14}/>} {label}</span>
+      <time>{splitTime?`运行 ${duration(elapsed-waitingMs)} · 等待 ${duration(waitingMs)}`:duration(elapsed)}</time>
+      <span className="run-actions"><button type="button" onClick={onEvents}>查看事件</button>
+        {review&&onReview&&<button type="button" className="run-review-action" aria-controls="tools-panel" aria-expanded={reviewOpen}
+          onClick={()=>onReview(review.messageId)}><GitPullRequest size={16}/>查看改动
+          {review.files>0&&<span>{review.files}</span>}
+        </button>}
+      </span>
+    </div>
+    {!splitTime&&waitingMs>1000&&<div className="run-detail">总历时中，等待你确认 {duration(waitingMs)}</div>}
     {run.active && run.detail && <div className="run-detail" title={run.detail}>{run.detail}</div>}
     {run.active && !waitingInput && silence >= 20000 && <div className="run-hint">{Math.floor(silence / 1000)} 秒未收到新输出。可继续等待，或停止后重试。</div>}
   </div>;
@@ -59,13 +73,22 @@ function ActivityGroup({items, active, ...render}: RenderProps & {items: Message
     {open && <div className="activity-rows">{items.map(message => message.role === 'tool' ? <ToolRow key={message.id} message={message} {...render}/> : <ThinkingRow key={message.id} message={message} {...render}/>)}</div>}
   </section>;
 }
-const TextMessage = memo(function TextMessage({message, ...render}: RenderProps & {message: Message}) {
+const TextMessage = memo(function TextMessage({message, review, reviewOpen, onChanges, ...render}: RenderProps & {
+  message: Message; review?: TurnChangeSummary; reviewOpen: boolean; onChanges?: (id: string) => void;
+}) {
   // Capture at mount, never restart on a token update or animate restored history.
   const [enter]=useState(()=>!!message.optimistic||!!message.streaming);
   const content = message.role === 'assistant' ? answerContent(message.content) : message.content;
-  return <article data-enter={enter} id={messageDomId(message.id)} className={`message ${message.role} ${render.jumpTarget===message.id?'timeline-target':''}`}><div className="message-author">{message.role === 'user' ? '你' : <><BrandAvatar size={24}/>OMP</>}{message.skill && <span className="skill-callout" title={message.skill.path}>技能 · {message.skill.name}</span>}{textContent(content) && <CopyButton label={message.role === 'user' ? '复制消息' : '复制回答'} text={() => textContent(content)} onError={render.onError}/>}</div><MessageContent content={content} streaming={!!message.streaming} {...render}/></article>;
+  return <article data-enter={enter} id={messageDomId(message.id)} className={`message ${message.role} ${render.jumpTarget===message.id?'timeline-target':''}`}><div className="message-author">{message.role === 'user' ? '你' : <><BrandAvatar size={24}/>OMP</>}{message.skill && <span className="skill-callout" title={message.skill.path}>技能 · {message.skill.name}</span>}{textContent(content) && <CopyButton label={message.role === 'user' ? '复制消息' : '复制回答'} text={() => textContent(content)} onError={render.onError}/>}</div><MessageContent content={content} streaming={!!message.streaming} {...render}/>
+    {review && onChanges && <button type="button" className="turn-review-action" aria-controls="tools-panel"
+      aria-expanded={reviewOpen} onClick={() => onChanges(review.messageId)}>
+      <GitPullRequest size={14}/>查看改动{review.files > 0 && <span>{review.files} 个文件</span>}{review.partial && <span>部分记录</span>}
+    </button>}
+  </article>;
 });
-export const SessionTranscript = memo(function SessionTranscript({messages, busy, ...render}: RenderProps & {messages: Message[]; busy: boolean}) {
+export const SessionTranscript = memo(function SessionTranscript({messages, busy, reviews, openReview, footerReview, onChanges, ...render}: RenderProps & {
+  messages: Message[]; busy: boolean; reviews?: TurnChangeSummary[]; openReview?: string; footerReview?: string; onChanges?: (id: string) => void;
+}) {
   const nodes: ReactNode[] = []; let activities: Message[] = [];
   const lastUser = [...messages].reverse().find(x => x.role === 'user');
   const currentMessages = new Set(messages.slice(lastUser ? messages.indexOf(lastUser) + 1 : messages.length).map(x => x.id));
@@ -78,7 +101,9 @@ export const SessionTranscript = memo(function SessionTranscript({messages, busy
     if (message.role === 'tool') {activities.push(message); continue;}
     if (message.role === 'assistant' && thinkingContent(message.content)) activities.push(message);
     const visible = hasVisibleAnswer(message);
-    if (visible) {flush(); nodes.push(<TextMessage key={message.id} message={message} {...render}/>);}
+    if (visible) {flush(); nodes.push(<TextMessage key={message.id} message={message}
+      review={message.turnKey&&message.turnKey!==footerReview?reviews?.find(item=>item.messageId===message.turnKey):undefined}
+      reviewOpen={!!openReview&&message.turnKey===openReview} onChanges={onChanges} {...render}/>);}
   }
   flush(); return <>{nodes}</>;
 });

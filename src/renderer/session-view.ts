@@ -1,7 +1,8 @@
 import type { OmpEvent } from './types';
 import {settledOutcome} from '../run-outcome.cjs';
+import {turnMessageKey} from '../turn-message-key.cjs';
 
-export type Message = { id: string; role: string; content: any; title?: string; intent?: string; args?: any; status?: string; startedAt?: number; endedAt?: number; streaming?: boolean; thinkingActive?: boolean; optimistic?: boolean; skill?: {name: string; path?: string} };
+export type Message = { id: string; role: string; content: any; turnKey?: string; title?: string; intent?: string; args?: any; status?: string; startedAt?: number; endedAt?: number; streaming?: boolean; thinkingActive?: boolean; optimistic?: boolean; skill?: {name: string; path?: string} };
 export type Run = { active: boolean; phase: string; startedAt: number; updatedAt: number; endedAt?: number; detail?: string; tools: number; waitingMs?:number; waitingSince?:number; outcome?: 'completed' | 'aborted' | 'error' };
 export type Queued = { queue: 'steering' | 'followUp'; message: string };
 export type SessionView = { messages: Message[]; run: Run | null; queued: Queued[] };
@@ -49,7 +50,7 @@ export function restoreMessages(items: OmpEvent[]): Message[] {
     const m = item.message ?? item, id = item.id || `history-${index}`;
     const user = userMessage(m);
     if (user || m.role === 'assistant') {
-      result.push(user ? {id, role: 'user', ...user} : {id, role: m.role, content: m.content});
+      result.push(user ? {id, role: 'user', turnKey: turnMessageKey(m), ...user} : {id, role: m.role, content: m.content});
       if (m.role === 'assistant' && Array.isArray(m.content)) for (const block of m.content) {
         if (block.type === 'toolCall') {const tool:Message={id: block.id || `${id}-tool`, role: 'tool', title: block.name, args: block.arguments, intent: block.intent, content: '', status: '历史记录'};result.push(tool);tools.set(tool.id,tool);}
       }
@@ -91,9 +92,10 @@ export function projectEvent(view: SessionView, event: OmpEvent, now = Date.now(
   const user = event.type === 'message_start' && event.message ? userMessage(event.message) : null;
   if (user) {
     const id = event.messageId || `user-${now}`, {content, skill} = user;
+    const turnKey = turnMessageKey(event.message);
     const optimistic = messages.find(x => x.optimistic && textContent(x.content) === textContent(content));
-    if (optimistic) messages = messages.map(x => x === optimistic ? {...x, id, content, skill, optimistic: false} : x);
-    else { upsert({id, role: 'user', content, skill}); run = {active: true, phase: 'waiting', startedAt: now, updatedAt: now, tools: 0}; }
+    if (optimistic) messages = messages.map(x => x === optimistic ? {...x, id, content, skill, turnKey, optimistic: false} : x);
+    else { upsert({id, role: 'user', content, skill, turnKey}); run = {active: true, phase: 'waiting', startedAt: now, updatedAt: now, tools: 0}; }
   }
   if (event.type === 'message_update') {
     const d = event.assistantMessageEvent || event.delta || {}, index = d.contentIndex ?? 0;

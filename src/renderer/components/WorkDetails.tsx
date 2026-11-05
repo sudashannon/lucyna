@@ -6,7 +6,6 @@ import {Spinner} from '@cindy/components/ui/spinner';
 import {api} from '../api';
 import type {FilePreview,HistoryEntry,Work} from '../types';
 import {groupRepositories,relatedHistory,workRecord,type GitInspection,type WorkAsset,type WorkDetail,type WorkMember} from '../work-detail-data';
-import {plainText} from '../panel-data';
 import {Document} from './Document';
 import {FileBrowser} from './FileBrowser';
 import {WorkRuns} from './WorkRuns';
@@ -121,16 +120,16 @@ export function WorkDetails({work,active,connections,onConnections,history,onOpe
     {!detail&&loading===work.root&&<div className="inline-loading"><Spinner size={14}/>读取当前工作记录与 Git 状态…</div>}
     {detail&&<>{tab!=='assistant'&&<p className="wd-caption">{loading===work.root?'正在刷新，暂显示上次结果':`读取于 ${time(detail.fetchedAt)}`}</p>}
       {tab==='overview'&&<div className="wd-overview">
-        {record.goal&&<p className="wd-goal">{record.goal.text}</p>}
+        {record.goal&&<div className="wd-goal"><Document content={record.goal.markdown} onError={onError} onNavigate={navigate}/></div>}
         <div className="wd-provenance"><span>文件修改 {time(detail.modifiedAt)}</span><span>文档登记 {record.recorded||'未填写'}</span></div>
         <p className="wd-caption">以下是文档记录；运行中的会话请在「活跃会话」查看。</p>
-        {record.current&&<section className="wd-section"><div className="wd-heading"><h3>当前进展</h3><button onClick={()=>source(record.current?.anchor)}>来源 <ArrowUpRight size={12}/></button></div><p>{record.current.text}</p></section>}
-        {!!record.pending.length&&<section className="wd-section wd-attention"><h3>未决与下一步</h3>{record.pending.map((f,i)=><div key={i}><span className="wd-caption">{f.label} · {f.section}</span><p>{f.text}</p><button className="text-action" onClick={()=>source(f.anchor)}>查看来源 <ArrowUpRight size={12}/></button></div>)}</section>}
+        {record.current&&<section className="wd-section"><div className="wd-heading"><h3>当前进展</h3><button onClick={()=>source(record.current?.anchor)}>来源 <ArrowUpRight size={12}/></button></div><Document content={record.current.markdown} onError={onError} onNavigate={navigate}/></section>}
+        {!!record.pending.length&&<section className="wd-section wd-attention"><h3>未决与下一步</h3>{record.pending.map((f,i)=><div key={i}><span className="wd-caption">{f.label} · {f.section}</span><Document content={f.markdown} onError={onError} onNavigate={navigate}/><button className="text-action" onClick={()=>source(f.anchor)}>查看来源 <ArrowUpRight size={12}/></button></div>)}</section>}
         {!!record.tasks.length&&<section className="wd-section"><h3>文档待办 · {record.tasks.length}</h3><ul>{record.tasks.map((task,i)=><li key={i}>{task}</li>)}</ul></section>}
         <p className="wd-caption">{record.completed} 项已勾选 · {record.tasks.length} 项未勾选；勾选数不代表工作已验收。</p>
         {!!record.latest.length&&<section className="wd-section"><h3>最近记录</h3>{record.latest.slice(0,3).map((s,i)=><details className="wd-record" key={s.title} open={isOpen(s.title)} onToggle={e=>toggle(s.title,e.currentTarget.open)}><summary>{s.title}<span>{i===0?'最新':''}</span></summary><Document content={s.content} onError={onError} onNavigate={href=>void navigate(href)}/><button className="text-action" onClick={()=>source(s.anchor)}>在 SESSION.md 中查看 <ArrowUpRight size={12}/></button></details>)}</section>}
-        {!!record.checks.length&&<details className="wd-record" open={isOpen('checks')} onToggle={e=>toggle('checks',e.currentTarget.open)}><summary>验收与范围 <span>文档记录</span></summary>{record.checks.map((f,i)=><div key={i}><h4>{f.label}</h4><p>{f.text}</p></div>)}</details>}
-        {!record.current&&!record.goal&&record.sections.length>0&&<section className="wd-section"><h3>{record.sections[0].title}</h3><p>{plainText(record.sections[0].content).slice(0,1000)}</p></section>}
+        {!!record.checks.length&&<details className="wd-record" open={isOpen('checks')} onToggle={e=>toggle('checks',e.currentTarget.open)}><summary>验收与范围 <span>文档记录</span></summary>{record.checks.map((f,i)=><div key={i}><h4>{f.label}</h4><Document content={f.markdown} onError={onError} onNavigate={navigate}/></div>)}</details>}
+        {!record.current&&!record.goal&&record.sections.length>0&&<section className="wd-section"><h3>{record.sections[0].title}</h3><Document content={record.sections[0].content} onError={onError} onNavigate={navigate}/></section>}
         <div className="wd-actions"><Button variant="secondary" compact onClick={()=>source()}><FileText size={13}/>完整记录</Button><Button variant="secondary" compact onClick={()=>onCommand('/work-continue')}>继续工作</Button><Button variant="secondary" compact onClick={()=>onCommand('/work-review')}>检查工作</Button></div>
       </div>}
       {tab==='code'&&<div className="wd-code"><p className="wd-caption">{groups.length} 个仓库 · {detail.members.length} 个登记 Worktree。远端分支基于本机缓存，未执行 fetch。</p>

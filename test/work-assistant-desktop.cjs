@@ -22,7 +22,7 @@ const assistant=new WorkAssistant({
   config:async()=>({baseURL:'http://deterministic.local',model:'fixture-agent'}),
   agent:{run:async(_model,_instructions,input)=>{
     const payload=JSON.parse(input),source=payload.messages.find(item=>item.role==='user')||payload.messages[0];
-    const citation={sessionId:source.sessionId,messageId:source.messageId,role:source.role,quote:source.text.slice(0,96)};
+    const citation={evidenceId:source.excerpts[0].evidenceId};
     return {finishReason:'stop',text:JSON.stringify({
       overview:{text:'多个会话都在推进构建流程；下一步先核对执行环境和留出检查。',sources:[citation]},
       goals:[{text:'归并会话中的构建目标与检查步骤。',sources:[citation]}],

@@ -15,6 +15,7 @@ const {configureAppIdentity}=require('./app-identity.cjs');
 const {installTaskbarIdentity}=require('./windows-taskbar.cjs');
 const { TerminalManager } = require('./terminal-manager.cjs');
 const { SessionManager } = require('./session-manager.cjs');
+const {TurnChanges} = require('./turn-changes.cjs');
 const { WslSessionHistory } = require('./wsl-session-history.cjs');
 const { HistoryTrash } = require('./history-trash.cjs');
 const {planDeletion,publicPlan}=require('./history-deletion.cjs');
@@ -132,6 +133,7 @@ function observeAssistant(event) {
 }
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const historyTrash = new HistoryTrash(app.getPath('userData'));
+const turnChanges = new TurnChanges({directory:path.join(app.getPath('userData'),'turn-changes'),runtime});
 const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get(),auxiliary:()=>auxiliarySettings.resolve()});
 const consolidation=new (require('./knowledge-consolidation-client.cjs').ConsolidationClient)({knowledge,listWorks,wslUnc,auxiliary:()=>auxiliarySettings.resolve(),busy:root=>workRunner.admissions.has(root)||(sessions?.list()||[]).some(c=>c.root===root&&(!c.ready||c.questions?.length||(workRunner.activity.get(c.id)??c.busy)))});
 const {WorkCreation}=require('./work-creation.cjs');
@@ -176,7 +178,7 @@ app.whenReady().then(async () => {
   if(windowChrome.enabled())windowChrome.installWindowChrome(window);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => { if (!url.startsWith('file://')) event.preventDefault(); });
-  sessions = new SessionManager({titles:sessionTitles,create: send => new OmpSession(send), onState:async record=>{
+  sessions = new SessionManager({titles:sessionTitles,turnChanges,create: send => new OmpSession(send), onState:async record=>{
     if(record.creation)return workCreation.remember(record);
     if(record.forkSource){
       record.forkTask ||= completeImportedFork(record.importRoot,record.agentDir,record.forkSource,record.sessionFile,record.root);
@@ -257,6 +259,8 @@ app.whenReady().then(async () => {
   handle('work:finish-creation',id=>sessions.finishWork(id,workCreation));
   handle('work:run', (operation,data) => workRunner.call(operation,data));
   handle('work:git', (root, member, action, options,hostId) => hostId?remote.workspaceCall(hostId,root,'workspace.git.read',{member,action,options}):workDetails(root, member, action, options));
+  handle('turn-changes:list', id => turnChanges.list(sessions.records.get(id)));
+  handle('turn-changes:read', (id, messageId) => turnChanges.read(sessions.records.get(id), messageId));
   handle('workspace:git', (root,member,action,options,hostId)=>{
     require('./git-service.cjs').validate(root,member,action,options||{});
     if(hostId&&(action==='disk'||options?.lfsMode!==undefined))throw Error('此功能当前仅支持本机 WSL 工作区');
@@ -519,7 +523,7 @@ app.on('before-quit', event => {
   if(quitting)return;
   event.preventDefault();quitting=true;feedback?.dispose();pet?.dispose();terminal?.dispose();
   void Promise.allSettled([sessions?.closeAll(),remote?.shutdown()]).finally(async()=>{
-    await Promise.allSettled([workGuidance.close(),workWorkflow.close()]);
+    await Promise.allSettled([workGuidance.close(),workWorkflow.close(),turnChanges.drain()]);
     await workAssistant.close();await consolidation.stop();await workRunner.stopAutomatic();app.quit();
   });
 });

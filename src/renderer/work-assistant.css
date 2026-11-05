@@ -203,6 +203,8 @@
 .work-workflow-heading button,.work-workflow-actions button { display:inline-flex; align-items:center; justify-content:center; gap:5px; }
 .work-workflow-state,.work-workflow-empty,.work-workflow-warning,.work-workflow-meta { display:flex; align-items:center; gap:6px; margin:7px 0; color:var(--text-secondary); font-size:var(--font-size-caption); line-height:1.55; overflow-wrap:anywhere; }
 .work-workflow-warning { color:var(--warning-text,#936411); }
+.work-workflow-warning[role=alert] { color:var(--text-danger); }
+.work-workflow-empty.is-unchecked { color:var(--text-primary-body-strong); }
 .work-workflow-reminder { padding:9px 0; border-top:1px solid var(--soft-border); }
 .work-workflow-reminder.is-stale { opacity:.78; }
 .work-workflow-reminder-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }

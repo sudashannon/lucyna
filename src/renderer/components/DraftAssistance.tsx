@@ -2,6 +2,8 @@ import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,type RefOb
 import {AlertCircle,BookOpen,Check,ChevronRight,Clock3,FileText,LoaderCircle,Sparkles,X} from 'lucide-react';
 import {Button} from '@cindy/components/ui/button';
 import {api} from '../api';
+import {errorText} from '../errors';
+import {Document} from './Document';
 import {sensitiveDocument} from '../../work-knowledge-policy.cjs';
 import type {WorkGuidanceAsset,WorkGuidanceCompletion,WorkGuidanceCoverage,WorkGuidanceMaterial,WorkGuidanceOperation,WorkGuidanceResponse,WorkGuidanceResult} from '../work-guidance-types';
 import '../draft-assistance.css';
@@ -69,7 +71,7 @@ export function DraftAssistance({target,enabled,disabled,draft,setDraft,inputRef
   const [ignoredAssets,setIgnoredAssets]=useState<Record<string,boolean>>({});
   const suggestionRef=useRef(suggestion);suggestionRef.current=suggestion;
   const previewRef=useRef<HTMLDivElement|null>(null);
-  const preRef=useRef<HTMLPreElement|null>(null);
+  const previewBody=useRef<HTMLDivElement>(null);
   const targetMatches=useCallback((request:Pick<RequestSnapshot,'identity'|'target'|'draft'|'caret'>)=>{
     const current=latest.current,el=current.inputRef.current;
     if(current.identity!==request.identity||current.target.root!==request.target.root||(current.target.hostId||'')!==(request.target.hostId||'')||current.target.workId!==request.target.workId||current.target.sessionKey!==request.target.sessionKey)return false;
@@ -122,7 +124,7 @@ export function DraftAssistance({target,enabled,disabled,draft,setDraft,inputRef
     if(material?.kind!=='ready')return;
     const frame=requestAnimationFrame(()=>{
       previewRef.current?.scrollIntoView({block:'nearest',inline:'nearest'});
-      preRef.current?.scrollIntoView({block:'nearest',inline:'nearest'});
+      previewBody.current?.scrollIntoView({block:'nearest',inline:'nearest'});
     });
     return()=>cancelAnimationFrame(frame);
   },[material?.kind,material?.asset.id]);
@@ -205,7 +207,7 @@ export function DraftAssistance({target,enabled,disabled,draft,setDraft,inputRef
   };
   const readSelectedText=()=>{
     const selected=window.getSelection(),node=selected?.anchorNode,focusNode=selected?.focusNode;
-      const text=selected&&node&&focusNode&&preRef.current?.contains(node)&&preRef.current.contains(focusNode)?selected.toString():'';
+    const text=selected&&node&&focusNode&&previewBody.current?.contains(node)&&previewBody.current.contains(focusNode)?selected.toString():'';
     setMaterial(previous=>previous?.kind==='ready'?{...previous,selectedText:text}:previous);
   };
   const insertAsset=(state:MaterialState,sourceOnly:boolean)=>{
@@ -260,7 +262,14 @@ export function DraftAssistance({target,enabled,disabled,draft,setDraft,inputRef
     {currentMaterial?.kind==='ready'&&currentMaterial.material&&<div className="draft-assistance-preview" ref={previewRef}>
       <div className="draft-assistance-preview-head"><div><strong>{currentMaterial.material.title}</strong><p title={currentMaterial.material.path}>{assetOriginLabel(currentMaterial.material.origin)} · {currentMaterial.material.path}{currentMaterial.material.snapshotVersion?` · 快照 ${currentMaterial.material.snapshotVersion}`:''}</p></div><button type="button" aria-label="关闭资料预览" onClick={()=>{previewSequence.current++;setMaterial(null);}}><X size={14}/></button></div>
       {currentMaterial.material.sourceHash&&<p className="draft-assistance-note" title={currentMaterial.material.sourceHash}>资料校验值：{currentMaterial.material.sourceHash.slice(0,12)}…（加入草稿时保留完整值）</p>}
-      {currentMaterial.material.snapshot&&currentMaterial.material.content?<><p className="draft-assistance-select-hint">可在正文中选中一段，再加入草稿。</p><pre ref={preRef} tabIndex={0} onMouseUp={readSelectedText} onKeyUp={readSelectedText}>{currentMaterial.material.content}</pre>{currentMaterial.material.truncated&&<p className="draft-assistance-note">资料预览受长度限制；此处显示的正文已截短。</p>}</>:<p className="draft-assistance-note">此资料只提供来源引用，没有可预览的快照正文。</p>}
+      {currentMaterial.material.snapshot&&currentMaterial.material.content?<><p className="draft-assistance-select-hint">可在正文中选中一段，再加入草稿。</p>
+        <div className="draft-assistance-preview-body" ref={previewBody} role="region" aria-label="资料正文" tabIndex={0} onMouseUp={readSelectedText} onKeyUp={readSelectedText}>
+          {/\.(?:md|markdown|mdown)$/i.test(currentMaterial.material.path)
+            ?<Document content={currentMaterial.material.content} onError={error=>setMaterial(previous=>previous&&previous.material===currentMaterial.material?{...previous,message:errorText(error)}:previous)}/>
+            :<pre>{currentMaterial.material.content}</pre>}
+        </div>
+        {currentMaterial.message&&<p className="draft-assistance-error" role="alert">{currentMaterial.message}</p>}
+        {currentMaterial.material.truncated&&<p className="draft-assistance-note">资料预览受长度限制；此处显示的正文已截短。</p>}</>:<p className="draft-assistance-note">此资料只提供来源引用，没有可预览的快照正文。</p>}
       <div className="draft-assistance-actions"><Button compact variant="secondary" disabled={!currentMaterial.selectedText?.trim()} onClick={()=>insertAsset(currentMaterial,false)}><Check size={13}/>加入所选片段</Button><Button compact variant="secondary" tone="quiet" onClick={()=>insertAsset(currentMaterial,true)}>仅加入来源</Button></div>
     </div>}
     {suggestion?.kind==='complete'&&currentRequest&&<p className="draft-assistance-footnote">只修改当前草稿；不会发送消息或启动 OMP。</p>}

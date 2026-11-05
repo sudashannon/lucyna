@@ -7,6 +7,7 @@ const {KnowledgeGovernance}=require('./knowledge-governance.cjs');
 const {KnowledgeScheduler}=require('./knowledge-scheduler.cjs');
 const {publishConnection}=require('./knowledge-connection.cjs');
 const {createMaintenanceAccess}=require('./knowledge-maintenance-access.cjs');
+const {KnowledgeReviewAdvice}=require('./knowledge-review-advice.cjs');
 const {KnowledgeSync}=require('./knowledge-sync.cjs');
 const {KnowledgeAutoSync}=require('./knowledge-auto-sync.cjs');
 const {AuxiliaryAgent}=require('./auxiliary-agent.cjs');
@@ -23,7 +24,7 @@ const tools=[
  {name:'library_write',description:'Create or update a Markdown document. For new unified-library documents choose category; unspecified categories go to 待分类. Updates require the revision/ETag returned by library_read; use expected=new only for a new path. operationId makes retries idempotent.',inputSchema:{type:'object',properties:{library:{type:'string'},document:{type:'string'},relative:{type:'string'},category:{type:'string',enum:['知识','规范','计划','提案','任务','报告','设计','图表','资料','待分类']},content:{type:'string'},expected:{type:'string'},operationId:{type:'string'}},required:['content','expected','operationId']},annotations:{readOnlyHint:false}},
  {name:'library_history',description:'List immutable document revisions.',inputSchema:{type:'object',properties:{document:{type:'string'}},required:['document']},annotations:{readOnlyHint:true}},
 ];
-async function startKnowledgeHost({directory,engineDirectory=process.resourcesPath&&fs.existsSync(path.join(process.resourcesPath,'knowledge-engine/manifest.json'))?path.join(process.resourcesPath,'knowledge-engine'):path.resolve(__dirname,'../resources/knowledge-engine'),idleMs=15*60*1000,consolidationOptions={},maintenanceOptions={},governanceOptions={},syncOptions={},automaticSyncOptions={}}={}){
+async function startKnowledgeHost({directory,engineDirectory=process.resourcesPath&&fs.existsSync(path.join(process.resourcesPath,'knowledge-engine/manifest.json'))?path.join(process.resourcesPath,'knowledge-engine'):path.resolve(__dirname,'../resources/knowledge-engine'),idleMs=15*60*1000,consolidationOptions={},maintenanceOptions={},governanceOptions={},reviewAdviceOptions={},syncOptions={},automaticSyncOptions={}}={}){
  if(!directory||!path.isAbsolute(directory))throw Error('Knowledge data directory must be absolute');
  const root=path.resolve(directory),runtime=path.join(root,'runtime');fs.mkdirSync(runtime,{recursive:true});
  const manifest=JSON.parse(fs.readFileSync(path.join(engineDirectory,'manifest.json'),'utf8')),binary=path.join(engineDirectory,manifest.binary);
@@ -48,6 +49,28 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
  const maintenance=new KnowledgeMaintenance({store,agent:new AuxiliaryAgent(),consolidation,register,verify:(...args)=>maintenanceAccess.verify(...args),...maintenanceOptions});
  maintenanceAccess=createMaintenanceAccess({maintenance,store,nativeJSON,native});
  const governance=new KnowledgeGovernance({store,agent:new AuxiliaryAgent(),maintenance,consolidation,search:maintenanceAccess.search,...governanceOptions});
+ const readReviewDocument=async(document,signal)=>{
+  const response=await native('/api/artifact?'+new URLSearchParams({path:document.path,workspace:document.workspace}),{signal});
+  if(!response.ok)throw failure(`暂时无法读取文档原文（${response.status}）`,response.status);
+  const declared=Number(response.headers.get('content-length')||0);if(declared>2*1024*1024)throw failure('文档超过 2 MiB 的模型读取上限',413);
+  const reader=response.body.getReader(),chunks=[];let length=0;
+  try{for(;;){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>2*1024*1024){await reader.cancel();throw failure('文档超过 2 MiB 的模型读取上限',413);}chunks.push(Buffer.from(value));}}
+  finally{reader.releaseLock();}
+  return {content:Buffer.concat(chunks).toString('utf8')};
+ };
+ const reviewAdvice=new KnowledgeReviewAdvice({
+  ...reviewAdviceOptions,store,
+  agent:reviewAdviceOptions.agent||consolidation.agent,
+  config:reviewAdviceOptions.config||(()=>consolidation.config),
+  getReviews:reviewAdviceOptions.getReviews|| (async(signal)=>{const value=await nativeJSON('/api/wiki/reviews',{signal});return Array.isArray(value)?value.filter(item=>!store.deletedReviewIdentity(item.issue?.componentId,item.workspace)):[];}),
+  getCatalog:reviewAdviceOptions.getCatalog||(async(signal)=>{
+   const [workspaces,documents]=await Promise.all([nativeJSON('/api/workspaces',{signal}),nativeJSON('/api/wiki/index',{signal})]);
+   return {workspaces,documents:Array.isArray(documents)?documents.filter(document=>!store.deletedReviewIdentity(document.id,document.workspace)):[]};
+  }),
+  readDocument:reviewAdviceOptions.readDocument||readReviewDocument,
+  search:reviewAdviceOptions.search||((query,topK,signal)=>nativeJSON('/api/wiki/search-semantic',{method:'POST',headers:{'content-type':'application/json'},bytes:JSON.stringify({query,topK}),signal})),
+  isBlocked:reviewAdviceOptions.isBlocked||maintenanceAccess.status,
+ });
  const scheduler=new KnowledgeScheduler();for(const service of [consolidation,maintenance,governance])service.scheduler=scheduler;
  consolidation.maintenanceBusy=()=>!!maintenance.job||!!governance.job;
  maintenance.governanceBusy=()=>!!governance.job;
@@ -73,6 +96,41 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
   const forwarded=message.method==='tools/call'&&message.params?.arguments?{...message,params:{...message.params,arguments:remapLegacyMcpArguments(message.params.arguments)}}:message;
   return nativeJSON('/mcp',{method:'POST',bytes:JSON.stringify(forwarded),headers:{'content-type':'application/json'}});
  }
+ const requestText=(value,name,max)=>{if(typeof value!=='string'||!value.trim()||value.length>max)throw failure(`无效的${name}`);return value;};
+ const deleteInput=value=>({id:requestText(value?.id,'待核实记录标识',1024),workspace:requestText(value?.workspace,'知识来源',256),revision:requestText(value?.revision,'检查版本',1024),documentId:requestText(value?.documentId,'文档标识',128),documentRevision:requestText(value?.documentRevision,'文档版本',128),operationId:requestText(value?.operationId,'操作标识',64)});
+ async function resolveReviewTarget(input){
+  const [findings,documents]=await Promise.all([nativeJSON('/api/wiki/reviews'),nativeJSON('/api/wiki/index')]);
+  const matches=(Array.isArray(findings)?findings:[]).filter(item=>item.id===input.id);if(!matches.length)throw failure('这条待核实记录已不存在，请刷新列表',404);if(matches.length!==1)throw failure('待核实记录标识不唯一，请刷新列表后重试',409);
+  const finding=matches[0];if(finding.workspace!==input.workspace||finding.issue?.inputRevision!==input.revision||!input.revision)throw failure('这条待核实记录的版本已变化，请刷新列表后重新核对',409);
+  const componentId=finding.issue?.componentId;if(typeof componentId!=='string'||!componentId)throw failure('待核实记录没有可定位的文档标识',409);
+  const indexed=(Array.isArray(documents)?documents:[]).filter(document=>document.id===componentId&&document.workspace===finding.workspace);if(indexed.length!==1||indexed[0].type==='session')throw failure('待核实文档当前未被索引，请刷新列表后重试',409);
+  let lib;try{lib=store.get(input.workspace);}catch{throw failure('待核实文档不属于当前受管知识库',409);}if(lib.alias!==input.workspace)throw failure('待核实文档不属于当前受管知识库',409);
+  const entry=indexed[0];let managed=store.doc(entry.id)||store.doc(entry.path);
+  if(!managed&&typeof entry.path==='string'){
+   let relative;try{relative=path.isAbsolute(entry.path)?path.relative(lib.path,entry.path).split(path.sep).join('/'):entry.path;relative=relative.replaceAll('\\','/');const {safeRelative}=require('./knowledge-library.cjs');relative=safeRelative(relative);managed=store.db.prepare('SELECT * FROM documents WHERE library=? AND relative=? COLLATE NOCASE').get(lib.id,relative)||null;}catch{}
+  }
+  if(!managed||managed.library!==lib.id)throw failure('待核实文档无法解析为当前受管文档，请刷新列表后重试',409);
+  if(managed.id!==input.documentId||managed.revision!==input.documentRevision)throw failure('文档内容已变化，请刷新列表后重新确认删除',409);
+  return {finding,entry,managed,componentId};
+ }
+ function assertNoPendingDocumentWrite(document){
+  const pending=maintenance.jobs().find(job=>job.document===document.id&&['applying','indexing'].includes(job.state));
+  if(pending)throw failure('该文档正处于自动维护写入或索引处理中，请待任务结束后再删除',409);
+  for(const plan of consolidation.all()){
+   const write=plan.pending?.write;if(write&&(write.document===document.id||write.library===document.library&&write.relative===document.relative))throw failure('该文档正等待 Work 沉淀写入，请待任务结束后再删除',409);
+  }
+ }
+ async function updateDeleteIndex(result,componentId){
+  let indexed=true,warning='';
+  try{
+   await nativeJSON('/api/wiki/rebuild',{method:'POST'});
+   const [documents,reviews]=await Promise.all([nativeJSON('/api/wiki/index'),nativeJSON('/api/wiki/reviews')]);
+   const visibleDocuments=Array.isArray(documents)?documents.filter(document=>!store.deletedReviewIdentity(document.id,document.workspace)):[];
+   const visibleReviews=Array.isArray(reviews)?reviews.filter(item=>!store.deletedReviewIdentity(item.issue?.componentId,item.workspace)):[];
+   if(visibleDocuments.some(document=>document.id===componentId||document.id===result.documentId)||visibleReviews.some(item=>item.issue?.componentId===componentId||item.issue?.componentId===result.documentId))throw failure('索引刷新后仍返回已删除文档的记录',503);
+  }catch(error){indexed=false;warning='文档已移入内部回收目录，但知识索引尚未确认刷新；请刷新待核实列表后再查看。'+String(error.message||'').slice(0,200);}
+  return store.reviewDeleteIndex(result.operationId,{indexed,...(!indexed?{warning}:{})});
+ }
  const server=http.createServer(async(request,response)=>{
   activeRequests++;response.once('finish',()=>{activeRequests--;lastUsed=Date.now();});response.once('close',()=>{if(!response.writableFinished)activeRequests--;});
   try{
@@ -90,8 +148,14 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
    if(url.pathname==='/internal/embed'){return json(response,await embed(JSON.parse((await body(request)).toString())));}
    if(url.pathname==='/internal/write'){const input=JSON.parse((await body(request)).toString());return json(response,await store.write({...managedPath(input.path),content:input.content,expected:input.expected,origin:'stele'}));}
    if(url.pathname==='/internal/shutdown'){json(response,{stopping:true});setImmediate(()=>void stop().then(()=>{if(standalone)process.exit(0);}));return;}
-   if(url.pathname==='/api/health')return json(response,{instanceId,ready:ready&&!draining,embeddingReady,unified:store.isUnified(),sourceHash:manifest.sourceHash,storageSchema:1,pid:process.pid,capabilities:['managed-libraries','directory-import','document-revisions','mcp','semantic-search','knowledge-consolidation','knowledge-maintenance','knowledge-governance','safe-restart']});
+   if(url.pathname==='/api/health')return json(response,{instanceId,ready:ready&&!draining,embeddingReady,unified:store.isUnified(),sourceHash:manifest.sourceHash,storageSchema:1,pid:process.pid,capabilities:['managed-libraries','directory-import','document-revisions','mcp','semantic-search','knowledge-consolidation','knowledge-maintenance','knowledge-governance','knowledge-review-advice','knowledge-review-delete','safe-restart']});
    if(!ready)throw failure('内置知识引擎正在启动',503);
+   if(url.pathname==='/api/wiki/index'&&request.method==='GET'){
+    const documents=await nativeJSON(url.pathname+url.search);return json(response,Array.isArray(documents)?documents.filter(document=>!store.deletedReviewIdentity(document.id,document.workspace)):documents);
+   }
+   if(url.pathname==='/api/wiki/reviews'&&request.method==='GET'){
+    const findings=await nativeJSON(url.pathname+url.search);return json(response,Array.isArray(findings)?findings.filter(item=>!store.deletedReviewIdentity(item.issue?.componentId,item.workspace)):findings);
+   }
    if(url.pathname==='/api/governance/status'&&request.method==='GET')return json(response,governance.status());
    if(url.pathname==='/api/governance/get'&&request.method==='GET')return json(response,governance.get(url.searchParams.get('id')));
    if(url.pathname==='/api/governance/configure'&&request.method==='POST')return json(response,governance.configure(JSON.parse((await body(request)).toString())));
@@ -101,6 +165,33 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
    if(url.pathname==='/api/maintenance/get'&&request.method==='GET')return json(response,maintenance.get(url.searchParams.get('id')));
    if(url.pathname==='/api/maintenance/configure'&&request.method==='POST')return json(response,maintenance.configure(JSON.parse((await body(request)).toString())));
    if(url.pathname==='/api/maintenance/action'&&request.method==='POST'){const input=JSON.parse((await body(request)).toString());return json(response,await maintenance.action(input.id,input.action));}
+   if(url.pathname==='/api/reviews/advice'){
+    if(request.method!=='POST')throw failure('请使用 POST 获取待核实处理建议',405);
+    const input=JSON.parse((await body(request,16*1024)).toString()),controller=new AbortController();
+    response.on('close',()=>{if(!response.writableEnded)controller.abort();});
+    return json(response,await reviewAdvice.get(input,controller.signal));
+   }
+   if(url.pathname==='/api/reviews/delete'){
+    if(request.method!=='POST')throw failure('请使用 POST 删除待核实文档',405);
+    const input=deleteInput(JSON.parse((await body(request,16*1024)).toString())),deleteKey={...input,reviewId:input.id,inputRevision:input.revision};
+    let prior=await store.serial(()=>store.findReviewDelete(deleteKey));
+    let componentId=prior?(store.reviewDeleteComponent(input.operationId)||prior.documentId):null;
+    if(!prior){
+     try{componentId=(await resolveReviewTarget(input)).componentId;}
+     catch(error){prior=await store.serial(()=>store.findReviewDelete(deleteKey));if(!prior)throw error;componentId=store.reviewDeleteComponent(input.operationId)||prior.documentId;}
+    }
+    const result=await reviewAdvice.retireDocument(componentId,async()=>{
+     const target=await store.serial(async()=>{
+      const existing=store.findReviewDelete(deleteKey);if(existing)return {value:existing,componentId:store.reviewDeleteComponent(input.operationId)||existing.documentId};
+      const resolved=await resolveReviewTarget(input);
+       assertNoPendingDocumentWrite(resolved.managed);
+       const value=store.deleteManagedDocumentSync({reviewId:input.id,workspace:input.workspace,inputRevision:input.revision,documentId:resolved.managed.id,documentRevision:resolved.managed.revision,operationId:input.operationId,title:resolved.entry.title,componentId:resolved.componentId});
+       return {value,componentId:resolved.componentId};
+     });
+     return updateDeleteIndex(target.value,target.componentId);
+    });
+    return json(response,result);
+   }
    if(url.pathname==='/api/consolidation/sync'&&request.method==='POST')return json(response,consolidation.sync(JSON.parse((await body(request)).toString())));
    if(url.pathname==='/api/consolidation/status')return json(response,consolidation.view(url.searchParams.get('root')));
    if(url.pathname==='/api/consolidation/configure'&&request.method==='POST'){const input=JSON.parse((await body(request)).toString());return json(response,consolidation.configure(input.root,input));}
@@ -135,7 +226,7 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
    if(upstream.body){for await(const chunk of upstream.body){if(response.destroyed)break;if(!response.write(Buffer.from(chunk)))await new Promise(resolve=>response.once('drain',resolve));}}response.end();
   }catch(error){if(!response.headersSent)json(response,{error:error.message},error.status||500);else response.destroy();}
  });
- const stop=async()=>{if(closing)return;closing=true;ready=false;clearInterval(idleTimer);scheduler.close();await Promise.all([governance.stop(),maintenance.stop(),consolidation.stop()]);server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await automaticSync.stop();child?.kill();await worker.terminate();store.close();try{const file=path.join(runtime,'connection.json'),saved=JSON.parse(fs.readFileSync(file,'utf8'));if(saved.instanceId===instanceId)fs.unlinkSync(file);}catch{};};
+ const stop=async()=>{if(closing)return;closing=true;ready=false;clearInterval(idleTimer);scheduler.close();await Promise.all([governance.stop(),maintenance.stop(),consolidation.stop(),reviewAdvice.stop()]);server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await automaticSync.stop();child?.kill();await worker.terminate();store.close();try{const file=path.join(runtime,'connection.json'),saved=JSON.parse(fs.readFileSync(file,'utf8'));if(saved.instanceId===instanceId)fs.unlinkSync(file);}catch{};};
  let idleTimer;
  try{
   await workerReady;await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const url='http://127.0.0.1:'+server.address().port;
@@ -149,7 +240,7 @@ async function startKnowledgeHost({directory,engineDirectory=process.resourcesPa
   const connection={version:1,instanceId,url,token,pid:process.pid,root,sourceHash:manifest.sourceHash};await publishConnection(path.join(runtime,'connection.json'),connection);
   consolidation.start();maintenance.start();governance.start();automaticSync.start();
   idleTimer=setInterval(()=>{if(!activeRequests&&!consolidation.keepAlive()&&!maintenance.settings().enabled&&!governance.settings().enabled&&!automaticSync.status().enabled&&Date.now()-lastUsed>idleMs)void stop().then(()=>{if(standalone)process.exit(0);});},10000);idleTimer.unref();
-  return {...connection,stop,store,mcp,nativeJSON,consolidation,maintenance,maintenanceAccess,governance,scheduler};
+  return {...connection,stop,store,mcp,nativeJSON,consolidation,maintenance,maintenanceAccess,governance,reviewAdvice,scheduler};
  }catch(error){await stop();throw error;}
 }
 function main(){

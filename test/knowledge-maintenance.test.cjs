@@ -11,6 +11,10 @@ async function fixture(t,{relative='knowledge/guide.md'}={}){
  const tick=async()=>{time+=1000;await maintenance.tick();},change=async()=>store.write({document:source.id,content:'# 实测记录\n\n'+updated,expected:store.doc(source.id).revision});
  await tick();return {store,maintenance,agent,consolidation,source,target,tick,change,calls:()=>calls};
 }
+async function reviewFixture(t){
+ const f=await fixture(t),doc=f.store.read(f.target.id);await f.store.write({document:doc.id,content:doc.content.replace('../source.md','../missing.md'),expected:doc.revision});await f.tick();
+ const job=f.maintenance.jobs().find(j=>j.document===f.target.id);assert.equal(job?.state,'review');return {...f,job};
+}
 test('source change produces cited local revision and verified retrieval; repeats are idempotent',async t=>{
  const f=await fixture(t);assert.equal(f.calls(),0);await f.change();await f.tick();const j=f.maintenance.jobs()[0];assert.equal(j.state,'completed');assert.equal(j.checks.passed,true);assert.match(f.store.read(f.target.id).content,/20 ms/);assert.equal(f.store.history(f.target.id).length,2);assert.equal(f.maintenance.settings().usedTokens,180);await f.tick();assert.equal(f.calls(),1);assert.equal(f.maintenance.blocked().size,0);
 });
@@ -71,6 +75,40 @@ test('registered path migrations repair links deterministically without a model'
 
 test('serialized review actions prevent overlapping apply and rollback',async t=>{
  const f=await fixture(t);f.maintenance.configure({autoApply:false});await f.change();await f.tick();const j=f.maintenance.jobs()[0];let release,started;const pending=new Promise(r=>started=r);f.maintenance.verify=async()=>{started();await new Promise(r=>release=r);return {passed:true};};const first=f.maintenance.action(j.id,'apply');await pending;await assert.rejects(f.maintenance.action(j.id,'rollback'),/正在运行/);release();await first;assert.equal(f.store.history(f.target.id).length,2);
+});
+
+test('confirm and dismiss remain available during unrelated background work',async t=>{
+ const f=await reviewFixture(t),other=await f.store.write({library:f.store.list()[0].id,relative:'unrelated.md',content:'# Unrelated\n\n没有引用。',expected:'new'}),second=await f.store.write({library:f.store.list()[0].id,relative:'another.md',content:'# Another\n\n[证据](absent.md)',expected:'new'});
+ await f.maintenance.tick();const deferred=f.maintenance.jobs().find(j=>j.document===second.id);assert.equal(deferred?.state,'review');
+ const background={id:'unrelated-running',document:other.id,fingerprint:'background',state:'analyzing',title:'其他记录',input:{document:{revision:other.revision},sources:[]},events:[]};f.maintenance.save(background);f.maintenance.processingJobId=background.id;f.maintenance.active=new AbortController();let release;f.maintenance.job=new Promise(resolve=>release=resolve);
+ try{await f.maintenance.action(f.job.id,'confirm');assert.equal(f.maintenance.get(f.job.id).state,'confirmed');await f.maintenance.action(deferred.id,'dismiss');assert.equal(f.maintenance.get(deferred.id).state,'dismissed');}
+ finally{release();f.maintenance.job=null;f.maintenance.active=null;f.maintenance.processingJobId=null;}
+});
+
+test('review actions lock one record and stop waits for an in-flight confirmation',async t=>{
+ const f=await reviewFixture(t),current=f.maintenance.current.bind(f.maintenance);let entered,release;const reached=new Promise(resolve=>entered=resolve),held=new Promise(resolve=>release=resolve);
+ f.maintenance.current=async job=>{const value=await current(job);entered();await held;return value;};const first=f.maintenance.action(f.job.id,'confirm');await reached;
+ await assert.rejects(f.maintenance.action(f.job.id,'dismiss'),/正在处理/);let stopped=false;const stopping=f.maintenance.stop().then(()=>{stopped=true;});await Promise.resolve();assert.equal(stopped,false);
+ release();await first;await stopping;assert.equal(stopped,true);assert.equal(f.maintenance.get(f.job.id).state,'confirmed');
+});
+
+test('a superseded review cannot overwrite a concurrent scan result',async t=>{
+ const f=await reviewFixture(t),current=f.maintenance.current.bind(f.maintenance);let entered,release;const reached=new Promise(resolve=>entered=resolve),held=new Promise(resolve=>release=resolve);
+ f.maintenance.current=async job=>{const value=await current(job);entered();await held;return value;};const action=f.maintenance.action(f.job.id,'confirm');await reached;
+ const changed=f.maintenance.get(f.job.id);changed.state='obsolete';f.maintenance.event(changed,'obsolete','已有新来源版本');release();await assert.rejects(action,/记录或来源在核实期间已变化/);assert.equal(f.maintenance.get(f.job.id).state,'obsolete');
+});
+
+test('a review can be deferred during unrelated work despite unavailable source and target',async t=>{
+ const f=await fixture(t);fs.unlinkSync(f.store.read(f.source.id).path);await f.tick();const review=f.maintenance.jobs().find(j=>j.document===f.target.id);assert.equal(review?.state,'review');fs.unlinkSync(f.store.read(f.target.id).path);
+ const other=await f.store.write({library:f.store.list()[0].id,relative:'unrelated.md',content:'# Unrelated',expected:'new'}),background={id:'unrelated-running',document:other.id,fingerprint:'background',state:'analyzing',title:'其他记录',input:{document:{revision:other.revision},sources:[]},events:[]};f.maintenance.save(background);f.maintenance.processingJobId=background.id;
+ await f.maintenance.action(review.id,'dismiss');assert.equal(f.maintenance.get(review.id).state,'dismissed');f.maintenance.processingJobId=null;
+});
+
+test('confirmation detects upstream status changes while inventory is being checked',async t=>{
+ const f=await fixture(t),source=f.store.read(f.source.id);await f.store.write({document:source.id,content:source.content+'\n\n[缺失依据](absent.md)',expected:source.revision});await f.tick();
+ const upstream=f.maintenance.jobs().find(j=>j.document===f.source.id),downstream=f.maintenance.jobs().find(j=>j.document===f.target.id);assert.equal(upstream?.state,'review');assert.equal(downstream?.state,'review');assert.equal(downstream.input.sources[0].blocked,true);
+ const current=f.maintenance.current.bind(f.maintenance);let entered,release;const reached=new Promise(resolve=>entered=resolve),held=new Promise(resolve=>release=resolve);f.maintenance.current=async job=>{const value=await current(job);entered();await held;return value;};const action=f.maintenance.action(downstream.id,'confirm');await reached;
+ const resolved=f.maintenance.get(upstream.id);resolved.state='confirmed';f.maintenance.event(resolved,'confirmed','上游已核实');release();await assert.rejects(action,/上游知识状态在核实期间已变化/);assert.equal(f.maintenance.get(downstream.id).state,'review');
 });
 
 test('Work aggregate delegates to original consolidation and verifies the refreshed revision',async t=>{

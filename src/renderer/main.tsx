@@ -16,6 +16,8 @@ import './context-sidebar.css';
 import './text-attachments.css';
 import './blue-theme.css';
 import './studio-themes.css';
+import './workbench-review.css';
+import './compact-workbench.css';
 import { App } from './App';
 i18n.use(initReactI18next).init({ lng: 'zh', fallbackLng: 'zh', interpolation: { escapeValue: false }, resources: { zh: { translation: {
   settings: { apiKey: { hideKey: '隐藏', showKey: '显示' } },

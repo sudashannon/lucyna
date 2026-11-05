@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('desktop', {
   finishWorkCreation:id=>ipcRenderer.invoke('work:finish-creation',id),
   workRun:(operation,data)=>ipcRenderer.invoke('work:run',operation,data),
   workGit:(root,member,action,options,hostId)=>ipcRenderer.invoke('work:git',root,member,action,options,hostId),
+  listTurnChanges:id=>ipcRenderer.invoke('turn-changes:list',id),
+  readTurnChanges:(id,messageId)=>ipcRenderer.invoke('turn-changes:read',id,messageId),
   gitWorkspace:(root,member,action,options,hostId)=>ipcRenderer.invoke('workspace:git',root,member,action,options,hostId),
   openExternal:url=>ipcRenderer.invoke('external:open',url),
   windowChrome:{

@@ -49,6 +49,11 @@ export type WorkWorkflowSnapshot={
   revision:number;
   stateRevision:number;
   contextFingerprint:string;
+  currentAnalysis:boolean;
+  lastAttemptAt:number;
+  lastAttemptSourceRevision:number;
+  lastSuccessAt:number;
+  lastSuccessSourceRevision:number;
   updatedAt?:number;
   reminders:WorkWorkflowReminder[];
 };
