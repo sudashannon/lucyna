@@ -118,6 +118,48 @@ function setup(saved){
 
 const savedSession=(id,extra={})=>({id,root:'/work/a',draftKey:'draft-'+id,title:'Task '+id,sessionFile:'C:/'+id+'.jsonl',agentDir:'C:/agent',runtime:'wsl',reconnectOnLaunch:true,...extra});
 
+test('citation navigation reuses a sibling conversation and leaves running work and drafts intact',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const origin=f.store.active;
+ origin.view.run={active:true,phase:'writing',startedAt:1,updatedAt:1,tools:0};
+ const target=f.store.create(f.works[0],undefined,false);target.sessionFile='C:/target.jsonl';
+ target.view.messages=[{id:'display-1',nativeId:'native-1',role:'assistant',content:'这是应在原会话定位的完整消息。'}];
+ f.api.workAssistantSource=async input=>({...input,clientSessionId:target.id,nativeMessageId:'native-1',role:'assistant',text:'这是应在原会话定位的完整消息。'});
+ const result=await f.store.navigateSource({sessionId:'journal-source',messageId:'hash-id',role:'assistant',quote:'完整消息'});
+ assert.deepEqual(result,{sessionId:target.id,messageId:'display-1'});assert.equal(f.store.active,target);
+ assert.ok(origin.busy);assert.notEqual(origin.draftKey,target.draftKey);assert.equal(f.calls.length,0);
+ f.store.dispose();
+});
+
+test('citation navigation opens original history in its own runtime without importing a copy',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);
+ const source='原会话有需要定位的用户决定。';
+ f.api.workAssistantSource=async input=>({...input,role:'user',text:source,entry:{sessionFile:'C:/original.jsonl',agentDir:'C:/original-agent',runtime:'windows',title:'原会话'}});
+ f.api.importSession=async()=>assert.fail('a citation must never create a history copy');
+ const start=f.api.start;f.api.start=async input=>{f.messages.set(input.clientSessionId,[{id:'original-user',role:'user',content:source}]);return start(input);};
+ const result=await f.store.navigateSource({sessionId:'journal-original',messageId:'hash-id',role:'user',quote:source});
+ const opened=f.calls.find(call=>call.type==='start');assert.equal(opened.runtime,'windows');assert.equal(opened.resume,'C:/original.jsonl');
+ assert.equal(result.messageId,'original-user');assert.equal(f.calls.some(call=>call.type==='prompt'),false);f.store.dispose();
+});
+
+test('late citation resolution cannot steal focus even when the user leaves and returns',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const origin=f.store.active;
+ let release;f.api.workAssistantSource=input=>new Promise(resolve=>{release=()=>resolve({...input,role:'user',text:'旧引用',clientSessionId:origin.id});});
+ const pending=f.store.navigateSource({sessionId:'journal-source',messageId:'m1',role:'user',quote:'旧引用'});
+ const rejected=assert.rejects(pending,/已切换会话/);
+ await f.store.selectWork(f.works[1]);f.store.selectSession(origin.id);release();await rejected;
+ assert.equal(f.store.active,origin);assert.equal(f.calls.length,0);f.store.dispose();
+});
+
+test('citation navigation rejects source scope mismatches and ambiguous content',async()=>{
+ const f=setup();await tick();await f.store.selectWork(f.works[0]);const origin=f.store.active;
+ f.api.workAssistantSource=async input=>({...input,hostId:'another-host',role:'user',text:'same',clientSessionId:origin.id});
+ const source={sessionId:'journal-source',messageId:'m1',role:'user',quote:'same'};
+ await assert.rejects(f.store.navigateSource(source),/所属 Work/);
+ origin.view.messages=[{id:'one',role:'user',content:'same'},{id:'two',role:'user',content:'same'}];
+ f.api.workAssistantSource=async input=>({...input,role:'user',text:'same',clientSessionId:origin.id});
+ await assert.rejects(f.store.navigateSource(source),/多条相同原文/);assert.equal(f.store.active,origin);f.store.dispose();
+});
+
 test('a Work handoff retains its own conversation and draft identity while another Work is selected',async()=>{
  const f=setup();await tick();await f.store.selectWork(f.works[0]);
  const previous=f.store.active;

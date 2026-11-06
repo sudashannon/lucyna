@@ -57,12 +57,16 @@ app.whenReady().then(async()=>{
   await until('document.querySelector(".workbench-top .workbench-branch")?.textContent.includes("codex/workspace-files")');
   assert.ok(await js('document.querySelector(".work-directory > .companion-sessions")?.getClientRects().length&& !document.querySelector(".application-navigation")'));
   assert.ok(await js('Array.from(document.querySelectorAll(".workbench-top button")).every(button=>button.getBoundingClientRect().right<=innerWidth)'));
+  // panel-in translates the panel during entry. Measure its final grid bounds,
+  // not an intermediate animation frame after the branch label has appeared.
+  await js('Promise.all(document.querySelector("#tools-panel").getAnimations().map(animation=>animation.finished.catch(()=>{})))');
   assert.ok(await js('document.querySelector(".workbench-tool-rail").getBoundingClientRect().left>=document.querySelector("#tools-panel").getBoundingClientRect().right-1'));
-  await until('document.querySelector("#tool-panel-overview .workbench-overview")?.textContent.includes("在对话旁审查本轮改动")');
-  await click('.workbench-overview > button');
-  await until('!document.querySelector("#tool-panel-work").hidden');
-  await click('#tab-overview');
-  await until('!document.querySelector("#tool-panel-overview").hidden');
+  await until('document.querySelector("#tool-panel-work:not([hidden]) .wd-tabs")');
+  assert.equal(await js('document.querySelector("#tab-work").getAttribute("aria-selected")'),'true');
+  assert.equal(await js('document.querySelector(".tool-rail-heading").textContent'),'工作详情');
+  assert.ok(await js('!document.querySelector("#tab-overview, #tool-panel-overview")'));
+  await captureConversation('workbench-default-details');
+  checks.push('The right rail opens full Work details directly and has no separate overview');
   const workMenu=label=>js(`document.querySelector(${JSON.stringify('button[aria-label="'+label+' 的更多操作"]')})
     .dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerType:'mouse',bubbles:true}))`);
   const placeWork=async (label,action)=>{
@@ -153,6 +157,7 @@ app.whenReady().then(async()=>{
   for(const width of [1440,1300]){
     window.setContentSize(width,960);
     await until('Math.abs(innerWidth-'+width+')<=2');
+    await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     const before=await navStarts();
     for(const tab of ['files','sessions','chat']){
       await click('#workspace-tab-'+tab);
@@ -206,18 +211,13 @@ app.whenReady().then(async()=>{
   assert.ok(await js('!document.querySelector(".turn-changes .wf-diff").textContent.includes("prior_round")'));
   await js('window.workspaceFixture.completeRound()');
   await until('document.querySelector("#run-status .run-review-action")');
-  await click('#tab-overview');
-  await until('!document.querySelector("#tool-panel-overview").hidden');
-  await until('document.querySelector(".workbench-progress-document table")?.textContent.includes("本地分支")');
-  assert.ok(await js('document.querySelector(".workbench-progress-document code")?.textContent.startsWith("feature/")'));
-  assert.ok(await js(`(()=>{
-    const preview=document.querySelector('.workbench-progress-document'),table=preview.querySelector('table'),panel=document.querySelector('#tools-panel');
-    return preview.getBoundingClientRect().right<=panel.getBoundingClientRect().right
-      && table.closest('[data-streamdown="table-wrapper"]')?.getBoundingClientRect().width<=preview.clientWidth
-      && !Array.from(document.querySelectorAll('.timeline-entry')).some(entry=>entry.textContent.includes('| --- |'));
-  })()`),'Markdown table renders within the inspector and navigation omits table syntax');
-  await captureConversation('compact-workbench-overview');
-  checks.push('Work overview preserves Markdown tables and inline code in its own scroll region');
+  await click('#tab-work');
+  await js(`Array.from(document.querySelectorAll('.wd-tabs button')).find(button=>button.textContent==='进展').click()`);
+  await until('document.querySelector(".wd-overview")?.textContent.includes("已接入侧栏差异查看")');
+  await until('document.querySelector(".transcript table")?.textContent.includes("本地分支")');
+  assert.ok(await js(`Array.from(document.querySelectorAll('.timeline-entry')).every(entry=>!entry.textContent.includes('| --- |'))`));
+  await captureConversation('workbench-details-progress');
+  checks.push('Work progress reads the registered document and the transcript renders the assistant Markdown');
   await click('.run-review-action');
   await until('document.querySelector(".turn-changes .wf-diff")?.textContent.includes("later_round")');
   await captureConversation('compact-workbench-review');

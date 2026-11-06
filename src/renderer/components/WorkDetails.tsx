@@ -10,6 +10,7 @@ import {Document} from './Document';
 import {FileBrowser} from './FileBrowser';
 import {WorkRuns} from './WorkRuns';
 import {WorkAssistant} from './WorkAssistant';
+import type {WorkAssistantSourceTarget} from '../work-assistant-types';
 import {Modal} from './Modal';
 import {classifyWorkAsset} from '../../work-knowledge-policy.cjs';
 import '../work-details.css';
@@ -21,9 +22,9 @@ const short=(value?:string)=>value?.slice(0,10)||'—';
 const workIdentity=(work:Work)=>`${work.hostId||'local'}\0${work.root}`;
 const assetLabels={note:'工作笔记 · L1',log:'会话日志 · L2',script:'可复用脚本',evidence:'引用证据'};
 const states:Record<string,string>={active:'进行中',paused:'已暂停',delivered:'已交付',merged:'已合并',archived:'已归档',abandoned:'已放弃'};
-type Props={work:Work;active:boolean;connections?:number;onConnections?:()=>void;history:HistoryEntry[];onOpen:(file:FilePreview)=>void;onGit?:(member:string,action:string,scope:string)=>void;onResume:(entry:HistoryEntry)=>void;onCommand:(command:string)=>void;onMemory:(query:string)=>void;onError:(error:unknown)=>void;draftTargetKey?:string};
+type Props={work:Work;active:boolean;connections?:number;onConnections?:()=>void;history:HistoryEntry[];onOpen:(file:FilePreview)=>void;onGit?:(member:string,action:string,scope:string)=>void;onResume:(entry:HistoryEntry)=>void;onCommand:(command:string)=>void;onMemory:(query:string)=>void;onNavigateSource:(source:WorkAssistantSourceTarget)=>Promise<void>|void;onError:(error:unknown)=>void;draftTargetKey?:string};
 
-export function WorkDetails({work,active,connections,onConnections,history,onOpen,onGit,onResume,onCommand,onMemory,onError,draftTargetKey}:Props){
+export function WorkDetails({work,active,connections,onConnections,history,onOpen,onGit,onResume,onCommand,onMemory,onNavigateSource,onError,draftTargetKey}:Props){
   const [cache,setCache]=useState<Record<string,WorkDetail>>({}),[tabs,setTabs]=useState<Record<string,string>>({}),[queries,setQueries]=useState<Record<string,string>>({});
   const [loading,setLoading]=useState(''),[error,setError]=useState(''),[revision,setRevision]=useState(0),[expanded,setExpanded]=useState<Record<string,boolean>>({});
   const [inspect,setInspect]=useState<{root:string;member:WorkMember;action:string;scope:string}|null>(null),[directory,setDirectory]=useState(''),[opening,setOpening]=useState('');
@@ -115,7 +116,7 @@ export function WorkDetails({work,active,connections,onConnections,history,onOpe
     <button className="wd-path" title="复制工作根路径" onClick={()=>void api.copyText(work.root).catch(onError)}><span>{work.root}</span><Copy size={12}/></button>
     <nav className="wd-tabs" aria-label="工作详情视图">{[['assistant','Work 助手'],['overview','进展'],['code','仓库与 Worktree'],['assets','资产'],['runs','后台任务']].map(([key,label])=><button key={key} aria-pressed={tab===key} onClick={()=>setTabs(v=>({...v,[work.root]:key}))}>{label}{key==='code'&&detail&&<small>{detail.members.length}</small>}</button>)}</nav>
     <WorkRuns key={work.root} root={work.root} active={active&&tab==='runs'} connections={connections} onConnections={onConnections}/>
-    {tab==='assistant'&&<WorkAssistant work={work} active={active} draftTargetKey={draftTargetKey} onCommand={onCommand} onError={onError}/>}
+    {tab==='assistant'&&<WorkAssistant work={work} active={active} draftTargetKey={draftTargetKey} onCommand={onCommand} onNavigateSource={onNavigateSource} onError={onError}/>}
     {error&&<p role="alert" className="error-text">{error}</p>}
     {!detail&&loading===work.root&&<div className="inline-loading"><Spinner size={14}/>读取当前工作记录与 Git 状态…</div>}
     {detail&&<>{tab!=='assistant'&&<p className="wd-caption">{loading===work.root?'正在刷新，暂显示上次结果':`读取于 ${time(detail.fetchedAt)}`}</p>}

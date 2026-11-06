@@ -5,6 +5,7 @@ const unavailable = async (): Promise<any> => { throw new Error(previewMode?'这
 // The browser preview is deliberately empty; it never fabricates a WSL or model connection.
 const defaults: Desktop = {
   workRun:unavailable, workDetails:unavailable, workGit:unavailable, openExternal:unavailable,
+  startCodeReview:unavailable,listCodeReviews:unavailable,readCodeReview:unavailable,cancelCodeReview:unavailable,updateCodeReviewFinding:unavailable,
   workAssistant:unavailable,onWorkAssistant:()=>()=>{},
   workGuidance:unavailable,workWorkflow:unavailable,onWorkWorkflow:()=>()=>{},
   knowledgeCatalog: unavailable, knowledgeDocument: unavailable, knowledgeCandidates: unavailable, knowledgeReviews: unavailable, knowledgeImage: unavailable,

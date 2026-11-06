@@ -9,3 +9,5 @@ Copied: components/ui/button.tsx, components/ui/button.css, components/ui/spinne
 Local changes: alias imports use @cindy; AttentionKind is an equivalent local type instead of importing the Cindy session store; segmented indicator dimensions change instantly while its position animates with transform; button face press uses transform instead of inset animation; unused font-weight variable declarations are omitted (the source values remain the same in Tailwind). The shell/composer/session integration is new OMP code, inspired by Cindy layout, and does not copy its agent harness. Readability overrides and graphite CTA ink live separately in the app tokens.css.
 
 Run node tools/vendor-cindy.cjs only after explicitly updating and reviewing the upstream checkout.
+
+Lucyna renders disabled shared buttons with a neutral face and readable secondary text at full opacity.

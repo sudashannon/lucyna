@@ -64,6 +64,8 @@ docs/design/*
 design/*
 !design/app-logo-v1/
 !design/app-logo-v1/**
+!design/app-logo-v2/
+!design/app-logo-v2/**
 !design/pixel-pet-v2/
 !design/pixel-pet-v2/**
 
@@ -160,3 +162,4 @@ src/pet/assets/companions-atlas-v2.png
 !test/session-tasks-desktop.cjs
 !docs/omp-task-monitoring.md
 !test/chat-images-desktop.cjs
+!test/code-review-desktop.cjs

@@ -61,8 +61,8 @@ async function readAssistantJournal({file, root, nativeId, limit = 16 * 1024 * 1
 }
 
 class WorkAssistantAccess {
-  constructor({assistant, resolveWork, listHistory, readHistory}) {
-    Object.assign(this, {assistant, resolveWork, listHistory, readHistory});
+  constructor({assistant, resolveWork, listHistory, readHistory, connections = () => []}) {
+    Object.assign(this, {assistant, resolveWork, listHistory, readHistory, connections});
     this.loading = new Map();
     this.operations = new Map();
   }
@@ -101,6 +101,57 @@ class WorkAssistantAccess {
       return this.loading.get(key);
     }
     return this.assistant.view(identity);
+  }
+
+  async resolveSource(input = {}) {
+    const allowed = ['root', 'hostId', 'sessionId', 'messageId'];
+    if (!input || typeof input !== 'object' || Array.isArray(input)
+      || Object.keys(input).some(key => !allowed.includes(key))
+      || typeof input.root !== 'string' || !input.root.trim() || input.root.length > 2048
+      || /[\x00-\x1f\x7f]/.test(input.root)
+      || input.hostId !== undefined && (typeof input.hostId !== 'string' || !input.hostId || input.hostId.length > 2048 || /[\x00-\x1f\x7f]/.test(input.hostId))
+      || typeof input.sessionId !== 'string' || !input.sessionId || input.sessionId.length > 2048 || /[\x00-\x1f\x7f]/.test(input.sessionId)
+      || typeof input.messageId !== 'string' || !input.messageId || input.messageId.length > 256 || /[\x00-\x1f\x7f]/.test(input.messageId)) {
+      throw Error('无效的 Work 会话引用');
+    }
+    const identity = {root: input.root, hostId: input.hostId || ''};
+    await this.resolveWork(identity);
+    const {state} = await this.assistant.load(identity);
+    const session = state.sessions.find(item => item.sessionId === input.sessionId);
+    const message = session?.messages.find(item => item.id === input.messageId);
+    if (!message) throw Error('这条摘要引用已失效，请更新 Work 摘要');
+
+    const connectionRows = await this.connections(identity);
+    const rows = Array.isArray(connectionRows) ? connectionRows : [];
+    const connection = rows.find(row => row && row.root === identity.root
+      && (row.hostId || '') === identity.hostId
+      && typeof row.sessionFile === 'string' && row.sessionFile
+      && journalIdentity(row.sessionFile) === input.sessionId);
+    let entry;
+    if (!connection) {
+      const history = await this.listHistory(identity);
+      const entries = [...history?.managed || [], ...history?.sessions || []];
+      entry = entries.find(item => {
+        if (!item || item.hostId && item.hostId !== identity.hostId || item.root && item.root !== identity.root) return false;
+        const file = item.sessionFile || item.path;
+        if (typeof file !== 'string' || !file) return false;
+        return journalIdentity(file) === input.sessionId || item.id === input.sessionId;
+      });
+      if (!entry) throw Error('原会话已从当前 Work 历史中移除，无法跳转');
+      if (identity.hostId && entry.hostId && entry.hostId !== identity.hostId) throw Error('引用会话不属于当前 SSH 主机');
+    }
+    return {
+      root: identity.root,
+      ...(identity.hostId ? {hostId: identity.hostId} : {}),
+      sessionId: input.sessionId,
+      messageId: input.messageId,
+      ...(message.nativeMessageId ? {nativeMessageId: message.nativeMessageId} : {}),
+      role: message.role,
+      text: message.text,
+      ...(message.at ? {at: message.at} : {}),
+      ...(connection ? {clientSessionId: connection.id} : {}),
+      ...(!connection ? {entry} : {}),
+    };
   }
 
   async loadHistory(identity) {

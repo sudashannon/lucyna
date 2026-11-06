@@ -1,5 +1,17 @@
 export type WorkAssistantStatus = 'idle'|'collecting'|'summarizing'|'waiting_model'|'error';
 export type WorkAssistantRole = 'user'|'assistant';
+export type WorkAnalysisStats={
+  mode:'incremental'|'full';
+  /** Distinct messages sent in the current or most recent batch, including evidence retrieval rounds. */
+  contextMessages:number;
+  changedMessages:number;
+  supplementalMessages:number;
+  pendingMessages:number;
+  fullProcessedMessages?:number;
+  fullTotalMessages?:number;
+  lastFullAt?:number;
+  rounds?:number;
+};
 
 export type WorkAssistantCitation = {
   sessionId:string;
@@ -8,7 +20,13 @@ export type WorkAssistantCitation = {
   quote:string;
 };
 
+export type WorkAssistantSourceTarget = WorkAssistantCitation & {
+  nativeMessageId?:string;
+  at?:number;
+};
+
 export type WorkAssistantItem = {
+  id?:string;
   text:string;
   sources:WorkAssistantCitation[];
 };
@@ -63,6 +81,7 @@ export type WorkAssistantSnapshot = {
   summaryRevision?:number;
   updatedAt?:number;
   lastAttemptAt?:number;
+  analysis?:WorkAnalysisStats;
   usedTokens:number;
   usageUnknown?:boolean;
 };

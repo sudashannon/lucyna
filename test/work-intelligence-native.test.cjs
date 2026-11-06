@@ -96,6 +96,19 @@ for (const protocol of ['chat-completions', 'responses']) {
       revision: snapshot.revision, action: 'draft'});
     assert.match(prepared.draftText, /SESSION\.md/);
     assert.equal(requests.length, 2);
+    await assistant.ingest({...identity, sessionId: 'third', title: '新增构建讨论', messages: [
+      {role: 'user', timestamp: 3, content: '再检查构建日志是否仍需整理。'},
+    ]}, {schedule: false});
+    const incremental = await workflow.refresh(identity, {force: false});
+    assert.equal(incremental.analysis.mode, 'incremental');
+    assert.equal(incremental.analysis.contextMessages, 1);
+    assert.equal(requests.length, 3, 'one appended message makes one native model request');
+    const incrementalInput = JSON.parse(typeof (requests.at(-1).messages || requests.at(-1).input).at(-1).content === 'string'
+      ? (requests.at(-1).messages || requests.at(-1).input).at(-1).content
+      : (requests.at(-1).messages || requests.at(-1).input).at(-1).content.map(part => part.text || '').join(''));
+    assert.equal(incrementalInput.mode, 'incremental');
+    assert.equal(incrementalInput.conversations.length, 1, 'the native model receives only the changed message on an ordinary delta');
+    assert.match(incrementalInput.conversations[0].excerpts[0].text, /再检查构建日志/);
     for (const body of requests) {
       assert.ok(!body.tools?.length);
       if (protocol === 'responses') assert.equal(body.store, false);

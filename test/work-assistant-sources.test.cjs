@@ -4,6 +4,24 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const {WorkAssistantAccess, journalIdentity, readAssistantJournal} = require('../src/work-assistant-sources.cjs');
+const {WorkAssistant} = require('../src/work-assistant.cjs');
+
+async function sourceFixture(t, {root='/work/project', hostId, sessionFile='C:\\Work\\project\\sessions\\conversation.jsonl', history={managed:[],sessions:[]}, connections=[]}={}) {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'lucyna-assistant-source-resolution-'));
+  const assistant = new WorkAssistant({directory, localScope:'source-resolution-fixture', agent:{run:async()=>{throw Error('unexpected model call');}}, config:async()=>null});
+  t.after(async()=>{await assistant.close(); await fs.rm(directory, {recursive:true, force:true});});
+  const identity = {root, ...(hostId ? {hostId} : {})};
+  const source = {sessionId: journalIdentity(sessionFile), messageId:'native-message-42'};
+  await assistant.ingest({...identity, ...source, title:'重复标题', messages:[{id:source.messageId,role:'user',timestamp:1234,content:'用户确认从摘要出处直接跳到原消息。'}]}, {schedule:false});
+  const workAccess = new WorkAssistantAccess({
+    assistant,
+    resolveWork:async target=>{if(target.root!==root||(target.hostId||'')!==(hostId||''))throw Error('Work scope mismatch');},
+    listHistory:async target=>{if(target.root!==root||(target.hostId||'')!==(hostId||''))throw Error('history scope mismatch');return history;},
+    readHistory:async()=>{throw Error('resolver must not read journal contents');},
+    connections:async()=>connections,
+  });
+  return {assistant, workAccess, identity, source};
+}
 
 async function journal(t, entries) {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'lucyna-assistant-sources-'));
@@ -99,4 +117,65 @@ test('history ingestion finishes before deletion removes its derived text', asyn
   assert.deepEqual(events, ['ingested', 'forgotten']);
   await assert.rejects(access.exclusive({root: '/work'}, () => { throw Error('Failed removal'); }));
   assert.equal(await access.exclusive({root: '/work'}, () => 'still usable'), 'still usable');
+});
+
+test('source resolver returns the exact live same-Work journal and native message ID', async t => {
+  const {workAccess,identity,source}=await sourceFixture(t,{connections:[
+    {id:'client-live',root:'/another/work',sessionFile:'C:\\Work\\project\\sessions\\conversation.jsonl'},
+    {id:'client-live',root:'/work/project',hostId:'other-host',sessionFile:'C:\\Work\\project\\sessions\\conversation.jsonl'},
+    {id:'client-right',root:'/work/project',sessionFile:'c:/work/project/sessions/conversation.jsonl'},
+  ]});
+  const result=await workAccess.resolveSource({...identity,...source});
+  assert.equal(result.clientSessionId,'client-right');
+  assert.equal(result.sessionId,source.sessionId);
+  assert.equal(result.messageId,source.messageId);
+  assert.equal(result.nativeMessageId,source.messageId);
+  assert.equal(result.text,'用户确认从摘要出处直接跳到原消息。');
+  assert.equal(result.at,1234);
+  assert.ok(!Object.hasOwn(result,'entry'));
+});
+
+test('source resolver returns a journal entry only for its canonical Work history identity', async t => {
+  const entry={title:'重复标题',sessionFile:'c:/WORK/project/sessions/conversation.jsonl',runtime:'windows',agentDir:'C:/OMP'};
+  const {workAccess,identity,source}=await sourceFixture(t,{history:{managed:[entry],sessions:[{...entry,sessionFile:'C:/work/project/sessions/unrelated.jsonl'}]}});
+  const result=await workAccess.resolveSource({...identity,...source});
+  assert.equal(result.entry,entry);
+  assert.equal(result.clientSessionId,undefined);
+});
+
+test('source resolver supports a legacy native session ID only within validated history', async t => {
+  const entry={id:'legacy-native-session',title:'重复标题',sessionFile:'C:/Work/project/sessions/legacy.jsonl',runtime:'windows',agentDir:'C:/OMP'};
+  const {assistant,workAccess,identity}=await sourceFixture(t,{history:{managed:[entry],sessions:[]}});
+  const legacySource={sessionId:'legacy-native-session',messageId:'legacy-message'};
+  await assistant.ingest({...identity,...legacySource,messages:[{id:legacySource.messageId,role:'assistant',content:'旧版身份只允许通过当前 Work 的历史目录匹配。'}]}, {schedule:false});
+  const result=await workAccess.resolveSource({...identity,...legacySource});
+  assert.equal(result.entry,entry);
+  assert.equal(result.nativeMessageId,legacySource.messageId);
+});
+
+test('source resolver rejects forged identities, deleted sources and unrelated hosts or roots', async t => {
+  const {workAccess,identity,source}=await sourceFixture(t,{history:{managed:[
+    {id:'foreign',root:'/another/work',title:'重复标题',sessionFile:'C:/Work/project/sessions/conversation.jsonl'},
+    {id:'foreign-host',hostId:'host-b',title:'重复标题',sessionFile:'C:/Work/project/sessions/conversation.jsonl'},
+  ],sessions:[]}});
+  await assert.rejects(workAccess.resolveSource({...identity,...source,root:'/another/work'}),/Work scope/);
+  await assert.rejects(workAccess.resolveSource({...identity,...source,hostId:'host-b'}),/Work scope/);
+  await assert.rejects(workAccess.resolveSource({...identity,...source,sessionId:'guessed-session'}),/失效/);
+  await assert.rejects(workAccess.resolveSource({...identity,...source,messageId:'guessed-message'}),/失效/);
+  await assert.rejects(workAccess.resolveSource({...identity,...source,sessionFile:'C:/private.jsonl'}),/无效/);
+  await assert.rejects(workAccess.resolveSource({...identity,...source}),/历史中移除/);
+});
+
+test('source resolver accepts a live remote journal only for the same host and root', async t => {
+  const journal='/home/user/remote.jsonl';
+  const root='/home/user/work';
+  const hostId='ssh-host-a';
+  const {workAccess,identity,source}=await sourceFixture(t,{root,hostId,sessionFile:journal,connections:[
+    {id:'wrong-root',hostId,root:'/home/user/other',sessionFile:journal},
+    {id:'wrong-host',hostId:'ssh-host-b',root,sessionFile:journal},
+    {id:'remote-client',hostId,root,sessionFile:journal,remoteSessionId:'remote-session'},
+  ]});
+  const result=await workAccess.resolveSource({...identity,...source});
+  assert.equal(result.clientSessionId,'remote-client');
+  assert.equal(result.hostId,hostId);
 });

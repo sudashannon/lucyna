@@ -20,7 +20,7 @@ const recordText='# Work\n\n## Build process\nVerify the build output before mar
 const sourceQuote=sourceText;
 const asset={id:'asset-build-log',path:'notes/build-log.md',title:'Build log checklist',kind:'note',version:'catalog-v1',origin:'saved',snapshot:true,modifiedAt:String(baseTime),size:180};
 let win,lateRelease=null,heldDraft='',holdWorkflowDraftResponse=false,releaseWorkflowDraftResponse=null,heldWorkflowDraftSnapshot=null;
-let promptCalls=0,workflowModelCalls=0,failWorkflowOnce=true,emptyWorkflowOnce=false,guidanceOps=[],guidanceTrace=[],workflowSnapshots=[];
+let promptCalls=0,workflowModelCalls=0,failWorkflowOnce=true,emptyWorkflowOnce=false,preserveWorkflowOnce=false,guidanceOps=[],guidanceTrace=[],workflowSnapshots=[];
 const suggestionCalls=[],consoleErrors=[];
 const send=(channel,value)=>{if(win&&!win.isDestroyed())win.webContents.send(channel,value);};
 const model={run:async(_config,instructions,input)=>{
@@ -42,13 +42,14 @@ const model={run:async(_config,instructions,input)=>{
     workflowModelCalls++;
     if(failWorkflowOnce){failWorkflowOnce=false;throw Object.assign(Error('fixture internal failure'),{publicMessage:'fixture 辅助模型连接失败'});}
     if(emptyWorkflowOnce){emptyWorkflowOnce=false;return {finishReason:'stop',text:JSON.stringify({reminders:[]}),totalUsage:{inputTokens:4,outputTokens:2}};}
-    const source=payload.conversations.find(item=>item.role==='assistant');
+    if(preserveWorkflowOnce){preserveWorkflowOnce=false;return {finishReason:'stop',text:JSON.stringify({reminders:[]}),totalUsage:{inputTokens:4,outputTokens:2}};}
+    const source=payload.conversations.find(item=>item.role==='assistant')||payload.conversations.find(item=>item.role==='user')||payload.conversations[0];
     return {finishReason:'stop',text:JSON.stringify({reminders:[{kind:'handover',key:'build-output-follow-up',title:'继续核对构建输出',reason:'会话中仍有一项明确的后续核对步骤。',draftText:'Continue by verifying the build output.',sources:[{evidenceId:source.excerpts[0].evidenceId}]}]}),totalUsage:{inputTokens:8,outputTokens:5}};
   }
   if(instructions.startsWith('Summarize one Work')){
     const source=payload.messages.find(item=>item.role==='user')||payload.messages[0];
     const citation={evidenceId:source.excerpts[0].evidenceId};
-    return {finishReason:'stop',text:JSON.stringify({overview:{text:'当前跨会话工作在核对构建输出。',sources:[citation]},goals:[],decisions:[],progress:[],openQuestions:[],nextSteps:[]}),totalUsage:{inputTokens:5,outputTokens:5}};
+    return {finishReason:'stop',text:JSON.stringify({overview:{text:'当前跨会话工作在核对构建输出。',sources:[citation]},changes:[]}),totalUsage:{inputTokens:5,outputTokens:5}};
   }
   throw Error('Unexpected deterministic model request');
 }};
@@ -183,6 +184,8 @@ app.whenReady().then(async()=>{
     assert.equal(uncheckedWorkflow.includes('才会显示检查结果'),false,'automatic analysis must not be described as dependent on a manual click');
     assert.equal(uncheckedWorkflow.includes('时间未记录'),false,'an unchecked workflow must not render an ambiguous missing check timestamp');
     assert.ok(uncheckedWorkflow.includes('尚未开始分析'),'workflow metadata distinguishes no attempt from a missing timestamp');
+    assert.equal(uncheckedWorkflow.includes('实际使用 0 条消息'),false,'an unstarted workflow does not show a zero actual analysis count');
+    assert.equal(uncheckedWorkflow.includes('整体校正 0 / 0 条'),false,'an unstarted workflow does not show an empty full-correction range');
     assert.ok(workflow.timers.has(assistant.identity({root}).workId),'loading status schedules initial workflow analysis even before a Work summary exists');
     await shot('workflow-unchecked-state');
     pass('loaded conversations are labelled unanalysed and scheduled until an analysis result exists');
@@ -227,28 +230,54 @@ app.whenReady().then(async()=>{
     assert.equal(failedWorkflow.includes('暂无待处理的流程提醒'),false,'workflow model failures cannot be shown as a completed empty analysis');
     assert.ok(failedWorkflow.includes('最近尝试')&&failedWorkflow.includes('尚无成功分析记录'),failedWorkflow);
     assert.equal((await workflow.call('status',{root})).snapshot.currentAnalysis,false,'a failed analysis is never current');
+    assert.ok(failedWorkflow.includes('重试分析'),'a failed analysis exposes an explicit retry action');
     await shot('workflow-analysis-error');
     pass('model failures show the latest real attempt and preserve an explicit retry path');
 
     // Retry the workflow analysis and check the revision-bound success time.
-    await click('.work-workflow-heading button','重新分析');
+    await click('.work-workflow-heading button','重试分析');
     await until('document.querySelector(".work-workflow-reminder")?.textContent.includes("继续核对构建输出")');
     assert.ok(workflowModelCalls>0);await shot('workflow-reminder');
     const firstSuccess=await workflow.call('status',{root});
     assert.ok(firstSuccess.snapshot.lastAttemptAt>0&&firstSuccess.snapshot.lastSuccessAt>=firstSuccess.snapshot.lastAttemptAt,'workflow records the actual analysis attempt and successful result times');
     assert.equal(firstSuccess.snapshot.lastSuccessSourceRevision,firstSuccess.snapshot.sourceRevision,'successful reminder result is bound to the conversation revision analyzed');
     assert.equal(firstSuccess.snapshot.currentAnalysis,true,'successful results are current for the complete Work context');
+    assert.ok(firstSuccess.snapshot.analysis&&Number.isSafeInteger(firstSuccess.snapshot.analysis.contextMessages)&&firstSuccess.snapshot.analysis.contextMessages>0,
+      'workflow records the unique messages actually sent across analysis rounds');
+    const analyzedPhrase=`${firstSuccess.snapshot.analysis.contextMessages} 条消息`;
+    await until(`document.querySelector(".work-workflow-meta")?.textContent.includes(${JSON.stringify(analyzedPhrase)})`);
+    assert.equal(await js('document.querySelector(".work-workflow-meta")?.textContent.includes("参考")'),false,
+      'the workflow UI does not present loaded-message coverage as the model reference count');
     await click('.work-workflow-reminder button','加入草稿');
     await until('document.querySelector("#message-input").value.includes("Continue by verifying the build output.")');
     await until('!Array.from(document.querySelectorAll(".work-workflow-reminder .work-workflow-actions button")).some(button=>button.disabled)');
     assert.equal(promptCalls,0);pass('workflow reminder adds a grounded proposal to the active draft without sending');
+    // An unrelated user message must preserve the old cited reminder, and its
+    // action must remain usable after the changed-message analysis succeeds.
+    const sourceRevisionBeforeUnrelated=(await assistant.view({root})).sourceRevision;
+    preserveWorkflowOnce=true;
+    await assistant.ingest({root,sessionId:'fixture-build-session-01',title:'构建输出核对',lastActivityAt:baseTime+50000,messages:[{
+      id:'user-build-02',role:'user',timestamp:baseTime+40000,content:'The output archive naming convention was also recorded.'
+    }]},{schedule:false});
+    await untilNative(()=>workflowSnapshots.some(snapshot=>snapshot.sourceRevision>sourceRevisionBeforeUnrelated));
+    const unrelatedSnapshot=workflowSnapshots.find(snapshot=>snapshot.sourceRevision>sourceRevisionBeforeUnrelated);
+    await until('!document.querySelector(".work-workflow-heading button")?.disabled',20000);
+    await click('.work-workflow-heading button','重新分析');
+    await untilNative(()=>workflowSnapshots.some(snapshot=>snapshot.sourceRevision===unrelatedSnapshot.sourceRevision&&snapshot.currentAnalysis));
+    const unrelatedSuccess=await workflow.call('status',{root});
+    const retainedReminder=unrelatedSuccess.snapshot.reminders.find(item=>item.key==='build-output-follow-up');
+    assert.ok(retainedReminder?.active&&!retainedReminder.stale,'an empty incremental result preserves the still-supported old reminder');
+    assert.equal(await js('!!document.querySelector(".work-workflow-reminder .work-workflow-actions button:disabled")'),false,
+      'supported old reminder actions remain available after an unrelated delta');
+    const callsAfterUnrelated=workflowModelCalls;
     const draftBeforeWorkflowRace=await js('document.querySelector("#message-input").value');
     const sourceRevisionBeforeWorkflowRace=(await assistant.view({root})).sourceRevision;
+    emptyWorkflowOnce=true;
     holdWorkflowDraftResponse=true;
     await click('.work-workflow-reminder button','加入草稿');
     await untilNative(()=>typeof releaseWorkflowDraftResponse==='function');
-    await assistant.ingest({root,sessionId:'fixture-build-session-01',title:'构建输出核对',lastActivityAt:baseTime+50000,messages:[{
-      id:'user-build-02',role:'user',timestamp:baseTime+40000,content:'While the workflow draft is pending, the build output source changes.'
+    await assistant.ingest({root,sessionId:'fixture-build-session-01',title:'构建输出核对',lastActivityAt:baseTime+60000,messages:[{
+      id:'assistant-build-01',role:'assistant',timestamp:baseTime+20000,content:'The build output is archived; no verification remains pending.'
     }]},{schedule:false});
     await untilNative(()=>workflowSnapshots.some(snapshot=>snapshot.sourceRevision>sourceRevisionBeforeWorkflowRace));
     const changedWorkflowSnapshot=workflowSnapshots.find(snapshot=>snapshot.sourceRevision>sourceRevisionBeforeWorkflowRace);
@@ -258,18 +287,23 @@ app.whenReady().then(async()=>{
     releaseWorkflowDraftResponse();releaseWorkflowDraftResponse=null;
     await until('Array.from(document.querySelectorAll(".work-workflow-warning[role=alert]" )).some(item=>item.textContent.includes("已阻止把过期内容加入草稿"))');
     assert.equal(await js('document.querySelector("#message-input").value'),draftBeforeWorkflowRace,'stale workflow draft cannot change the active OMP draft');
-    assert.equal(promptCalls,0);pass('workflow draft returned after a source change is rejected without changing the active OMP draft');
+    assert.equal(promptCalls,0);pass('unrelated old reminders remain actionable, but a draft is rejected when its cited source changes');
 
-    // A valid empty model result is a success only for the current conversation revision.
-    emptyWorkflowOnce=true;
+    // The exact cited-source edit gets an empty incremental result, and a
+    // subsequent no-op refresh reuses it without another model call.
     await until('!document.querySelector(".work-workflow-heading button")?.disabled',20000);
-    await click('.work-workflow-heading button','重新分析');
+    await click('.work-workflow-heading button');
     await until('document.querySelector(".work-workflow-empty")?.textContent.includes("已检查当前对话，暂未发现需要处理的流程提醒")');
     const emptySuccess=await workflow.call('status',{root});
+    assert.ok(workflowModelCalls>callsAfterUnrelated,'editing the cited source triggers a new delta model request');
     assert.ok(emptySuccess.snapshot.lastSuccessAt>0&&emptySuccess.snapshot.lastSuccessSourceRevision===emptySuccess.snapshot.sourceRevision,'a valid empty result records success for the current conversation revision');
     assert.equal(emptySuccess.snapshot.currentAnalysis,true,'a valid empty result is current for the complete Work context');
     await shot('workflow-success-empty');
     pass('valid empty workflow analysis is shown as checked only after a successful current-revision result');
+    const noOpCalls=workflowModelCalls;
+    await click('.work-workflow-heading button','重新分析');
+    await pause(250);
+    assert.equal(workflowModelCalls,noOpCalls,'manual refresh with no pending evidence does not call the model again');
 
     // Stale async results are bound to their original draft revision and caret.
     await replaceDraft('late draft');await untilNative(()=>heldDraft==='late draft');

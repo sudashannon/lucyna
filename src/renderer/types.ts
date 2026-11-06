@@ -14,6 +14,7 @@ export interface AuxiliaryCheck {elapsedMs:number;model:string;usage:{inputToken
 export interface EnvironmentCheck {runtime:string; version:string; configFiles:string[]; elapsedMs:number; note:string}
 export interface HistoryDeletionPlan {token:string;files:{path:string;kind:'journal'|'artifacts'|'backup'|'memo'}[];warnings:string[]}
 export interface History { sessions: HistoryEntry[]; managed: HistoryEntry[]; warnings?: string[]; trash?: {key:string;source:string;entry:HistoryEntry;deletedAt:string;version?:number;files?:HistoryDeletionPlan['files'];state?:string}[] }
+export type WorkSourceLocation = import('./work-source-types').WorkSourceLocation;
 export interface FilePreview { kind: 'markdown' | 'image' | 'text'; name: string; path?: string; content?: string; dataUrl?: string; anchor?: string }
 export interface FileEntry { name: string; path: string; kind: 'directory' | 'markdown' | 'image' | 'text' | 'file' | 'blocked'; link?: boolean; reason?: string }
 export interface FileListing { directory: string; entries: FileEntry[]; total: number; nextOffset: number | null }
@@ -29,7 +30,13 @@ export type TurnChanges = {
 // OMP extension events and message blocks are owned by the native protocol.
 export type OmpEvent = Record<string, any>;
 export interface Desktop {
+  startCodeReview?(source:import('./code-review-types').CodeReviewSource):Promise<import('./code-review-types').CodeReviewRun>;
+  listCodeReviews?(source:import('./code-review-types').CodeReviewSource):Promise<import('./code-review-types').CodeReviewRun[]>;
+  readCodeReview?(id:string):Promise<import('./code-review-types').CodeReviewRun>;
+  cancelCodeReview?(id:string):Promise<import('./code-review-types').CodeReviewRun>;
+  updateCodeReviewFinding?(id:string,findingId:string,status:'open'|'ignored'):Promise<import('./code-review-types').CodeReviewRun>;
   workAssistant?(operation:'status'|'refresh'|'configure'|'history',input:{root:string;hostId?:string;enabled?:boolean}):Promise<import('./work-assistant-types').WorkAssistantSnapshot>;
+  workAssistantSource?(input:{root:string;hostId?:string;sessionId:string;messageId:string}):Promise<WorkSourceLocation>;
   onWorkAssistant?(fn:(snapshot:import('./work-assistant-types').WorkAssistantSnapshot)=>void):()=>void;
   workGuidance?(operation:import('./work-guidance-types').WorkGuidanceOperation,input:import('./work-guidance-types').WorkGuidanceSuggestArgs|import('./work-guidance-types').WorkGuidanceCancelArgs|import('./work-guidance-types').WorkGuidanceMaterialArgs|import('./work-guidance-types').WorkGuidanceFeedbackArgs):Promise<import('./work-guidance-types').WorkGuidanceResult>;
   workWorkflow?(operation:import('./work-workflow-types').WorkWorkflowOperation,input:import('./work-workflow-types').WorkWorkflowRequest):Promise<import('./work-workflow-types').WorkWorkflowResponse>;

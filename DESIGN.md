@@ -668,7 +668,7 @@ Blue keeps its softened workbench controls, rows, message bubbles, composer, and
 
 ### Buttons
 
-Blue primary actions use cobalt. Folio and Pixel New Chat controls use their sidebar selection fill and a one-pixel border; their composer send buttons use the theme action color. The send control follows the theme’s square-corner role. Keep disabled states legible and retain the visible keyboard focus treatment.
+Blue primary actions use cobalt. Folio and Pixel New Chat controls use their sidebar selection fill and a one-pixel border; their composer send buttons use the theme action color. The send control follows the theme’s square-corner role. Disabled shared buttons use a subtle neutral face over the local surface, readable secondary text, and no whole-control opacity. Keep the keyboard focus treatment visible.
 
 ### Work directory rows
 
@@ -704,7 +704,11 @@ Structural findings lead with **查看原文**; evidence findings retain explici
 
 ### Work files and Git review
 
-In expanded Blue, **对话工作**, **工作区文件**, and **活跃会话** stay anchored beside the left directory as the inspector opens or closes across pages. Appearance and browser shortcuts live in the shared top bar. The terminal and **工作区改动** stay available for the selected Work across all three pages. The latter opens the conversation alongside current Git state and identifies the member, branch, file, and staging scope. A prompt with a saved record has a **查看改动** action. The expanded Blue workbench places this action beside the latest completed run, while earlier turns keep their own actions. **本轮改动** compares the working tree before sending and after the session settles. The panel shows its capture interval, indicates partial records, and links back to current Git state. Both views dock beside the conversation on wide windows and use the keyboard-accessible drawer on narrow windows. A selection or bounded patch can be added to the active draft. Blue’s wide tool rail includes Work overview, which shows the registered goal, recent progress and pending questions, with a separate entry to full Work details.
+In expanded Blue, **对话工作**, **工作区文件**, and **活跃会话** stay anchored beside the left directory as the inspector opens or closes across pages. Appearance and browser shortcuts live in the shared top bar. The terminal and **工作区改动** stay available for the selected Work across all three pages. The latter opens the conversation alongside current Git state and identifies the member, branch, file, and staging scope. A prompt with a saved record has a **查看改动** action. The expanded Blue workbench places this action beside the latest completed run, while earlier turns keep their own actions. **本轮改动** compares the working tree before sending and after the session settles. The panel shows its capture interval, indicates partial records, and links back to current Git state. Both views dock beside the conversation on wide windows and use the keyboard-accessible drawer on narrow windows. A selection or bounded patch can be added to the active draft.
+
+The tools panel defaults to **工作详情**. Its **进展** view shows the registered Work goal and status from `SESSION.md`. Assistant replies and per-turn review actions stay in the conversation.
+
+The Work assistant summary is a compact reader: an expandable overview followed by count-bearing tabs for next steps, open questions, decisions, goals, and progress. Keep one section visible at a time, with four entries initially and an explicit control for the remainder. Preserve the existing item order and text; long entries expand from a three-line preview. Separate entries with fine rules and whitespace, without decorative cards or implied priorities. Each item has one compact original-message link; additional citations expand inline as links, never as duplicated source prose. Full session names remain available in accessible names and hover titles. Tab selection supports arrow keys, Home, and End; narrow panels wrap controls instead of clipping them. Draft continuation still includes the summary across all sections.
 
 The Work content keeps **对话工作** and **工作区文件** mounted as sibling surfaces, so changing tabs preserves the conversation draft, terminal, opened files, and reader positions for that Work and host while the client stays open. File browsing and Git review use the main Work width. The file surface groups **浏览、改动、历史、分支、Worktree** under one secondary navigation; the reader reuses the existing document reader, while diff additions and deletions use semantic status colors and explicit labels.
 
@@ -717,6 +721,8 @@ At wide sizes, pair a 280px list with a flexible reading area; Worktree details 
 ### Brand assets
 
 Keep the silver-haired character and black cat as the existing illustrations. Pixel’s original 5×7 geometric SVG wordmark is the only bitmap-style typography; the Chinese UI remains ordinary text.
+
+The application icon uses only the black cat: a natural smooth forehead, cyan eyes, muted pink ears and nose, and a light silhouette outline on transparent edges. It has no human hair or silver fringe. Use `design/app-logo-v2` for the full and small optical masters; the 16–24px version simplifies the eyes and omits the nose and mouth. `tools/build-app-icons.cjs` produces the shared sidebar, window, taskbar, favicon and tray assets from these masters.
 
 ## Do's and Don'ts
 

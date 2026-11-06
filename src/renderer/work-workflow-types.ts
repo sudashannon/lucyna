@@ -16,6 +16,18 @@ export type WorkWorkflowCoverage={
   truncated?:boolean;
   historyCoverage?:{available:number;loaded:number;skipped:number;limited:boolean;warnings:string[]};
 };
+export type WorkWorkflowAnalysis={
+  mode:'incremental'|'full';
+  /** Distinct messages sent in the current or most recent batch, including evidence retrieval rounds. */
+  contextMessages:number;
+  changedMessages:number;
+  supplementalMessages:number;
+  pendingMessages:number;
+  fullProcessedMessages?:number;
+  fullTotalMessages?:number;
+  lastFullAt?:number;
+  rounds?:number;
+};
 export type WorkWorkflowReminder={
   id:string;
   key:string;
@@ -45,6 +57,7 @@ export type WorkWorkflowSnapshot={
   recordWarning?:string;
   recordTruncated?:boolean;
   coverage?:WorkWorkflowCoverage;
+  analysis?:WorkWorkflowAnalysis;
   /** Alias for stateRevision, kept by the backend contract for action requests. */
   revision:number;
   stateRevision:number;

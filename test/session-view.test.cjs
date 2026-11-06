@@ -5,6 +5,13 @@ mod.filename=filename;mod.paths=Module._nodeModulePaths(path.dirname(filename));
 mod._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, filename);
 const {emptyView, projectEvent: step, restoreMessages, thinkingContent, textContent, answerContent, toolSummary} = mod.exports;
 const start = () => step(emptyView(), {type:'local_send',id:'optimistic',text:'Status?'}, 1000);
+test('source navigation preserves native message IDs through live projection and journal restoration',()=>{
+ let view=step(emptyView(),{type:'message_start',messageId:'display-user',message:{id:'native-user',role:'user',content:'Repeated content'}},1);
+ view=step(view,{type:'message_end',messageId:'display-answer',message:{id:'native-answer',role:'assistant',content:'Repeated content'}},2);
+ assert.deepEqual(view.messages.map(m=>[m.id,m.nativeId]),[['display-user','native-user'],['display-answer','native-answer']]);
+ const restored=restoreMessages([{id:'journal-node',message:{id:'native-answer',role:'assistant',content:'Repeated content'}}]);
+ assert.equal(restored[0].id,'journal-node');assert.equal(restored[0].nativeId,'native-answer');
+});
 test('waiting for approval is counted separately across repeated questions and frozen at settlement',()=>{
  let v=start();v=step(v,{type:'local_input_wait',waiting:true},2000);v=step(v,{type:'local_input_wait',waiting:true},3000);
  v=step(v,{type:'local_input_wait',waiting:false},5000);assert.equal(v.run.waitingMs,3000);

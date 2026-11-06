@@ -16,6 +16,8 @@ const {installTaskbarIdentity}=require('./windows-taskbar.cjs');
 const { TerminalManager } = require('./terminal-manager.cjs');
 const { SessionManager } = require('./session-manager.cjs');
 const {TurnChanges} = require('./turn-changes.cjs');
+const {CodeReviewService} = require('./code-review.cjs');
+const {createNativeReviewEngine} = require('./code-review-engine.cjs');
 const { WslSessionHistory } = require('./wsl-session-history.cjs');
 const { HistoryTrash } = require('./history-trash.cjs');
 const {planDeletion,publicPlan}=require('./history-deletion.cjs');
@@ -134,6 +136,31 @@ function observeAssistant(event) {
 const nativeWslHistory = new WslSessionHistory(app.getPath('userData'));
 const historyTrash = new HistoryTrash(app.getPath('userData'));
 const turnChanges = new TurnChanges({directory:path.join(app.getPath('userData'),'turn-changes'),runtime});
+const codeReview = new CodeReviewService({
+  directory:path.join(app.getPath('userData'),'code-reviews'),
+  engine:createNativeReviewEngine(auxiliaryAgent),
+  config:async()=>{try{return await auxiliarySettings.resolve();}catch(error){throw Object.assign(error,{publicMessage:error.message});}},
+  resolveSource:async source=>{
+    const localScope=JSON.stringify([runtime.distro,runtime.user]);
+    if(source.kind==='workspace'){
+      requireWorkRoot(await listWorks(),source.root);
+      return {source,root:source.root,key:JSON.stringify([localScope,source]),
+        load:signal=>require('./code-review-snapshot.cjs').captureWorkspace(source,signal)};
+    }
+    const record=sessions?.records.get(source.sessionId);
+    if(!record?.sessionFile||record.creation||remote?.active.has(source.sessionId))throw Error('请先打开本机 Work 中的目标会话');
+    const owner={root:record.root,sessionFile:record.sessionFile};
+    requireWorkRoot(await listWorks(),owner.root);
+    return {source,root:owner.root,key:JSON.stringify([localScope,owner.root,journalIdentity(owner.sessionFile),source.messageId]),
+      load:async signal=>{
+        signal.throwIfAborted();
+        const snapshot=await turnChanges.read(owner,source.messageId);
+        if(!snapshot)throw Object.assign(Error('本轮改动记录已不存在，请审查当前未提交代码'),{publicMessage:'本轮改动记录已不存在，请审查当前未提交代码'});
+        signal.throwIfAborted();
+        return {...snapshot,capturedAt:snapshot.finishedAt,files:snapshot.files.map(file=>({...file,scope:'turn'}))};
+      }};
+  },
+});
 const workRunner = new WorkRunner({listWorks,connections:()=>sessions?.list()||[],settings:()=>settingsStore.get(),auxiliary:()=>auxiliarySettings.resolve()});
 const consolidation=new (require('./knowledge-consolidation-client.cjs').ConsolidationClient)({knowledge,listWorks,wslUnc,auxiliary:()=>auxiliarySettings.resolve(),busy:root=>workRunner.admissions.has(root)||(sessions?.list()||[]).some(c=>c.root===root&&(!c.ready||c.questions?.length||(workRunner.activity.get(c.id)??c.busy)))});
 const {WorkCreation}=require('./work-creation.cjs');
@@ -261,6 +288,11 @@ app.whenReady().then(async () => {
   handle('work:git', (root, member, action, options,hostId) => hostId?remote.workspaceCall(hostId,root,'workspace.git.read',{member,action,options}):workDetails(root, member, action, options));
   handle('turn-changes:list', id => turnChanges.list(sessions.records.get(id)));
   handle('turn-changes:read', (id, messageId) => turnChanges.read(sessions.records.get(id), messageId));
+  handle('code-review:start',source=>codeReview.start(source));
+  handle('code-review:list',source=>codeReview.list(source));
+  handle('code-review:read',id=>codeReview.read(id));
+  handle('code-review:cancel',id=>codeReview.cancel(id));
+  handle('code-review:finding',(id,findingId,status)=>codeReview.updateFinding(id,findingId,status));
   handle('workspace:git', (root,member,action,options,hostId)=>{
     require('./git-service.cjs').validate(root,member,action,options||{});
     if(hostId&&(action==='disk'||options?.lfsMode!==undefined))throw Error('此功能当前仅支持本机 WSL 工作区');
@@ -387,6 +419,7 @@ app.whenReady().then(async () => {
     assistant:workAssistant,
     resolveWork:resolveAssistantWork,
     listHistory:({root,hostId})=>sessionHistory(root,hostId),
+    connections:()=>[...(sessions?.list()||[]),...(remote?.listConnections()||[])],
     readHistory:async(entry,{root})=>{
       const source=entry.sessionFile||entry.path,settings=await settingsStore.get();
       const locations=historyLocations(app.getPath('userData'),entry.runtime);
@@ -404,6 +437,7 @@ app.whenReady().then(async () => {
     if(operation==='status')void Promise.resolve(workWorkflow.observe(snapshot)).catch(error=>console.error('Work workflow:',error.message));
     return snapshot;
   });
+  handle('work:assistant-source',input=>assistantAccess.resolveSource(input));
   handle('work:guidance',(operation,input)=>workGuidance.call(operation,input));
   handle('work:workflow',(operation,input)=>workWorkflow.call(operation,input));
   const deletionPlan=async(source,root)=>{
@@ -522,7 +556,7 @@ let quitting=false;
 app.on('before-quit', event => {
   if(quitting)return;
   event.preventDefault();quitting=true;feedback?.dispose();pet?.dispose();terminal?.dispose();
-  void Promise.allSettled([sessions?.closeAll(),remote?.shutdown()]).finally(async()=>{
+  void Promise.allSettled([sessions?.closeAll(),remote?.shutdown(),codeReview.close()]).finally(async()=>{
     await Promise.allSettled([workGuidance.close(),workWorkflow.close(),turnChanges.drain()]);
     await workAssistant.close();await consolidation.stop();await workRunner.stopAutomatic();app.quit();
   });

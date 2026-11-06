@@ -7,6 +7,7 @@ const http = require('node:http');
 const {WorkAssistant} = require('../src/work-assistant.cjs');
 const {WorkAssistantAccess} = require('../src/work-assistant-sources.cjs');
 const {AuxiliaryAgent} = require('../src/auxiliary-agent.cjs');
+const {reconcileFixtureResponse} = require('./work-summary-fixture.test.cjs');
 
 for (const protocol of ['chat-completions', 'responses']) {
   test(`Work summary uses the real auxiliary SDK and durable sources through ${protocol}`, async t => {
@@ -22,8 +23,10 @@ for (const protocol of ['chat-completions', 'responses']) {
         const prompt = typeof content === 'string' ? content : content.map(part => part.text || '').join('');
         const input = JSON.parse(prompt);
         const citations = input.messages.map(message => ({evidenceId: message.excerpts[0].evidenceId}));
-        const summary = {overview: {text: '两个会话共同推进 Work 协作摘要。', sources: citations}, goals: [], decisions: [], progress: [], openQuestions: [], nextSteps: []};
-        const text = JSON.stringify(summary);
+        const summary = input.analysis.mode === 'incremental'
+          ? {changes: []}
+          : {overview: {text: '两个会话共同推进 Work 协作摘要。', sources: citations}, changes: []};
+        const text = reconcileFixtureResponse({text: JSON.stringify(summary)}, input).text;
         res.setHeader('Content-Type', 'application/json');
         if (protocol === 'responses') {
           res.end(JSON.stringify({id: 'response', object: 'response', created_at: 1, model: 'local-fixture', status: 'completed',
@@ -44,8 +47,8 @@ for (const protocol of ['chat-completions', 'responses']) {
     const access = new WorkAssistantAccess({assistant, resolveWork: async ({root}) => assert.equal(root, '/work/demo')});
     const identity = {root: '/work/demo'};
     assert.equal((await access.call('configure', {...identity, enabled: false})).enabled, false);
-    await assistant.ingest({...identity, sessionId: 'first', title: '目标讨论', messages: [{role: 'user', timestamp: 1, content: '请为整个 Work 汇总多个会话中的工作进展。'}]});
-    await assistant.ingest({...identity, sessionId: 'second', title: '实现讨论', messages: [{role: 'assistant', timestamp: 2, content: '已经梳理会话来源，下一步接入摘要到草稿。'}]});
+    await assistant.ingest({...identity, sessionId: 'first', title: '目标讨论', messages: [{id:'m1',role: 'user', timestamp: 1, content: '请为整个 Work 汇总多个会话中的工作进展。'}]});
+    await assistant.ingest({...identity, sessionId: 'second', title: '实现讨论', messages: [{id:'m2',role: 'assistant', timestamp: 2, content: '已经梳理会话来源，下一步接入摘要到草稿。'}]});
     assert.equal(requests.length, 0);
     await access.call('configure', {...identity, enabled: true});
     const pending = await assistant.view(identity);
@@ -60,8 +63,18 @@ for (const protocol of ['chat-completions', 'responses']) {
     assert.equal(requests[0].max_tokens,undefined);
     assert.equal(requests[0].max_output_tokens,undefined);
     if (protocol === 'responses') assert.equal(requests[0].store, false);
+    await assistant.ingest({...identity,sessionId:'second',title:'实现讨论',messages:[{
+      id:'m3',role:'user',timestamp:3,content:'只分析这个新增消息，并继续引用有帮助的旧证据。'
+    }]},{schedule:false});
     await assistant.summarize(view.workId);
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length,2);
+    const incrementalContent=(requests[1].messages||requests[1].input).at(-1).content;
+    const incrementalText=typeof incrementalContent==='string'?incrementalContent:incrementalContent.map(part=>part.text||'').join('');
+    const incrementalPrompt=JSON.parse(incrementalText);
+    assert.equal(incrementalPrompt.analysis.mode,'incremental');
+    assert.deepEqual(incrementalPrompt.messages.map(message=>message.messageId),['m3']);
+    await assistant.summarize(view.workId);
+    assert.equal(requests.length, 2);
     await assistant.close();
     const restored = new WorkAssistant(options);
     try {

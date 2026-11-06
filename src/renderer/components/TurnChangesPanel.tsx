@@ -5,6 +5,7 @@ import {Spinner} from '@cindy/components/ui/spinner';
 import {api} from '../api';
 import {errorText} from '../errors';
 import type {TurnChanges} from '../types';
+import {CodeReviewPanel} from './CodeReviewPanel';
 import {diffQuote} from './WorkspaceChanges';
 
 const DiffView = lazy(() => import('./WorkspaceDiff'));
@@ -78,5 +79,11 @@ export function TurnChangesPanel({sessionId, messageId, workName, canQuote, onDi
     {file?.patch && canQuote && <div className="changes-actions">
       <Button compact variant="secondary" onClick={discuss}><MessageSquare size={14}/>加入对话草稿</Button>
     </div>}
+    <CodeReviewPanel
+      source={{kind: 'turn', sessionId, messageId}}
+      disabledReason={snapshot ? undefined : error ? '本轮改动记录不可用，无法创建审查快照。' : '读取本轮改动记录后即可开始审查。'}
+      canQuote={canQuote}
+      onDiscuss={onDiscuss}
+    />
   </div>;
 }

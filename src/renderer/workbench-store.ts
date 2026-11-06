@@ -9,6 +9,8 @@ import {validateInput,type PromptImage} from './composer-input';
 import {workKey,sameWork} from './work-identity';
 import {canAccessWorkRoot} from '../work-access.cjs';
 import {SessionTasks,taskCounts} from './session-tasks';
+import {findSourceMessage} from './work-source-navigation';
+import type {WorkAssistantSourceTarget} from './work-assistant-types';
 const uid = () => crypto.randomUUID();
 const label = (s: OmpEvent) => typeof s.model === 'string' ? s.model : s.model?.name || s.model?.id || 'OMP 默认模型';
 const savedRun=(run:any):Run|null=>run&&!run.active&&['completed','aborted','error'].includes(run.outcome)&&[run.startedAt,run.endedAt,run.tools].every(Number.isFinite)?{active:false,phase:run.outcome,outcome:run.outcome,startedAt:run.startedAt,endedAt:run.endedAt,updatedAt:run.endedAt,tools:run.tools,waitingMs:Number.isFinite(run.waitingMs)?run.waitingMs:0}:null;
@@ -276,6 +278,8 @@ class Conversation {
 
 export class Workbench {
   works:Work[]=[];loading=true;activeId='';sessions=new Map<string,Conversation>();data=new Map<string,WorkData>();
+  sourceNavigation=0;
+  selectionEpoch=0;
   conversationVisible=true;
   isReading=(id:string)=>this.conversationVisible&&this.activeId===id;
   setConversationVisible=(visible:boolean)=>{this.conversationVisible=visible;if(visible&&this.active.unread){this.active.unread=false;this.persist();this.changed();}};
@@ -364,7 +368,7 @@ export class Workbench {
     }
     if(!this.initializing)this.restoreConnections();
   }catch(e){this.active.report(e);}finally{this.loading=false;this.changed();}};
-  selectSession=(id:string,connect=true)=>{const s=this.sessions.get(id);if(!s)return;this.activeId=id;if(this.conversationVisible)s.unread=false;this.lastByWork.set(workKey(s.work),id);this.persist();this.changed();if(!canAccessWorkRoot(s.work)){this.blockUnavailableRoot(s.work);s.setError(s.work.error||'工作区校验失败');return;}if(!s.creatingWork){void this.refreshHistory(s.work.root,s.work.hostId);if(!this.workData(s.work.root,s.work.hostId).document)void this.refreshDocument(s.work.root,s.work.hostId);}if(connect&&s.entry?.sessionFile&&!s.view.messages.length&&s.connection==='idle')void s.start().catch(s.report);};
+  selectSession=(id:string,connect=true)=>{const s=this.sessions.get(id);if(!s)return;if(this.activeId!==id)this.selectionEpoch++;this.activeId=id;if(this.conversationVisible)s.unread=false;this.lastByWork.set(workKey(s.work),id);this.persist();this.changed();if(!canAccessWorkRoot(s.work)){this.blockUnavailableRoot(s.work);s.setError(s.work.error||'工作区校验失败');return;}if(!s.creatingWork){void this.refreshHistory(s.work.root,s.work.hostId);if(!this.workData(s.work.root,s.work.hostId).document)void this.refreshDocument(s.work.root,s.work.hostId);}if(connect&&s.entry?.sessionFile&&!s.view.messages.length&&s.connection==='idle')void s.start().catch(s.report);};
   selectWork=async(work:Work)=>{const previous=this.lastByWork.get(workKey(work));if(previous&&this.sessions.has(previous)){this.selectSession(previous);return;}this.create(work,workKey(work));};
   create=(work:Work,draftKey?:string,select=true)=>{const s=new Conversation(this,work,uid(),draftKey||uid());this.sessions.set(s.id,s);if(select)this.selectSession(s.id);return s;};
   newSession=async()=>{if(!this.active.work.root||this.active.creatingWork)return false;this.create(this.active.work);return true;};
@@ -399,6 +403,38 @@ export class Workbench {
   refreshHistory=async(root?:string,hostId?:string)=>{if(root===undefined){root=this.active.work.root;hostId=this.active.work.hostId;}if(!root)return;const work=this.works.find(w=>sameWork(w,{root:root!,hostId}));if(work&&!canAccessWorkRoot(work)){this.blockUnavailableRoot(work);this.changed();return;}const d=this.workData(root,hostId),revision=++d.historyRevision;d.historyError='';try{const history=await this.api.listHistory(root,hostId);if(revision===d.historyRevision)d.history=history;}catch(e){if(revision===d.historyRevision)d.historyError=errorText(e);}this.changed();};
   refreshDocument=async(root?:string,hostId?:string)=>{if(root===undefined){root=this.active.work.root;hostId=this.active.work.hostId;}if(!root)return;const work=this.works.find(w=>sameWork(w,{root:root!,hostId}));if(work&&!canAccessWorkRoot(work)){this.blockUnavailableRoot(work);this.changed();return;}const d=this.workData(root,hostId),revision=++d.documentRevision;d.documentLoading=true;d.documentError='';this.changed();try{const content=await this.api.readWork(root,hostId);if(revision===d.documentRevision){d.document=content;d.documentUpdated=new Date().toLocaleTimeString('zh-CN',{hour12:false});}}catch(e){if(revision===d.documentRevision)d.documentError=errorText(e);}finally{if(revision===d.documentRevision)d.documentLoading=false;this.changed();}};
   imports=new Map<string,Promise<void>>();
+  navigateSource=async(source:WorkAssistantSourceTarget)=>{
+    const origin=this.active,work=origin.work,request=++this.sourceNavigation,selection=this.selectionEpoch;
+    if(!this.api.workAssistantSource)throw Error('引用定位服务尚未载入，请重新打开 Lucyna。');
+    const location=await this.api.workAssistantSource({root:work.root,hostId:work.hostId,sessionId:source.sessionId,messageId:source.messageId});
+    if(this.disposed||this.active!==origin||selection!==this.selectionEpoch||request!==this.sourceNavigation)throw Error('已切换会话，本次定位已取消。');
+    if(!sameWork(location,work)||location.sessionId!==source.sessionId||location.messageId!==source.messageId)throw Error('引用所属 Work 或会话已变化，请更新摘要后重试。');
+    const entry=location.entry;
+    let target=location.clientSessionId?this.sessions.get(location.clientSessionId):undefined;
+    if(target&&!sameWork(target.work,work))throw Error('引用所属 Work 已变化，请更新摘要后重试。');
+    if(!target&&entry)target=[...this.sessions.values()].find(session=>sameWork(session.work,work)&&
+      (work.hostId?!!entry.remoteSessionId&&session.remoteSessionId===entry.remoteSessionId:!!entry.sessionFile&&fileKey(session.sessionFile)===fileKey(entry.sessionFile)));
+    if(!target){
+      if(!entry?.sessionFile||(!work.hostId&&!entry.agentDir)||(work.hostId&&(!entry.remoteSessionId||entry.hostId!==work.hostId)))throw Error('原会话当前不可打开，请刷新历史列表后重试。');
+      // Source navigation opens the original writer with its original runtime.
+      // The ordinary history import/copy flow is intentionally not used here.
+      target=this.create(work,undefined,false);target.entry=entry;target.sessionFile=entry.sessionFile;
+      target.agentDir=entry.agentDir||'';target.runtime=entry.runtime||'';target.remoteSessionId=entry.remoteSessionId||'';
+      target.sessionName=entry.title||'引用会话';target.resumeExplicit=!!work.hostId;
+    }
+    if(target.historyDeleted)throw Error('原会话已移入回收站，请恢复后再定位。');
+    this.selectSession(target.id,false);
+    const selected=this.selectionEpoch;
+    if(!target.view.messages.length){
+      if(target.starting)await target.starting;
+      else if(target.connection==='ready'&&!target.loadingHistory)await target.ready(true);
+      else await target.start();
+    }
+    if(this.disposed||this.active!==target||selected!==this.selectionEpoch||request!==this.sourceNavigation)throw Error('已切换会话，本次定位已取消。');
+    if(target.historyPending||target.loadingHistory)throw Error('原会话历史正在载入，请稍后重试；运行中的任务会继续执行。');
+    const index=findSourceMessage(target.view.messages,location);
+    return {sessionId:target.id,messageId:target.view.messages[index].id};
+  };
   resume=async(entry?:HistoryEntry,options:{copy?:boolean}={})=>{
     const origin=this.active,work=origin.work;if(!work.root)return;
     try{
@@ -435,7 +471,7 @@ export class Workbench {
       id:s.id,timelineRevision:s.timelineRevision,draftKey:s.draftKey,runtime:s.runtime,importing:s.importing,connectionPhase:s.connectionPhase,connectionStarted:s.connectionStarted,stopStalled:s.stopStalled,forcingStop:s.forcingStop,forceStop:s.forceStop,pruneEmpty:this.pruneEmpty,sessions:[...this.sessions.values()].map(c=>({id:c.id,root:c.work.root,hostId:c.work.hostId,hostName:c.work.hostName,workName:c.work.name,title:c.title,draftKey:c.draftKey,busy:c.busy,taskCounts:taskCounts(c.tasks.items),connection:c.connection,unread:c.unread,questions:c.questions.length,error:!!c.error,errorText:c.error,summary:c.summary,model:c.model,runtime:c.runtime,run:c.view.run,queued:c.view.queued.length,connectionPhase:c.connectionPhase,outcome:c.view.run?.outcome,stopStalled:c.stopStalled,forcingStop:c.forcingStop,forceStop:c.forceStop,report:c.report,stop:c.stop,close:c.close})),
       tasks:s.tasks.items,taskCapability:s.tasks.background,taskError:s.tasks.error,refreshTasks:s.tasks.refreshNow,expandTask:s.tasks.expand,cancelTask:s.tasks.cancel,taskCounts:taskCounts(s.tasks.items),
       pendingOperation:s.pendingOperation,operationStatus:s.operationStatus,checkOperation:s.checkOperation,reconnect:s.reconnect,detach:s.detach,report:s.report,setError:s.setError,log:s.log,loadWorks:this.loadWorks,selectWork:this.selectWork,selectSession:this.selectSession,newSession:this.newSession,dismiss:this.dismiss,setConversationVisible:this.setConversationVisible,
-      refreshHistory:this.refreshHistory,refreshDocument:this.refreshDocument,start:s.start,send:s.send,resume:this.resume,close:s.close,stop:s.stop,answer:s.answer,changeModel:s.changeModel,removeQueued:s.removeQueued,request:s.request,
+      refreshHistory:this.refreshHistory,refreshDocument:this.refreshDocument,start:s.start,send:s.send,resume:this.resume,navigateSource:this.navigateSource,close:s.close,stop:s.stop,answer:s.answer,changeModel:s.changeModel,removeQueued:s.removeQueued,request:s.request,
       nativeCommands:s.nativeCommands,commandsStatus:s.commandsStatus,commandsError:s.commandsError,loadCommands:s.loadCommands};
   }
 }

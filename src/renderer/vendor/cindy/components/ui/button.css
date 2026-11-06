@@ -36,6 +36,18 @@
   --button-face-border-width: var(--space-px);
 }
 
+.cindy-button:is(:disabled, [aria-disabled='true']) {
+  background: transparent;
+  color: var(--muted-readable);
+  cursor: not-allowed;
+}
+
+/* Use the local surface beneath the button, including tinted sidebars. */
+.cindy-button:is(:disabled, [aria-disabled='true'])::before {
+  --button-face-bg: color-mix(in srgb, currentColor 6%, transparent);
+  --button-face-border: color-mix(in srgb, currentColor 20%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cindy-button-frame,
   .cindy-button-frame::before {

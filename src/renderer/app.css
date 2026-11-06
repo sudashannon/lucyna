@@ -269,12 +269,6 @@ kbd { font-family: var(--font-body); font-size: var(--font-size-caption); color:
 .preview-image { border: 1px solid var(--soft-border); border-radius: 10px; overflow: clip; width: 100%; cursor: zoom-in; }
 .preview-image img { width: 100%; object-fit: contain; }
 .memory-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); margin-bottom: var(--space-6); }
-.memory-search .cindy-button:disabled {
-  --button-face-bg: var(--surface-hover-soft);
-  --button-face-border: var(--border-default);
-  color: var(--muted-readable);
-  opacity: 1;
-}
 .memory-note { display: flex; align-items: center; gap: var(--space-3); padding-block: var(--space-5); border-top: 1px solid var(--soft-border); font-size: var(--font-size-caption); line-height: 1.9; color: var(--muted-readable); }
 .event-list { margin: 0; padding: 0; list-style: none; }
 .event-list li { border-bottom: 1px solid var(--soft-border); padding-block: var(--space-4); }

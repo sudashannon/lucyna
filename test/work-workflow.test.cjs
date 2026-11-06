@@ -246,7 +246,7 @@ test('只用无工具辅助调用生成建议，并把核对出处一并放入�
   assert.ok(drafted.snapshot.stateRevision > snapshot.stateRevision);
 });
 
-test('已收集对话会在Work摘要失败时自动分析，并记录尝试与成功时间', async t => {
+test('已收集对话会在Work摘要失败时自动分析，强制刷新不重复分析无变化来源', async t => {
   let time = 1000;
   const f = await fixture(t, {source: {summaryReady: false, summaryStatus: 'error'}, clock: () => time});
   const identity = {root: '/work/summary-failed'};
@@ -266,10 +266,11 @@ test('已收集对话会在Work摘要失败时自动分析，并记录尝试与�
   time = 2000;
   f.workflow.agent.run = async () => ({text: JSON.stringify({reminders: []}), finishReason: 'stop'});
   const noReminder = await f.workflow.refresh(identity, {force: true});
-  assert.equal(noReminder.reminders.filter(item => item.active).length, 0);
-  assert.equal(noReminder.lastAttemptAt, 2000);
-  assert.equal(noReminder.lastSuccessAt, 2000, 'a valid empty result counts as a successful check');
+  assert.equal(noReminder.reminders.filter(item => item.active).length, 1);
+  assert.equal(noReminder.lastAttemptAt, 1000, 'an explicit force refresh does not reanalyze an unchanged dataset');
+  assert.equal(noReminder.lastSuccessAt, 1000);
   assert.equal(noReminder.lastSuccessSourceRevision, 1);
+  assert.equal(f.calls.length, 1);
 });
 
 test('升级到 evidence-v2 后会对旧版失败分析自动重试一次', async t => {
@@ -386,6 +387,22 @@ test('无关新消息和引用窗口变化不会让改写 key 的旧提醒重新
   assert.equal(refreshed.reminders.filter(item => item.active).length, 1, '同一支持来源不会在一次模型回复中重复生成卡片');
 });
 
+test('无关新消息不会阻止仍有原文支持的提醒动作', async t => {
+  const f = await fixture(t);
+  const identity = {root: '/work/unrelated-action'};
+  const first = await f.workflow.refresh(identity);
+  const reminder = first.reminders.find(item => item.active);
+  f.current.sourceRevision++;
+  f.current.sources = [...f.current.sources, {sessionId: 'session-c', messageId: 'new-note', role: 'user',
+    title: '其他主题', at: 3, text: '记录与构建主题无关的显示配色变动。'}];
+
+  const result = await f.workflow.call('action', {...identity, id: reminder.id, revision: first.stateRevision, action: 'view'});
+  const current = result.snapshot.reminders.find(item => item.id === reminder.id);
+  assert.equal(current.active, true);
+  assert.equal(current.stale, false);
+  assert.equal(current.state, 'viewed');
+});
+
 test('提醒状态落盘失败时不提交内存状态或版本', async t => {
   const f = await fixture(t);
   const identity = {root: '/work/persist-failure'};
@@ -497,4 +514,42 @@ test('forgetSession 清理该 Work 的所有提醒派生文本', async t => {
   const loaded = await f.workflow.call('status', identity);
   assert.equal(loaded.snapshot.reminders.length, 0);
   assert.equal(await fs.readFile(path.join(f.directory, result.snapshot.workId + '.json'), 'utf8').then(text => text.includes('我决定不再沿用旧编译流程')), false);
+});
+
+test('最后一条来源被删除时会本地清理检查点与提醒，不需要模型请求', async t => {
+  const f = await fixture(t);
+  const identity = {root: '/work/last-source-removed'};
+  const first = await f.workflow.refresh(identity);
+  assert.equal(first.reminders.filter(item => item.active).length, 1);
+  const beforeCalls = f.calls.length;
+  f.current.sourceRevision++;
+  f.current.sources = [];
+
+  const removed = await f.workflow.refresh(identity, {force: false});
+  const state = f.workflow.states.get(first.workId);
+  assert.equal(f.calls.length, beforeCalls, 'source deletion needs no model request when no retained evidence can be related');
+  assert.deepEqual(state.checkpointHashes, {});
+  assert.equal(removed.reminders.some(item => item.active), false);
+  assert.equal(removed.currentAnalysis, true);
+});
+
+test('记录中的不相邻原文不能拼成一条引用', async t => {
+  const recordText = '# Work\n当前构建方案保持旧流程。\n\n当前部署方案保持旧流程。';
+  const userText = '我确认当前构建方案改为新流程，部署方案保持旧流程。';
+  const f = await fixture(t, {source: {sources: makeSources(1, userText)}, record: {
+    available: true, path: 'SESSION.md', text: recordText, version: digest(recordText),
+  }});
+  f.workflow.agent.run = async (_config, _instructions, prompt) => {
+    const payload = JSON.parse(prompt);
+    assert.ok(payload.record.excerpts.length >= 2, 'relevant record lines are supplied as separate excerpts');
+    const joined = payload.record.excerpts.slice(0, 2).map(item => item.text).join('\n');
+    return {text: JSON.stringify({reminders: [{kind: 'record_update', key: 'work-plan', title: '同步工作计划',
+      reason: '用户提出了变更，记录存在旧计划。', draftText: '请核对后同步记录。',
+      sources: [{evidenceId: payload.conversations[0].excerpts[0].evidenceId},
+        {type: 'record', path: 'SESSION.md', quote: joined}]}]}), finishReason: 'stop'};
+  };
+  const result = await f.workflow.refresh({root: '/work/nonadjacent-record'});
+  assert.equal(result.status, 'error');
+  assert.equal(result.reminders.some(item => item.active), false);
+  assert.match(result.error, /缺少可核对/);
 });

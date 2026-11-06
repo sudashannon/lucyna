@@ -12,8 +12,7 @@
  * surface-hover 与 surface-chip 同值，直接 alias 会让悬停不可见。
  * 字号字重 text-13 / 500（G4）。secondary 绑 Tier-1，不继承 settings 域 alias（G5）。
  *
- * 禁用态指针遵循既有「禁用统一普通指针」裁决（#3246）：class 仍写
- * disabled:cursor-not-allowed，globals.css 把它收成普通箭头。
+ * 禁用态的底色、文字和指针统一由 button.css 处理。
  *
  * loading 仅表达调用方持有的进行中状态；不执行请求或改变提交语义。
  */
@@ -131,7 +130,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           '[--button-face-border:transparent] [--button-face-bg:var(--perm-allow-btn-bg)] text-[var(--perm-allow-btn-text)] enabled:[&:not([aria-disabled=true])]:hover:[--button-face-bg:color-mix(in_srgb,var(--perm-allow-btn-bg)_92%,var(--perm-allow-btn-text))] enabled:[&:not([aria-disabled=true])]:active:[--button-face-bg:color-mix(in_srgb,var(--perm-allow-btn-bg)_82%,var(--perm-allow-btn-text))]',
         TONE_STYLES[tone],
         compact && 'px-3',
-        'disabled:cursor-not-allowed disabled:opacity-60',
         className,
       )}
       {...props}

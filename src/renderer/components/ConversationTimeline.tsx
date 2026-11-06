@@ -6,7 +6,7 @@ import {messageDomId,railEntries,timelineLabels,type TimelineEntry} from '../con
 import '../conversation-timeline.css';
 import '../conversation-timeline-inline.css';
 
-export function ConversationTimeline({entries,total,selected,onJump,transcript}:{entries:TimelineEntry[];total:number;selected:string;onJump:(entry:TimelineEntry)=>void;transcript:RefObject<HTMLDivElement|null>}){
+export function ConversationTimeline({entries,total,selected,revealRequest=0,onJump,transcript}:{entries:TimelineEntry[];total:number;selected:string;revealRequest?:number;onJump:(entry:TimelineEntry)=>void;transcript:RefObject<HTMLDivElement|null>}){
  const [query,setQuery]=useState(''),[page,setPage]=useState(0),[reading,setReading]=useState('');
  const list=useRef<HTMLOListElement>(null),rail=useRef<HTMLDivElement>(null),[slots,setSlots]=useState(24);
  useEffect(()=>{const element=rail.current;if(!element)return;const observer=new ResizeObserver(()=>setSlots(Math.max(4,Math.min(24,Math.floor(element.clientHeight/24)-3))));observer.observe(element);return()=>observer.disconnect();},[entries.length>0]);
@@ -14,6 +14,7 @@ export function ConversationTimeline({entries,total,selected,onJump,transcript}:
  const pages=Math.max(1,Math.ceil(filtered.length/30)),current=Math.min(page,pages-1);
  useEffect(()=>setPage(0),[query]);
  useEffect(()=>{if(selected)setReading(selected);},[selected]);
+ useEffect(()=>{if(revealRequest)setQuery('');},[revealRequest]);
  // Observe only the mounted history window, never measure thousands of journal
  // entries or run a scroll handler on every streamed token in the whole app.
  useEffect(()=>{

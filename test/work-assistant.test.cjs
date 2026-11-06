@@ -4,6 +4,7 @@ const fs=require('node:fs/promises');
 const os=require('node:os');
 const path=require('node:path');
 const {WorkAssistant}=require('../src/work-assistant.cjs');
+const {withSummaryReconciliation}=require('./work-summary-fixture.test.cjs');
 
 async function fixture(t,{run,localScope='scope-a',debounceMs=10}={}){
   const directory=await fs.mkdtemp(path.join(os.tmpdir(),'lucyna-work-assistant-'));
@@ -11,7 +12,7 @@ async function fixture(t,{run,localScope='scope-a',debounceMs=10}={}){
     directory,
     localScope,
     debounceMs,
-    agent:{run},
+    agent:{run:withSummaryReconciliation(run)},
     config:async()=>({baseURL:'http://fixture.invalid/v1',model:'fixture'})
   });
   t.after(async()=>{
@@ -21,9 +22,9 @@ async function fixture(t,{run,localScope='scope-a',debounceMs=10}={}){
   return {assistant,directory};
 }
 
-function summaryFor(prompt,{quote,messageIndex=0}={}){
+function summaryFor(prompt,{quote,messageIndex}={}){
   const payload=JSON.parse(prompt);
-  const source=payload.messages[messageIndex];
+  const source=payload.messages[messageIndex===undefined?payload.messages.length-1:messageIndex];
   return {
     overview:{text:'根据会话来源整理的工作摘要。',sources:[quote===undefined?{evidenceId:source.excerpts[0].evidenceId}:{
       sessionId:source.sessionId,
@@ -31,7 +32,7 @@ function summaryFor(prompt,{quote,messageIndex=0}={}){
       role:source.role,
       quote
     }]},
-    goals:[],decisions:[],progress:[],openQuestions:[],nextSteps:[]
+    changes:[]
   };
 }
 
@@ -84,6 +85,24 @@ test('authoritative history replaces the prior branch and identical snapshots do
   assert.equal(summarized.sources[0].text,'当前分支确认采用新的协作流程。');
 });
 
+test('manual refresh with no pending messages returns idle without a model request',async t=>{
+  let calls=0;
+  const {assistant}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
+    calls++;return {text:JSON.stringify(summaryFor(prompt)),finishReason:'stop',totalUsage:{inputTokens:3,outputTokens:2}};
+  }});
+  const identity={root:'/work/unchanged-refresh'};
+  const collected=await assistant.ingest({...identity,sessionId:'journal',messages:[{
+    id:'m1',role:'user',timestamp:1,content:'当前工作仍按已经确认的计划继续。'
+  }]},{schedule:false});
+  await assistant.summarize(collected.workId);
+  const before=await assistant.view(identity);
+  const refreshed=await assistant.refresh(identity);
+  assert.equal(calls,1);
+  assert.equal(refreshed.status,'idle');
+  assert.equal(refreshed.summaryRevision,before.summaryRevision);
+  assert.equal(refreshed.analysis.pendingMessages,0);
+});
+
 test('short user corrections without timestamps remain the latest citable context',async t=>{
   const {assistant}=await fixture(t,{run:async(_config,_instructions,prompt)=>({
     text:JSON.stringify(summaryFor(prompt)),finishReason:'stop',totalUsage:{inputTokens:4,outputTokens:2}
@@ -126,10 +145,9 @@ test('scheduled summaries across Works are serialized and stale results cannot r
   const {assistant}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
     calls++;active++;maxActive=Math.max(maxActive,active);
     const payload=JSON.parse(prompt);
-    const quote=payload.messages[0].excerpts[0].text;
     await new Promise(resolve=>setTimeout(resolve,55));
     active--;
-    return {text:JSON.stringify(summaryFor(prompt,{quote})),finishReason:'stop',totalUsage:{inputTokens:3,outputTokens:2}};
+    return {text:JSON.stringify(summaryFor(prompt)),finishReason:'stop',totalUsage:{inputTokens:3,outputTokens:2}};
   }});
   const first={root:'/work/first'};
   const second={root:'/work/second'};
@@ -218,7 +236,8 @@ test('initial persistence failure releases the active summary slot for retry',as
   assert.equal(assistant.active.has(workId),false);
   assert.equal((await assistant.view(identity)).status,'error');
 
-  await assistant.summarize(workId);
+  await assistant.refresh(identity);
+  await until(()=>calls===1);
   assert.equal(calls,1);
   assert.equal((await assistant.view(identity)).summaryRevision,(await assistant.view(identity)).sourceRevision);
 });
@@ -240,18 +259,20 @@ test('Work synthesis uses a background deadline without capping reasoning output
 
 test('summary failures preserve sanitized model diagnostics and never expose arbitrary upstream text',async t=>{
   let failure=Object.assign(Error('辅助模型请求超时或已取消'),{publicMessage:'辅助模型请求超时或已取消'});
-  const {assistant,directory}=await fixture(t,{run:async()=>{throw failure;}});
+  let attempts=0;
+  const {assistant,directory}=await fixture(t,{run:async()=>{attempts++;throw failure;}});
   const identity={root:'/work/diagnostics'};
   const collected=await assistant.ingest({...identity,sessionId:'session',messages:[{id:'m1',role:'user',content:'需要整理当前工作中尚未完成的事项。'}]},{schedule:false});
   await assistant.summarize(collected.workId);
   let result=await assistant.view(identity);
   assert.equal(result.error,'辅助模型请求超时或已取消');assert.ok(result.lastAttemptAt>0);assert.equal(result.updatedAt,0);
   failure=Error('PRIVATE_PROMPT API_KEY_SECRET arbitrary response');
-  await assistant.summarize(collected.workId);result=await assistant.view(identity);
+  await assistant.refresh(identity);await until(()=>attempts===2&&assistant.states.get(collected.workId)?.status==='error');result=await assistant.view(identity);
   assert.equal(result.status,'error');assert.ok(!/PRIVATE_PROMPT|API_KEY_SECRET/.test(result.error));
   const saved=await fs.readFile(path.join(directory,collected.workId+'.json'),'utf8');assert.ok(!saved.includes('API_KEY_SECRET'));
   assistant.config=async()=>{throw Error('已保存的 API Key 无法解密，请重新填写');};
-  await assistant.summarize(collected.workId);assert.equal((await assistant.view(identity)).error,'已保存的 API Key 无法解密，请重新填写');
+  await assistant.refresh(identity);await until(()=>attempts===2&&assistant.states.get(collected.workId)?.error==='已保存的 API Key 无法解密，请重新填写');
+  assert.equal((await assistant.view(identity)).error,'已保存的 API Key 无法解密，请重新填写');
 });
 
 test('truncated model output remains a failed attempt and cannot masquerade as a validated summary',async t=>{
@@ -262,7 +283,7 @@ test('truncated model output remains a failed attempt and cannot masquerade as a
   assert.match(result.error,/截断/);assert.equal(result.summary,null);assert.equal(result.summaryRevision,0);assert.equal(result.usedTokens,4106);
 });
 
-test('opening a legacy failed summary retries the new protocol once, without a polling retry loop',async t=>{
+test('opening an uncheckpointed legacy failure runs one baseline attempt without a polling retry loop',async t=>{
   let calls=0;
   const {assistant,directory}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
     calls++;
@@ -275,16 +296,146 @@ test('opening a legacy failed summary retries the new protocol once, without a p
   delete state.summaryFormatVersion;
   await assistant.persist(resolved,state);
   assistant.states.delete(snapshot.workId);
-  assert.equal((await assistant.view(identity)).status,'collecting');
+  await assistant.view(identity);
   await until(async()=> (await assistant.view(identity)).status==='error');
   for(let i=0;i<4;i++)await assistant.view(identity);
   await new Promise(resolve=>setTimeout(resolve,60));
   assert.equal(calls,1);
   const saved=JSON.parse(await fs.readFile(path.join(directory,snapshot.workId+'.json'),'utf8'));
-  assert.equal(saved.summaryFormatVersion,2);
+  assert.equal(saved.summaryFormatVersion,undefined);
+  assert.equal(saved.analysis.hashes.length,0,'failed baseline must leave per-message checkpoint empty');
   assistant.states.delete(snapshot.workId);
   assert.equal((await assistant.view(identity)).status,'error');
   assert.equal(calls,1,'restart must not silently retry an already attempted v2 failure');
+});
+
+test('changed messages alone are analyzed and an edited citation invalidates its whole claim',async t=>{
+  let calls=0;
+  const {assistant}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
+    calls++;
+    const payload=JSON.parse(prompt);
+    if(calls===1){
+      const first=payload.messages.find(message=>message.messageId==='m1');
+      const second=payload.messages.find(message=>message.messageId==='m2');
+      return {text:JSON.stringify({
+        overview:{text:'当前 Work 已确认 SOC 和录像验证。',sources:[{evidenceId:first.excerpts[0].evidenceId}]},
+        changes:[{section:'decisions',upsert:[{text:'SOC 与录像验证均已通过。',sources:[
+          {evidenceId:first.excerpts[0].evidenceId},{evidenceId:second.excerpts[0].evidenceId}
+        ]}]}]
+      }),finishReason:'stop',totalUsage:{inputTokens:4,outputTokens:2}};
+    }
+    assert.equal(payload.analysis.mode,'incremental');
+    assert.deepEqual(payload.messages.map(message=>message.messageId),['m2','m1'],'the changed message is primary and old evidence is retrieved only for the invalidated claim');
+    assert.equal(payload.invalidatedItems.some(item=>item.section==='decisions'),true);
+    return {text:JSON.stringify({changes:[]}),finishReason:'stop',totalUsage:{inputTokens:2,outputTokens:1}};
+  }});
+  const identity={root:'/work/edit-invalidates-claim'};
+  await assistant.ingest({...identity,sessionId:'journal',authoritative:true,messages:[
+    {id:'m1',role:'user',timestamp:1,content:'SOC启动和基础录像验证通过。'},
+    {id:'m2',role:'assistant',timestamp:2,content:'确认录像、启动检查都通过。'}
+  ]},{schedule:false});
+  const initial=await assistant.view(identity);await assistant.summarize(initial.workId);
+  assert.equal((await assistant.view(identity)).summary.decisions.length,1);
+  await assistant.ingest({...identity,sessionId:'journal',authoritative:true,messages:[
+    {id:'m1',role:'user',timestamp:1,content:'SOC启动和基础录像验证通过。'},
+    {id:'m2',role:'assistant',timestamp:2,content:'修订：录像验证还未执行，等待新固件。'}
+  ]},{schedule:false});
+  assert.equal((await assistant.view(identity)).summary.decisions.length,0,'a multi-source claim is removed when any supporting source changes');
+  await assistant.summarize(initial.workId);
+  const result=await assistant.view(identity);
+  assert.equal(calls,2);
+  assert.equal(result.summary.decisions.length,0);
+  assert.equal(result.analysis.contextMessages,2);
+});
+
+test('deleting a cited message removes dependent items locally without rereading unchanged messages',async t=>{
+  let calls=0;
+  const {assistant}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
+    calls++;
+    const payload=JSON.parse(prompt),first=payload.messages.find(message=>message.messageId==='m1');
+    const second=payload.messages.find(message=>message.messageId==='m2');
+    return {text:JSON.stringify({
+      overview:{text:'当前 Work 已确认一条继续中的验证。',sources:[{evidenceId:first.excerpts[0].evidenceId}]},
+      changes:[{section:'decisions',upsert:[{text:'启动和录像验证均已通过。',sources:[
+        {evidenceId:first.excerpts[0].evidenceId},{evidenceId:second.excerpts[0].evidenceId}
+      ]}]}]
+    }),finishReason:'stop',totalUsage:{inputTokens:4,outputTokens:2}};
+  }});
+  const identity={root:'/work/delete-invalidates-claim'};
+  await assistant.ingest({...identity,sessionId:'journal',authoritative:true,messages:[
+    {id:'m1',role:'user',timestamp:1,content:'启动检查已通过。'},
+    {id:'m2',role:'assistant',timestamp:2,content:'录像验证已通过。'}
+  ]},{schedule:false});
+  const initial=await assistant.view(identity);await assistant.summarize(initial.workId);
+  assert.equal((await assistant.view(identity)).summary.decisions.length,1);
+  await assistant.ingest({...identity,sessionId:'journal',authoritative:true,messages:[
+    {id:'m1',role:'user',timestamp:1,content:'启动检查已通过。'}
+  ]},{schedule:false});
+  await assistant.summarize(initial.workId);
+  const result=await assistant.view(identity);
+  assert.equal(calls,1,'deletion alone must not send unaffected messages back to the model');
+  assert.equal(result.summary.decisions.length,0);
+  assert.equal(result.analysis.contextMessages,0);
+  assert.equal((await assistant.load(identity)).state.analysis.hashes.length,1);
+});
+
+test('failed incremental analysis keeps the old checkpoint and requires an explicit retry',async t=>{
+  let calls=0,failDelta=true;
+  const {assistant}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
+    calls++;
+    const payload=JSON.parse(prompt);
+    if(payload.analysis.mode==='incremental'&&failDelta){
+      failDelta=false;
+      throw Object.assign(Error('upstream private details'),{publicMessage:'辅助模型请求失败，请重试'});
+    }
+    return {text:JSON.stringify(summaryFor(prompt)),finishReason:'stop',totalUsage:{inputTokens:3,outputTokens:2}};
+  }});
+  const identity={root:'/work/failed-delta'};
+  await assistant.ingest({...identity,sessionId:'journal',messages:[{id:'m1',role:'user',timestamp:1,content:'保留原有工作的决定和来源。'}]},{schedule:false});
+  const initial=await assistant.view(identity);await assistant.summarize(initial.workId);
+  const prior=(await assistant.load(identity)).state.analysis.hashes;
+  await assistant.ingest({...identity,sessionId:'journal',messages:[{id:'m2',role:'user',timestamp:2,content:'新增一个仅用于增量分析的问题。'}]},{schedule:false});
+  await assistant.summarize(initial.workId);
+  let result=await assistant.view(identity),state=(await assistant.load(identity)).state;
+  assert.equal(result.status,'error');assert.equal(result.summaryRevision,initial.sourceRevision);
+  assert.deepEqual(state.analysis.hashes,prior,'failed work must not mark the new message as analyzed');
+  for(let index=0;index<4;index++)await assistant.view(identity);
+  assert.equal(calls,2,'status polling must not retry an unchanged failed delta');
+  await assistant.refresh(identity);
+  await until(()=>assistant.states.get(initial.workId)?.summaryRevision===assistant.states.get(initial.workId)?.sourceRevision&&calls===3);
+  result=await assistant.view(identity);state=(await assistant.load(identity)).state;
+  assert.equal(result.status,'idle');assert.equal(state.analysis.hashes.length,2);
+});
+
+test('summary checkpoint commits serialize with concurrent message ingestion',async t=>{
+  let blockCommit=false,signalCommit,releaseCommit;
+  const commitStarted=new Promise(resolve=>{signalCommit=resolve;});
+  const gate=new Promise(resolve=>{releaseCommit=resolve;});
+  const {assistant}=await fixture(t,{run:async(_config,_instructions,prompt)=>{
+    blockCommit=true;
+    return {text:JSON.stringify(summaryFor(prompt)),finishReason:'stop',totalUsage:{inputTokens:3,outputTokens:2}};
+  }});
+  const persist=assistant.persist.bind(assistant);
+  assistant.persist=async(identity,state)=>{
+    if(blockCommit&&state.summaryRevision===state.sourceRevision&&state.analysis.hashes.length===1){
+      blockCommit=false;signalCommit();await gate;
+    }
+    return persist(identity,state);
+  };
+  const identity={root:'/work/summary-ingest-lock'};
+  await assistant.ingest({...identity,sessionId:'journal',messages:[{id:'m1',role:'user',timestamp:1,content:'先记录已知工作的可靠来源。'}]},{schedule:false});
+  const initial=await assistant.view(identity);
+  const summaryRun=assistant.summarize(initial.workId);
+  await commitStarted;
+  let ingested=false;
+  const ingestion=assistant.ingest({...identity,sessionId:'journal',messages:[{id:'m2',role:'user',timestamp:2,content:'这个新消息不能被旧 checkpoint 覆盖。'}]},{schedule:false}).then(value=>{ingested=true;return value;});
+  await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(ingested,false,'ingestion waits for the checkpoint transaction');
+  releaseCommit();await summaryRun;await ingestion;
+  const state=(await assistant.load(identity)).state;
+  assert.equal(state.summaryRevision,initial.sourceRevision);
+  assert.equal(state.sourceRevision,initial.sourceRevision+1);
+  assert.equal(state.analysis.hashes.length,1,'the later message remains pending for its own delta');
 });
 
 test('a direct history ingest that finishes loading after close does not mutate or persist',async t=>{

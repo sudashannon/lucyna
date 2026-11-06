@@ -4,7 +4,9 @@ import {Button} from '@cindy/components/ui/button';
 import {Spinner} from '@cindy/components/ui/spinner';
 import {api} from '../api';
 import {errorText} from '../errors';
+import {CodeReviewPanel} from './CodeReviewPanel';
 import type {Work} from '../types';
+import type {CodeReviewSource} from '../code-review-types';
 import {useWorkspaceGitRead} from '../useWorkspaceGitRead';
 import type {GitFile, WorkDetail} from '../work-detail-data';
 
@@ -77,6 +79,14 @@ export function WorkspaceChanges({work, active, canQuote, onDiscuss, onOpenFiles
   const diff = useWorkspaceGitRead(work, name, 'diff', {file: entry?.file, scope: entry?.scope},
     canRead && !!entry, revision);
   const patch = diff.data?.text || '';
+  const reviewDisabledReason = work.hostId ? '首批代码审查仅支持本机 WSL Work。'
+    : !canRead ? detailError || member?.detailError || '读取本机仓库后即可审查。'
+      : listing.busy ? '正在读取当前仓库状态…'
+        : !entries.length ? '当前仓库没有可审查的改动。' : undefined;
+  const reviewSource: CodeReviewSource | null = !work.hostId && member && root
+    ? {kind: 'workspace', root, member: name, scope: 'all'} : null;
+  const currentReviewDisabledReason = work.hostId ? reviewDisabledReason
+    : !active ? '打开工作区改动后即可开始审查。' : reviewDisabledReason;
   const refresh = () => setRevision(value => value + 1);
   const failure = detailError || member?.detailError || listing.error || diff.error;
   const pending = !failure && (!detail || listing.busy || diff.busy);
@@ -132,5 +142,6 @@ export function WorkspaceChanges({work, active, canQuote, onDiscuss, onOpenFiles
       {patch && canQuote && <Button compact variant="secondary" onClick={discuss}><MessageSquare size={14}/>加入对话草稿</Button>}
       <button type="button" className="text-action" onClick={() => onOpenFiles(name)}>在工作区文件中打开<ArrowUpRight size={13}/></button>
     </div>}
+    <CodeReviewPanel source={reviewSource} disabledReason={currentReviewDisabledReason} canQuote={canQuote} onDiscuss={onDiscuss}/>
   </div>;
 }

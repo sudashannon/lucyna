@@ -1,7 +1,7 @@
 // Package generated logo artwork for Windows. Only resize/format conversion;
 // the full-resolution imagegen masters are retained unchanged in design/.
 const {nativeImage}=require('electron'),fs=require('node:fs'),path=require('node:path');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'src/assets'),design=path.join(root,'design/app-logo-v1');fs.mkdirSync(out,{recursive:true});
+const root=path.resolve(__dirname,'..'),out=path.join(root,'src/assets'),design=path.join(root,'design/app-logo-v2');fs.mkdirSync(out,{recursive:true});
 const master=nativeImage.createFromPath(path.join(design,'logo-master.png')),small=nativeImage.createFromPath(path.join(design,'logo-small-master.png'));
 if(master.isEmpty()||small.isEmpty())throw Error('Logo master is missing');
 const sizes=[16,20,24,32,40,48,64,128,256],frames=sizes.map(size=>(size<=24?small:master).resize({width:size,height:size,quality:'best'}).toPNG());
